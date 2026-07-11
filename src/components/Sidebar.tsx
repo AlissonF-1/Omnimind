@@ -11,6 +11,7 @@ interface Workspace {
   id: string
   name: string
   description: string | null
+  is_archived?: boolean
 }
 
 export default function Sidebar({ workspaces }: { workspaces: Workspace[] }) {
