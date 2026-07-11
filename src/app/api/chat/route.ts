@@ -1,0 +1,192 @@
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { createClient } from '@/utils/supabase/server'
+import { embedQuery } from '@/lib/embeddings'
+
+const MAX_CONTEXT_TOKENS = 6000
+
+function truncateContext(chunks: string[], maxTokens: number): string[] {
+  let totalTokens = 0
+  const truncated: string[] = []
+
+  for (const chunk of chunks) {
+    const estimatedTokens = chunk.split(/\s+/).length * 1.3
+    if (totalTokens + estimatedTokens > maxTokens) break
+    truncated.push(chunk)
+    totalTokens += estimatedTokens
+  }
+
+  return truncated
+}
+
+function streamJsonLines(lines: Array<{ type: string; data: unknown }>) {
+  return new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder()
+
+      for (const line of lines) {
+        controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`))
+      }
+
+      controller.close()
+    },
+  })
+}
+
+export async function POST(req: Request) {
+  try {
+    const { question, workspaceId, persona } = await req.json()
+    const trimmedQuery = typeof question === 'string' ? question.trim() : ''
+
+    if (!trimmedQuery || trimmedQuery.length < 3) {
+      return Response.json({ error: 'Pergunta muito curta.' }, { status: 400 })
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'GEMINI_API_KEY não configurada.' }, { status: 500 })
+    }
+
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return Response.json({ error: 'Usuário não autenticado.' }, { status: 401 })
+    }
+
+    const queryEmbedding = await embedQuery(trimmedQuery)
+
+    const { data: matches, error: rpcError } = await supabase.rpc('match_content_embeddings', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.65,
+      match_count: 10,
+      p_user_id: user.id,
+      p_workspace_id: workspaceId || null,
+    })
+
+    if (rpcError) {
+      return Response.json({ error: 'Falha ao buscar conteúdo relevante.' }, { status: 500 })
+    }
+
+    if (!matches || matches.length === 0) {
+      return new Response(
+        streamJsonLines([
+          { type: 'sources', data: [] },
+          { type: 'model', data: 'Gemini 2.5 Flash' },
+          {
+            type: 'text',
+            data: 'Não encontrei nenhuma informação nas suas anotações sobre este assunto. Tente reformular.',
+          },
+        ]),
+        {
+          headers: {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            Connection: 'keep-alive',
+          },
+        }
+      )
+    }
+
+    const contextChunks = matches.map((m: any, idx: number) => `[Fonte ${idx + 1}]: ${m.chunk_text}`)
+    const truncatedChunks = truncateContext(contextChunks, MAX_CONTEXT_TOKENS)
+
+    const noteIds = [...new Set(matches.map((m: any) => m.note_id).filter(Boolean))]
+    const { data: notes } = await supabase.from('notes').select('id, title').in('id', noteIds)
+    const noteMap = new Map(notes?.map((n: any) => [n.id, n.title]) || [])
+
+    const sources = matches.map((m: any) => ({
+      id: m.id,
+      title: m.note_id ? noteMap.get(m.note_id) : 'Flashcard',
+      type: m.source_type,
+      similarity: m.similarity,
+      workspaceId: workspaceId || null,
+      noteId: m.note_id || null,
+    }))
+
+    let personaPrompt = ''
+    if (persona === 'grill') {
+      personaPrompt = `
+Você é uma banca examinadora de concurso público ou banca de TCC de extrema exigência.
+Sua missão é testar o conhecimento do estudante ao limite.
+- Critique a resposta dele de forma firme se ela for muito superficial, incompleta ou carecer de detalhes técnicos do contexto.
+- Faça perguntas desafiadoras baseadas nas contradições ou pontos fracos do contexto fornecido para ver se ele realmente domina o tema.
+- Seja formal, incisivo e firme. Não faça elogios fáceis.
+`
+    } else if (persona === 'eli5') {
+      personaPrompt = `
+Você é um especialista em simplificação de conceitos complexos (Explain Like I'm 5).
+Sua missão é explicar qualquer conceito do contexto de forma extremamente lúdica, simples e divertida.
+- Use metáforas cotidianas simples, analogias fáceis e historinhas curtas.
+- Evite jargões técnicos difíceis; se precisar usá-los, explique-os logo em seguida em termos muito simples e infantis.
+`
+    } else {
+      // Tutor Socrático (Padrão)
+      personaPrompt = `
+Você é um Tutor Socrático altamente capacitado.
+Sua missão é guiar o estudante a raciocinar por conta própria.
+- Em vez de dar respostas prontas imediatamente, forneça explicações ricas em analogias úteis e instigantes baseadas no contexto.
+- Sempre termine sua resposta fazendo uma pequena pergunta provocativa ou de fixação para testar se ele entendeu o conceito.
+`
+    }
+
+    const systemPrompt = `Você é o assistente virtual do OmniMind.
+${personaPrompt}
+
+  Regras obrigatórias:
+  - Responda diretamente, sem saudação, sem autoapresentação e sem frases de abertura.
+  - Não use títulos de introdução como "Olá", "Claro" ou similares.
+  - Não comece com markdown heading se ele não trouxer valor real para a resposta.
+  - Baseie-se UNICAMENTE no contexto fornecido.
+  - Se a informação não estiver no contexto, diga exatamente: "Com base nas suas anotações, não possuo informações suficientes para responder a esta pergunta."
+  - Ao usar informações do contexto, cite a fonte no formato [Fonte X].
+  - Estruture a resposta em tópicos curtos e objetivos quando fizer sentido.
+  - Responda em português (pt-BR).
+
+  **CONTEXTO EXTRAÍDO DAS ANOTAÇÕES:**
+  ${truncatedChunks.join('\n\n')}`
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' })
+
+    const resultStream = await model.generateContentStream({
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        { role: 'user', parts: [{ text: `Pergunta: ${trimmedQuery}` }] },
+      ],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 800 },
+    })
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'sources', data: sources })}\n`))
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'model', data: 'Gemini 2.5 Flash' })}\n`))
+
+          for await (const chunk of resultStream.stream) {
+            const chunkText = chunk.text()
+            if (chunkText) {
+              controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'text', data: chunkText })}\n`))
+            }
+          }
+
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+      },
+    })
+  } catch (error) {
+    console.error('Erro na API de Chat:', error)
+    return Response.json({ error: 'Erro interno de servidor' }, { status: 500 })
+  }
+}

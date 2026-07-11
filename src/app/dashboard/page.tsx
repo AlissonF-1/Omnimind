@@ -1,0 +1,221 @@
+import { BrainCircuit, FolderPlus, NotebookPen, Sparkles, CalendarDays, AlertCircle, Sun, Moon } from 'lucide-react'
+import Heatmap from '@/components/Heatmap'
+import DashboardStatsCards from '@/components/DashboardStatsCards'
+import DashboardRelearningAlert from '@/components/DashboardRelearningAlert'
+import BlindSpotsPanel from '@/components/BlindSpotsPanel'
+import ReviewAlarm from '@/components/ReviewAlarm'
+import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, CriticalAlert } from '@/actions/stats'
+import { getBlindSpots } from '@/actions/blindspots'
+import { Suspense } from 'react'
+import Link from 'next/link'
+
+export const dynamic = 'force-dynamic'
+
+const steps = [
+  {
+    title: 'Crie um workspace',
+    description: 'Separe matérias, projetos ou concursos em espaços próprios.',
+    icon: FolderPlus,
+  },
+  {
+    title: 'Escreva suas notas',
+    description: 'Use Markdown para registrar conceitos, exemplos e imagens.',
+    icon: NotebookPen,
+  },
+  {
+    title: 'Gere flashcards',
+    description: 'Extraia perguntas úteis a partir do conteúdo que você já escreveu.',
+    icon: Sparkles,
+  },
+  {
+    title: 'Revise no momento certo',
+    description: 'FSRS agenda cada card no pico do esquecimento.',
+    icon: BrainCircuit,
+  },
+]
+
+function DashboardLoading() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-24 rounded-xl bg-surface-muted" />
+      <div className="grid grid-cols-3 gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-20 rounded-xl bg-surface-muted" />
+        ))}
+      </div>
+      <div className="h-40 rounded-xl bg-surface-muted" />
+      <div className="h-48 rounded-xl bg-surface-muted" />
+    </div>
+  )
+}
+
+function DashboardError({ error }: { error: string }) {
+  return (
+    <div className="panel-muted flex flex-col items-center justify-center gap-3 py-12 text-center rounded-2xl">
+      <AlertCircle className="size-10 text-error" />
+      <div>
+        <p className="text-sm font-medium text-text-strong">Erro ao carregar o dashboard</p>
+        <p className="mt-1 text-xs text-text-muted">{error}</p>
+      </div>
+    </div>
+  )
+}
+
+export default async function DashboardPage() {
+  // 1. Blindagem de Fuso Horário (Garante o horário local correto no Servidor)
+  const formatterHour = new Intl.DateTimeFormat('pt-BR', {
+    hour: 'numeric',
+    hour12: false,
+    timeZone: 'America/Fortaleza' // Fuso horário alinhado com Teresina
+  })
+  const hour = parseInt(formatterHour.format(new Date()), 10)
+
+  let greeting, IconComponent, iconColor
+
+  if (hour < 12) {
+    greeting = 'Bom dia'
+    IconComponent = Sun
+    iconColor = 'text-amber-400'
+  } else if (hour < 18) {
+    greeting = 'Boa tarde'
+    IconComponent = Sun
+    iconColor = 'text-orange-400'
+  } else {
+    greeting = 'Boa noite'
+    IconComponent = Moon
+    iconColor = 'text-indigo-300'
+  }
+
+  // 2. Formatação elegante da data atual com fuso horário blindado
+  const today = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Fortaleza',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }).format(new Date())
+
+  return (
+    <div className="page-container px-4 sm:px-6 py-4 sm:py-6">
+      {/* Cabeçalho com data */}
+      <header className="mb-6 border-b border-border/50 pb-4 sm:pb-5">
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-sm font-medium text-primary flex items-center gap-2">
+            Painel
+          </p>
+          <span className="text-text-muted">•</span>
+          <span className="text-xs text-text-muted font-normal capitalize">
+            {today}
+          </span>
+        </div>
+        
+        <h1 className="page-title text-2xl sm:text-3xl flex items-center gap-3">
+          <IconComponent className={`size-7 ${iconColor}`} />
+          <span>
+            {greeting} — sua memória te espera.
+          </span>
+        </h1>
+      </header>
+
+      <Suspense fallback={<DashboardLoading />}>
+        <DashboardContent />
+      </Suspense>
+    </div>
+  )
+}
+
+async function DashboardContent() {
+  try {
+    const [studyLogs, stats, criticalAlerts, blindSpots] = await Promise.all([
+      getDailyStudyLogs(),
+      getUserDashboardStats(),
+      getCriticalReviewAlerts(),
+      getBlindSpots(),
+    ])
+
+    const hasActivity = studyLogs && studyLogs.length > 0
+    
+    // 3. Blindagem contra arrays nulos quebrando o spread operator
+    const topAlert = [...(criticalAlerts || [])].sort(
+      (a: CriticalAlert, b: CriticalAlert) => b.criticalCount - a.criticalCount
+    )[0] ?? null
+    
+    // 4. Blindagem para garantir que o stats existe
+    const isNewUser = (stats?.totalCards || 0) === 0 && !hasActivity
+
+    return (
+      <div className="space-y-6">
+
+        {topAlert && <DashboardRelearningAlert topAlert={topAlert} />}
+
+        <DashboardStatsCards
+          totalCards={stats?.totalCards || 0}
+          overdueCards={stats?.overdueCards || 0}
+          streak={stats?.streak || 0}
+          retentionRate={stats?.retentionRate || 0}
+        />
+
+        {hasActivity ? (
+          <Heatmap logs={studyLogs} />
+        ) : (
+          <div className="panel-muted flex flex-col items-center justify-center gap-3 rounded-xl px-6 py-10 text-center">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+              <CalendarDays className="size-6" />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-text-strong">
+                Sua sequência de estudos aparece aqui
+              </p>
+              <p className="mt-1 text-xs text-text-muted max-w-sm">
+                Complete sua primeira sessão de revisão para começar a construir sua sequência.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <ReviewAlarm />
+
+        {/* Nossa nova feature acionável */}
+        {blindSpots && blindSpots.length > 0 && (
+          <BlindSpotsPanel blindSpots={blindSpots} />
+        )}
+
+        {isNewUser && (
+          <section>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Como começar
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {steps.map((step, index) => {
+                const Icon = step.icon
+                return (
+                  <article
+                    key={step.title}
+                    className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4 hover:border-primary/20 transition-colors"
+                  >
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary mt-0.5">
+                      <Icon className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h2 className="text-sm font-semibold text-text-strong">{step.title}</h2>
+                        <span className="text-[10px] font-medium text-text-muted tabular-nums">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                      </div>
+                      <p className="text-xs leading-5 text-text-medium">{step.description}</p>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+      </div>
+    )
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Falha ao carregar os dados.'
+    return <DashboardError error={message} />
+  }
+}
