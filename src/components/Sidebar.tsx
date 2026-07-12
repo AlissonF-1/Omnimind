@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createWorkspace, updateWorkspace, deleteWorkspace, signOut, archiveWorkspace } from '@/actions/workspaces'
 import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy, User, CalendarDays } from 'lucide-react'
@@ -68,7 +69,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
     if (confirm('Tem certeza que deseja excluir esta workspace? Todas as notas e flashcards serão perdidos.')) {
       await deleteWorkspace(id)
       setOpenDropdownId(null)
-      if (pathname.includes(id)) {
+      if (pathname?.includes(id)) {
         router.push('/dashboard')
       }
     }
@@ -80,6 +81,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
   }
 
   const isActive = (path: string) => {
+    if (!pathname) return false
     if (path === '/dashboard' && pathname === '/dashboard') return true
     if (path !== '/dashboard' && pathname.startsWith(path)) return true
     return false
@@ -136,10 +138,12 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
             onClick={() => setIsOpen(false)}
             className="mb-8 flex h-10 items-center gap-3 rounded-lg px-2"
           >
-            <img
+            <Image
               src="/logo.png"
               alt="OmniMind Logo"
-              className="size-8 shrink-0 rounded-lg object-contain"
+              width={32}
+              height={32}
+              className="shrink-0 rounded-lg object-contain"
             />
             <span className="text-lg font-semibold text-text-strong">OmniMind</span>
           </Link>

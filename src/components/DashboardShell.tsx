@@ -1,6 +1,6 @@
-﻿'use client'
+'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import MobileTopbar from '@/components/MobileTopbar'
 import AchievementToast from '@/components/AchievementToast'
@@ -32,6 +32,26 @@ export default function DashboardShell({
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle sidebar com Ctrl+B ou Cmd+B
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        const target = e.target as HTMLElement
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return
+        }
+        e.preventDefault()
+        setSidebarOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
     <div className="app-shell">
       {/* Topbar mobile — compartilha o estado do drawer com a Sidebar */}
@@ -55,7 +75,9 @@ export default function DashboardShell({
         md:pt-0 remove o padding no desktop onde o topbar nao existe.
       */}
       <main className="flex-1 h-screen overflow-y-auto px-5 py-6 pt-20 md:px-8 md:py-8 md:pt-8">
-        {children}
+        <div className="max-w-7xl mx-auto w-full">
+          {children}
+        </div>
       </main>
 
       <AchievementToast />
@@ -63,3 +85,4 @@ export default function DashboardShell({
     </div>
   )
 }
+

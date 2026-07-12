@@ -36,7 +36,7 @@ function streamJsonLines(lines: Array<{ type: string; data: unknown }>) {
 
 export async function POST(req: Request) {
   try {
-    const { question, workspaceId, persona } = await req.json()
+    const { question, workspaceId, persona, history } = await req.json()
     const trimmedQuery = typeof question === 'string' ? question.trim() : ''
 
     if (!trimmedQuery || trimmedQuery.length < 3) {
@@ -150,14 +150,31 @@ ${personaPrompt}
   ${truncatedChunks.join('\n\n')}`
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      systemInstruction: systemPrompt
+    })
+
+    const contents: any[] = []
+    if (Array.isArray(history)) {
+      for (const turn of history) {
+        // Ignora mensagens com erro ou vazias
+        if (!turn.content) continue
+        contents.push({
+          role: turn.role === 'ai' ? 'model' : 'user',
+          parts: [{ text: turn.content }]
+        })
+      }
+    }
+
+    contents.push({
+      role: 'user',
+      parts: [{ text: `Pergunta: ${trimmedQuery}` }]
+    })
 
     const resultStream = await model.generateContentStream({
-      contents: [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'user', parts: [{ text: `Pergunta: ${trimmedQuery}` }] },
-      ],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 800 },
+      contents,
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
     })
 
     const stream = new ReadableStream({

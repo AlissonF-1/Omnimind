@@ -51,6 +51,7 @@ export default function RootLayout({
         {/* Splash Screen — aparece no primeiro paint e some após o app carregar */}
         <div
           id="omnimind-splash"
+          suppressHydrationWarning
           style={{
             position: 'fixed',
             inset: 0,
@@ -144,6 +145,7 @@ export default function RootLayout({
             }}>
               <div
                 id="omnimind-splash-bar"
+                suppressHydrationWarning
                 style={{
                   height: '100%',
                   width: '0%',

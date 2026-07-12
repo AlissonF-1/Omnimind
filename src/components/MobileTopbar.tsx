@@ -1,8 +1,8 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { BellDot, Bell, Menu } from 'lucide-react'
-import { usePathname } from 'next/navigation'
 
 interface MobileTopbarProps {
   userName: string
@@ -41,10 +41,10 @@ export default function MobileTopbar({
       {/* Hamburguer */}
       <button
         onClick={onMenuOpen}
-        className="flex size-9 items-center justify-center rounded-xl text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all shrink-0"
+        className="flex size-11 items-center justify-center rounded-xl text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all shrink-0"
         aria-label="Abrir menu"
       >
-        <Menu className="size-5" />
+        <Menu className="size-6" />
       </button>
 
       {/* Logo centralizada */}
@@ -52,10 +52,12 @@ export default function MobileTopbar({
         href="/dashboard"
         className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2"
       >
-        <img
+        <Image
           src="/logo.png"
           alt="OmniMind"
-          className="size-7 rounded-lg object-contain"
+          width={28}
+          height={28}
+          className="rounded-lg object-contain"
         />
         <span className="text-base font-black text-text-strong tracking-tight">OmniMind</span>
       </Link>
@@ -66,16 +68,16 @@ export default function MobileTopbar({
         {/* Sino de alertas */}
         <Link
           href="/dashboard/revisoes"
-          className="relative flex size-9 items-center justify-center rounded-xl text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all"
+          className="relative flex size-11 items-center justify-center rounded-xl text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all"
           aria-label={hasAlert ? `${overdueCards} cards para revisar` : 'Revisoes em dia'}
         >
           {hasAlert ? (
-            <BellDot className="size-5 text-red-400" />
+            <BellDot className="size-6 text-red-400" />
           ) : (
-            <Bell className="size-5" />
+            <Bell className="size-6" />
           )}
           {hasAlert && (
-            <span className="absolute top-1 right-1 flex size-2 rounded-full bg-red-500" />
+            <span className="absolute top-2.5 right-2.5 flex size-2 rounded-full bg-red-500" />
           )}
         </Link>
 
@@ -83,7 +85,7 @@ export default function MobileTopbar({
         <Link
           href="/dashboard/perfil"
           aria-label="Meu perfil"
-          className={`relative flex size-9 items-center justify-center rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 transition-all ${getAvatarRingClass(currentLevel)}`}
+          className={`relative flex size-11 items-center justify-center rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 transition-all ${getAvatarRingClass(currentLevel)}`}
         >
           {avatarUrl ? (
             <img
@@ -92,7 +94,7 @@ export default function MobileTopbar({
               className="size-full object-cover rounded-full"
             />
           ) : (
-            <span className="text-[11px] font-black text-text-strong leading-none select-none">
+            <span className="text-[12px] font-black text-text-strong leading-none select-none">
               {getInitials(userName)}
             </span>
           )}
@@ -102,3 +104,4 @@ export default function MobileTopbar({
     </header>
   )
 }
+

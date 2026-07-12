@@ -86,7 +86,7 @@ export async function POST(req: Request) {
         { role: 'user', parts: [{ text: systemPrompt }] },
         { role: 'user', parts: [{ text: `Pergunta: ${trimmedQuery}` }] }
       ],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
     })
 
     // 5. Monta o Stream de saída para o navegador ler

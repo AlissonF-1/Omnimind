@@ -218,8 +218,27 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
+  const [userName, setUserName] = useState('Estudante')
 
   const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const { createClient } = await import('@/utils/supabase/client')
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Estudante'
+          setUserName(name)
+        }
+      } catch (err) {
+        console.error('Erro ao buscar usuário no Chat:', err)
+      }
+    }
+    fetchUser()
+  }, [])
+
   const [isLoading, setIsLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyError, setCopyError] = useState<string | null>(null)
@@ -459,11 +478,21 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
       textareaRef.current.style.height = 'auto'
     }
 
+    const history = activeMessages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }))
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: trimmed, workspaceId, persona: currentPersona }),
+        body: JSON.stringify({
+          question: trimmed,
+          workspaceId,
+          persona: currentPersona,
+          history
+        }),
       })
 
       if (!response.ok) {
@@ -773,7 +802,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
         )}
 
         {/* Mensagens protegidas pelo ErrorBoundary */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto bg-surface-muted/30 p-4 custom-scrollbar">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto bg-surface p-4 pb-16 custom-scrollbar">
           <ChatErrorBoundary fallback={
             <div className="flex h-full flex-col items-center justify-center px-4 text-center">
               <AlertCircle className="size-10 text-error mb-4" />
@@ -792,83 +821,57 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                 Carregando chat...
               </div>
             ) : activeMessages.length === 0 ? (
-              <div className="mx-auto flex h-full max-w-lg flex-col items-center justify-center px-4 text-center animate-in fade-in duration-500">
-                <div className="mb-6 flex size-16 items-center justify-center rounded-2xl border border-border bg-surface shadow-sm">
-                  <Bot className="size-8 text-primary opacity-80" />
-                </div>
-                <h2 className="mb-2 text-xl font-semibold text-text-strong">Como posso ajudar?</h2>
-                <p className="mb-8 text-sm text-text-medium">
-                  Faça perguntas sobre os seus estudos. Vou vasculhar suas notas, flashcards e PDFs para responder.
-                </p>
+              <div className="mx-auto flex flex-col justify-center min-h-[80dvh] w-full max-w-2xl px-4 py-4 md:py-12 animate-in fade-in duration-500">
+                <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
+                  <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                    Olá, {userName}
+                  </span>
+                </h1>
+                <h2 className="text-2xl md:text-4xl font-semibold text-text-muted mt-2 mb-6 md:mb-8">
+                  Como posso ajudar você hoje?
+                </h2>
 
-                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex sm:grid gap-3 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 w-full snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid-cols-2">
                   {SUGGESTIONS.map((sug, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleAsk(sug)}
                       disabled={!isWorkspaceValid}
                       aria-label={`Enviar sugestão: ${sug}`}
-                      className="group flex items-center gap-2 rounded-xl border border-border bg-surface p-3 text-left text-sm transition-all hover:border-primary/30 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                      className="group flex flex-col justify-between rounded-2xl border border-border bg-surface p-4 md:p-5 text-left text-sm transition-all hover:border-primary/50 hover:bg-surface-muted/20 disabled:cursor-not-allowed disabled:opacity-50 min-h-[100px] md:min-h-[120px] w-[240px] sm:w-auto shrink-0 sm:shrink snap-align-start shadow-sm hover:shadow-md"
                     >
-                      <Sparkles className="size-4 shrink-0 text-primary opacity-50 transition-opacity group-hover:opacity-100" />
-                      <span className="line-clamp-2 font-medium text-text-strong">{sug}</span>
+                      <span className="font-semibold text-text-strong leading-relaxed text-xs md:text-sm">{sug}</span>
+                      <div className="w-full flex justify-end mt-2 md:mt-4">
+                        <span className="flex size-7 md:size-8 items-center justify-center rounded-full bg-primary-soft text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Sparkles className="size-3.5 md:size-4" />
+                        </span>
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-8 max-w-3xl mx-auto w-full px-4 py-6">
                 {activeMessages.map((msg) => {
                   const uniqueSources = getUniqueSources(msg.sources)
 
                   return (
-                    <div key={msg.id} className={`group flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                      <div className="shrink-0 mt-1">
+                    <div key={msg.id} className="flex gap-4">
+                      {msg.role === 'ai' && (
+                        <div className="shrink-0 mt-1">
+                          <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-indigo-600 text-white shadow-sm">
+                            <Sparkles className="size-4" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className={`flex-1 space-y-2 min-w-0 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
                         {msg.role === 'user' ? (
-                          <div className="flex size-8 items-center justify-center rounded-full border border-border bg-surface text-text-medium">
-                            <User className="size-4" />
+                          <div className="inline-block text-left rounded-3xl bg-surface-muted/60 text-text-strong px-5 py-3 text-sm shadow-sm border border-border/20 max-w-[85%] sm:max-w-[70%] ml-auto break-words">
+                            <div className="whitespace-pre-wrap">{msg.content}</div>
                           </div>
                         ) : (
-                          <div className="flex size-8 items-center justify-center rounded-full bg-primary text-white shadow-sm">
-                            <Bot className="size-4" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className={`max-w-[85%] space-y-2 sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                        <div className="relative flex items-start gap-2 w-full">
-                          {msg.role === 'ai' && !msg.error && (
-                            <div className="absolute -left-16 top-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => handleCopy(msg.id, msg.content)}
-                                aria-label="Copiar resposta"
-                                className="rounded-md p-1.5 text-text-muted hover:bg-surface hover:text-primary transition-colors"
-                                title="Copiar resposta"
-                              >
-                                {copiedId === msg.id ? <CheckCircle2 className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-                              </button>
-                              <button
-                                onClick={() => speakText(msg.content)}
-                                aria-label="Ouvir resposta"
-                                className="rounded-md p-1.5 text-text-muted hover:bg-surface hover:text-primary transition-colors"
-                                title="Ouvir resposta"
-                              >
-                                <Volume2 className="size-3.5" />
-                              </button>
-                            </div>
-                          )}
-
-                          <div
-                            className={`rounded-2xl p-4 text-sm leading-relaxed w-full ${
-                              msg.role === 'user'
-                                ? 'rounded-tr-sm border border-border bg-surface text-text-strong shadow-sm'
-                                : msg.error
-                                  ? 'rounded-tl-sm border border-error/20 bg-error-soft text-error'
-                                  : 'panel w-full rounded-tl-sm shadow-sm bg-surface'
-                            }`}
-                          >
-                            {msg.error && <AlertCircle className="mr-2 inline-block size-4 align-[-2px]" />}
-
+                          <div className="w-full">
                             {msg.role === 'ai' && msg.model && (
                               <div className="mb-2">
                                 <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase bg-primary-soft/30 border border-primary/10 px-2.5 py-0.5 rounded-full">
@@ -877,20 +880,48 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                               </div>
                             )}
 
-                            {msg.role === 'ai' && !msg.error ? (
-                              <div className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:border prose-pre:border-border prose-pre:bg-surface-muted">
+                            {msg.error ? (
+                              <div className="inline-block rounded-2xl border border-error/20 bg-error-soft text-error p-4 text-sm">
+                                <AlertCircle className="mr-2 inline-block size-4 align-[-2px]" />
+                                {msg.content}
+                              </div>
+                            ) : (
+                              <div className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:border prose-pre:border-border prose-pre:bg-surface-muted prose-p:text-text-strong prose-li:text-text-strong">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                   {msg.content}
                                 </ReactMarkdown>
                               </div>
-                            ) : (
-                              <div className="whitespace-pre-wrap text-text-strong">{msg.content}</div>
+                            )}
+
+                            {/* Actions under the AI message */}
+                            {!msg.error && (
+                              <div className="flex items-center gap-2 mt-3 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(msg.id, msg.content)}
+                                  aria-label="Copiar resposta"
+                                  className="rounded-lg p-1.5 text-text-muted hover:bg-surface-muted hover:text-text-strong transition-all"
+                                  title="Copiar"
+                                >
+                                  {copiedId === msg.id ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => speakText(msg.content)}
+                                  aria-label="Ouvir resposta"
+                                  className="rounded-lg p-1.5 text-text-muted hover:bg-surface-muted hover:text-text-strong transition-all"
+                                  title="Ouvir"
+                                >
+                                  <Volume2 className="size-4" />
+                                </button>
+                              </div>
                             )}
                           </div>
-                        </div>
+                        )}
 
+                        {/* Sources displayed directly under the AI bubble */}
                         {msg.role === 'ai' && !msg.error && uniqueSources.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-2">
+                          <div className="mt-3 flex flex-wrap gap-2">
                             {uniqueSources.map((src, idx) => {
                               const href = buildSourceHref(src)
                               const label = buildSourceLabel(src)
@@ -929,19 +960,21 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
             )}
 
             {isLoading && (
-              <div className="flex gap-4 flex-row mt-4">
+              <div className="flex gap-4 max-w-3xl mx-auto w-full px-4 mt-4">
                 <div className="shrink-0 mt-1">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-primary text-white shadow-sm">
-                    <Loader2 className="size-4 animate-spin" />
+                  <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-indigo-600 text-white shadow-sm">
+                    <Loader2 className="size-4 animate-spin shrink-0" />
                   </div>
                 </div>
-                <div className="panel flex items-center gap-3 rounded-2xl rounded-tl-sm p-4 text-sm text-text-medium shadow-sm animate-pulse bg-surface">
-                  <div className="flex gap-1">
-                    <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '0ms' }} />
-                    <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '150ms' }} />
-                    <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '300ms' }} />
+                <div className="flex-1 space-y-2 min-w-0">
+                  <div className="flex items-center gap-2 rounded-2xl p-4 text-sm text-text-medium animate-pulse bg-surface-muted/30 border border-border/30 shadow-sm">
+                    <div className="flex gap-1 mr-2">
+                      <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '0ms' }} />
+                      <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '150ms' }} />
+                      <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    Vasculhando anotações...
                   </div>
-                  Vasculhando anotações...
                 </div>
               </div>
             )}
@@ -949,23 +982,22 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
         </div>
 
         {/* Input e botões rápidos */}
-        <div className="border-t border-border bg-surface p-4 shrink-0">
-
+        <div className="bg-surface px-4 py-4 md:py-6 shrink-0 w-full max-w-3xl mx-auto z-10">
           <form onSubmit={(e) => { e.preventDefault(); handleAsk(); }}>
-            <div className="relative flex items-end gap-2">
+            <div className="relative flex items-end gap-2 bg-surface-muted/40 border border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 rounded-[24px] pl-3 pr-12 py-2 shadow-sm transition-all focus-within:shadow-md">
               {/* Botão de gravação de voz */}
               <button
                 type="button"
                 onClick={toggleRecording}
                 disabled={isLoading || !isWorkspaceValid}
-                className={`absolute left-2.5 bottom-2 rounded-lg p-1.5 transition-colors z-10 ${
+                className={`flex size-9 items-center justify-center rounded-full transition-all shrink-0 ${
                   isRecording 
                     ? 'bg-error text-white animate-pulse' 
                     : 'text-text-muted hover:bg-surface-muted hover:text-primary'
                 }`}
                 title={isRecording ? 'Parar gravação' : 'Falar pergunta'}
               >
-                {isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}
+                {isRecording ? <Square className="size-4 fill-current" /> : <Mic className="size-5" />}
               </button>
 
               <textarea
@@ -973,16 +1005,16 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isWorkspaceValid ? 'Pergunte ao seu Segundo Cérebro...' : 'Workspace inválido'}
+                placeholder={isWorkspaceValid ? 'Escreva sua pergunta...' : 'Workspace inválido'}
                 disabled={isLoading || !isWorkspaceValid}
-                className="field w-full min-h-[44px] max-h-[120px] resize-none py-3 pl-11 pr-12 overflow-y-auto disabled:bg-surface-muted disabled:opacity-50"
+                className="w-full bg-transparent border-0 outline-none focus:ring-0 resize-none py-1.5 px-2 text-sm text-text-strong min-h-[36px] max-h-[140px] overflow-y-auto placeholder:text-text-muted/70"
                 rows={1}
               />
               
               <button
                 type="submit"
                 disabled={isLoading || query.trim().length < 3 || !isWorkspaceValid}
-                className="absolute right-2 bottom-1.5 rounded-lg bg-primary p-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="absolute right-2.5 bottom-2 flex size-9 items-center justify-center rounded-full bg-primary text-white shadow-sm transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-muted"
               >
                 <Send className="size-4" />
               </button>
@@ -990,7 +1022,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
 
             {activeMessages.some((message) => message.role === 'ai') && (
               <p className="mt-3 text-center text-[10px] font-medium text-text-muted">
-                A IA pode cometer erros. Verifique as fontes citadas para confirmar.
+                A IA pode apresentar informações imprecisas. Verifique as fontes citadas para confirmar.
               </p>
             )}
             {copyError && (
