@@ -175,7 +175,7 @@ export default function RootLayout({
                     if (bar) bar.style.width = '70%';
                   }, 100);
 
-                  // Remove o splash quando a página terminar de carregar
+                  // Oculta o splash quando a página terminar de carregar
                   function removeSplash() {
                     var splash = document.getElementById('omnimind-splash');
                     var bar = document.getElementById('omnimind-splash-bar');
@@ -184,11 +184,7 @@ export default function RootLayout({
                     setTimeout(function() {
                       splash.style.opacity = '0';
                       splash.style.visibility = 'hidden';
-                      setTimeout(function() {
-                        if (splash && splash.parentNode) {
-                          splash.parentNode.removeChild(splash);
-                        }
-                      }, 500);
+                      splash.style.pointerEvents = 'none';
                     }, 300);
                   }
 
