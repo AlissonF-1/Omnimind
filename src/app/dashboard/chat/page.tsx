@@ -136,7 +136,7 @@ function ChatPageContent() {
       {/* ChatPanel protegido */}
       <div className="flex-1 min-h-0 relative">
         <ChatPanel 
-          workspaceId={activeWorkspaceId} 
+          workspaceId={activeWorkspaceId || undefined} 
           workspaces={workspaces} 
           onWorkspaceChange={(newId: string) => router.replace(`/dashboard/chat?workspaceId=${newId}`)}
         />
