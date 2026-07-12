@@ -14,8 +14,25 @@ interface Workspace {
   is_archived?: boolean
 }
 
-export default function Sidebar({ workspaces }: { workspaces: Workspace[] }) {
-  const [isOpen, setIsOpen] = useState(false)
+interface SidebarProps {
+  workspaces: Workspace[]
+  isOpen?: boolean
+  onOpen?: () => void
+  onClose?: () => void
+}
+
+export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClose }: SidebarProps) {
+  const [isOpenInternal, setIsOpenInternal] = useState(false)
+  
+  // Usa controle externo se passado, senao usa estado interno
+  const isOpen = isOpenProp !== undefined ? isOpenProp : isOpenInternal
+  const setIsOpen = (val: boolean) => {
+    if (val) {
+      onOpen ? onOpen() : setIsOpenInternal(true)
+    } else {
+      onClose ? onClose() : setIsOpenInternal(false)
+    }
+  }
   const [isModalOpen, setIsModalOpen] = useState(false)
   
   // Novos estados para a arquitetura de Dropdown e Edição
@@ -75,8 +92,9 @@ export default function Sidebar({ workspaces }: { workspaces: Workspace[] }) {
         <div className="fixed inset-0 z-40" onClick={() => setOpenDropdownId(null)} />
       )}
 
-      {/* Botão de abrir - visível apenas em mobile quando a sidebar está fechada */}
-      {!isOpen && (
+      {/* Botao hamburger NO header mobile — agora controlado pelo MobileTopbar */}
+      {/* Mantemos um fallback caso o MobileTopbar nao esteja presente */}
+      {!isOpenProp && !onOpen && !isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           className="icon-button fixed left-4 top-4 z-50 md:hidden"

@@ -1,29 +1,39 @@
-import Sidebar from '@/components/Sidebar'
-import { getWorkspaces } from '@/actions/workspaces'
+﻿import { getWorkspaces } from '@/actions/workspaces'
+import { getUserStudyStats } from '@/actions/achievements'
+import { getUserDashboardStats } from '@/actions/stats'
+import { createClient } from '@/utils/supabase/server'
 import AchievementToast from '@/components/AchievementToast'
 import LevelUpModal from '@/components/LevelUpModal'
+import DashboardShell from '@/components/DashboardShell'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const workspaces = await getWorkspaces()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const [workspaces, userStats, dashStats] = await Promise.all([
+    getWorkspaces(),
+    getUserStudyStats(),
+    getUserDashboardStats()
+  ])
+
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'
+  const avatarUrl = user?.user_metadata?.avatar_url || null
+  const currentLevel = userStats?.current_level || 1
+  const overdueCards = dashStats?.overdueCards || 0
 
   return (
-    <div className="app-shell">
-      <Sidebar workspaces={workspaces} />
-      {/*
-        h-screen garante que o main sempre ocupe a altura da viewport.
-        Isso permite que filhos com h-full (como o ChatPanel) se ancorem
-        corretamente sem depender de altura fixa.
-        overflow-y-auto mantém o scroll nas páginas normais.
-      */}
-      <main className="flex-1 h-screen overflow-y-auto px-5 py-6 pt-20 md:px-8 md:py-8">
-        {children}
-      </main>
-      <AchievementToast />
-      <LevelUpModal />
-    </div>
+    <DashboardShell
+      workspaces={workspaces}
+      userName={userName}
+      avatarUrl={avatarUrl}
+      currentLevel={currentLevel}
+      overdueCards={overdueCards}
+    >
+      {children}
+    </DashboardShell>
   )
 }

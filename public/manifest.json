@@ -1,21 +1,59 @@
 {
+  "id": "/",
   "name": "OmniMind",
   "short_name": "OmniMind",
-  "description": "Seu segundo cérebro para estudos.",
+  "description": "Seu segundo cérebro para estudos inteligentes.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
   "theme_color": "#111827",
   "background_color": "#111827",
-  "display": "standalone",
-  "orientation": "portrait",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Revisão Ativa",
+      "short_name": "Revisar",
+      "description": "Abrir sessão de revisão de flashcards",
+      "url": "/dashboard/revisoes",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Assistente IA",
+      "short_name": "Assistente",
+      "description": "Conversar com o Tutor IA",
+      "url": "/dashboard/chat",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
 }
