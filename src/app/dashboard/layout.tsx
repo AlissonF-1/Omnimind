@@ -1,9 +1,7 @@
-﻿import { getWorkspaces } from '@/actions/workspaces'
+import { getWorkspaces } from '@/actions/workspaces'
 import { getUserStudyStats } from '@/actions/achievements'
 import { getUserDashboardStats } from '@/actions/stats'
 import { createClient } from '@/utils/supabase/server'
-import AchievementToast from '@/components/AchievementToast'
-import LevelUpModal from '@/components/LevelUpModal'
 import DashboardShell from '@/components/DashboardShell'
 
 export default async function DashboardLayout({
@@ -11,14 +9,32 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Fetches com fallback defensivo — nenhum erro aqui pode derrubar o layout inteiro
+  let workspaces: any[] = []
+  let userStats: any = null
+  let dashStats: any = null
+  let user: any = null
 
-  const [workspaces, userStats, dashStats] = await Promise.all([
-    getWorkspaces(),
-    getUserStudyStats(),
-    getUserDashboardStats()
-  ])
+  try {
+    const supabase = await createClient()
+    const { data: { user: u } } = await supabase.auth.getUser()
+    user = u
+  } catch (e) {
+    console.error('[layout] Erro ao buscar usuário:', e)
+  }
+
+  try {
+    const results = await Promise.allSettled([
+      getWorkspaces(),
+      getUserStudyStats(),
+      getUserDashboardStats(),
+    ])
+    if (results[0].status === 'fulfilled') workspaces = results[0].value ?? []
+    if (results[1].status === 'fulfilled') userStats = results[1].value
+    if (results[2].status === 'fulfilled') dashStats = results[2].value
+  } catch (e) {
+    console.error('[layout] Erro nos fetches paralelos:', e)
+  }
 
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const avatarUrl = user?.user_metadata?.avatar_url || null

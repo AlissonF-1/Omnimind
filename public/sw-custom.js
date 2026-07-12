@@ -1,4 +1,25 @@
-// Service Worker Customizado para gerenciar Notificações Push do OmniMind PWA
+// Service Worker Customizado — OmniMind PWA
+
+// Ao ativar um novo SW, limpa todos os caches antigos
+// Isso resolve o "page couldn't load" quando o sw.js é regenerado no build
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          // Remove caches que não pertencem ao SW atual
+          console.log('[SW] Limpando cache antigo:', cacheName);
+          return caches.delete(cacheName);
+        })
+      );
+    }).then(() => {
+      // Assume controle de todos os clientes imediatamente
+      return self.clients.claim();
+    })
+  );
+});
+
+// Gerencia Notificações Push do OmniMind
 self.addEventListener('push', (event) => {
   try {
     let payload = {
@@ -13,8 +34,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
       body: payload.body,
-      icon: '/logo.png', // Logo oficial
-      badge: '/logo.png', // Badge de status do celular
+      icon: '/logo.png',
+      badge: '/logo.png',
       vibrate: [100, 50, 100],
       data: {
         url: payload.url || '/dashboard/revisoes'
@@ -32,12 +53,10 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
-  // Abre o app e direciona para a tela de revisões
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       const targetUrl = event.notification.data.url;
       
-      // Se houver uma aba aberta no site, foca nela
       for (const client of clientList) {
         if (client.url.includes('/dashboard') && 'focus' in client) {
           client.postMessage({ type: 'NAVIGATE', url: targetUrl });
@@ -45,7 +64,6 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       
-      // Caso contrário, abre uma nova aba
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
