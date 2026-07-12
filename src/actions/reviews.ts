@@ -38,7 +38,31 @@ export async function getDueFlashcards(filters?: { workspaceId?: string; noteId?
 
     const sprintWsIds = sprintWs?.map(ws => ws.id) || []
 
-    // 2. Query principal (com joins para garantir segurança)
+    // 2. Busca workspaces ativos (não arquivados) de forma robusta
+    let activeWsIds: string[] = []
+    const { data: activeWs, error: activeWsError } = await supabase
+      .from('workspaces')
+      .select('id')
+      .eq('is_archived', false)
+
+    if (activeWsError) {
+      const { data: fallbackWs } = await supabase.from('workspaces').select('id')
+      activeWsIds = fallbackWs?.map(w => w.id) || []
+    } else {
+      activeWsIds = activeWs?.map(w => w.id) || []
+    }
+
+    if (activeWsIds.length === 0) return []
+
+    // 3. Monta o filtro OR de forma otimizada para o Postgres
+    const nowIso = new Date().toISOString()
+    let orFilter = `due.is.null,state.eq.0,state.is.null,due.lte.${nowIso}`
+
+    if (sprintWsIds.length > 0) {
+      orFilter += `,notes.workspace_id.in.(${sprintWsIds.join(',')})`
+    }
+
+    // 4. Query principal otimizada (filtros aplicados diretamente no banco de dados)
     let query = supabase
       .from('flashcards')
       .select(`
@@ -48,10 +72,11 @@ export async function getDueFlashcards(filters?: { workspaceId?: string; noteId?
         )
       `)
       .eq('notes.user_id', user.id)
+      .in('notes.workspace_id', activeWsIds)
+      .or(orFilter)
 
-    // Filtro Flexível: Por Workspace ou Por Nota
     if (filters?.noteId) {
-      query = query.eq('note_id', filters?.noteId)
+      query = query.eq('note_id', filters.noteId)
     } else if (filters?.workspaceId) {
       query = query.eq('notes.workspace_id', filters.workspaceId)
     }
@@ -60,28 +85,8 @@ export async function getDueFlashcards(filters?: { workspaceId?: string; noteId?
 
     if (error || !data) return []
 
-    // 2.1. Busca workspaces ativos de forma robusta e resiliente
-    let activeWsIds: string[] = []
-    const { data: activeWs, error: activeWsError } = await supabase
-      .from('workspaces')
-      .select('id')
-      .eq('is_archived', false)
-
-    if (activeWsError) {
-      // Se a coluna is_archived ainda não existir no DB, aceita todas as workspaces
-      const { data: fallbackWs } = await supabase.from('workspaces').select('id')
-      activeWsIds = fallbackWs?.map(w => w.id) || []
-    } else {
-      activeWsIds = activeWs?.map(w => w.id) || []
-    }
-
-    // 3. Filtro híbrido à prova de balas
     const now = new Date().getTime()
     const dueCards = data.filter((card: any) => {
-      // Se o workspace ao qual o card pertence estiver arquivado, ignora!
-      if (!activeWsIds.includes(card.notes.workspace_id)) return false
-
-      // Se não tem due date (card novo) ou o state é 0 (New), ele DEVE aparecer
       if (!card.due || card.state === 0 || card.state === null) return true
       
       const isDue = new Date(card.due).getTime() <= now

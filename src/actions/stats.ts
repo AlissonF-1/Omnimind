@@ -57,16 +57,7 @@ export async function getUserDashboardStats() {
   
   if (!user) throw new Error('Não autenticado')
 
-  const { data: allCards } = await supabase
-    .from('flashcards')
-    .select('id, due, reps, lapses, notes!inner(workspace_id)')
-    .eq('user_id', user.id)
-
-  if (!allCards) {
-    return { totalCards: 0, overdueCards: 0, streak: 0, retentionRate: 0 }
-  }
-
-  // 1.1. Busca workspaces ativos de forma robusta e resiliente
+  // 1. Busca workspaces ativos (não arquivados)
   let activeWsIds: string[] = []
   const { data: activeWs, error: activeWsError } = await supabase
     .from('workspaces')
@@ -74,29 +65,49 @@ export async function getUserDashboardStats() {
     .eq('is_archived', false)
 
   if (activeWsError) {
-    // Se a coluna is_archived ainda não existir no DB, aceita todas as workspaces
     const { data: fallbackWs } = await supabase.from('workspaces').select('id')
     activeWsIds = fallbackWs?.map(w => w.id) || []
   } else {
     activeWsIds = activeWs?.map(w => w.id) || []
   }
 
-  // Filtra cards de workspaces arquivadas em memória
-  const activeCards = allCards.filter((card: any) => {
-    const noteData = card.notes as any
-    const cardWorkspaceId = Array.isArray(noteData) ? noteData[0]?.workspace_id : noteData?.workspace_id
-    return activeWsIds.includes(cardWorkspaceId)
-  })
+  if (activeWsIds.length === 0) {
+    return { totalCards: 0, overdueCards: 0, streak: 0, retentionRate: 0 }
+  }
 
-  const now = new Date().getTime()
-  const overdueCards = activeCards.filter((card) => new Date(card.due).getTime() <= now).length
+  const nowIso = new Date().toISOString()
 
-  const { data: logs } = await supabase
-    .from('daily_study_logs')
-    .select('study_date')
-    .eq('user_id', user.id)
-    .order('study_date', { ascending: false })
-    .limit(365)
+  // Executa as consultas de agregação de contagem em paralelo no banco de dados
+  const [totalRes, overdueRes, neverLapsedRes, logsRes] = await Promise.all([
+    supabase
+      .from('flashcards')
+      .select('id, notes!inner(workspace_id)', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('notes.workspace_id', activeWsIds),
+    supabase
+      .from('flashcards')
+      .select('id, notes!inner(workspace_id)', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('notes.workspace_id', activeWsIds)
+      .lte('due', nowIso),
+    supabase
+      .from('flashcards')
+      .select('id, notes!inner(workspace_id)', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('notes.workspace_id', activeWsIds)
+      .eq('lapses', 0),
+    supabase
+      .from('daily_study_logs')
+      .select('study_date')
+      .eq('user_id', user.id)
+      .order('study_date', { ascending: false })
+      .limit(365)
+  ])
+
+  const totalCards = totalRes.count || 0
+  const overdueCards = overdueRes.count || 0
+  const neverLapsed = neverLapsedRes.count || 0
+  const logs = logsRes.data
 
   let streak = 0
   if (logs && logs.length > 0) {
@@ -117,11 +128,10 @@ export async function getUserDashboardStats() {
     }
   }
 
-  const neverLapsed = activeCards.filter((card) => card.lapses === 0).length
-  const retentionRate = activeCards.length > 0 ? Math.round((neverLapsed / activeCards.length) * 100) : 0
+  const retentionRate = totalCards > 0 ? Math.round((neverLapsed / totalCards) * 100) : 0
 
   return {
-    totalCards: activeCards.length,
+    totalCards,
     overdueCards,
     streak,
     retentionRate,
