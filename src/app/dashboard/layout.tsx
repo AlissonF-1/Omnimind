@@ -1,5 +1,6 @@
 import Sidebar from '@/components/Sidebar'
 import { getWorkspaces } from '@/actions/workspaces'
+import AchievementToast from '@/components/AchievementToast'
 
 export default async function DashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default async function DashboardLayout({
       <main className="flex-1 h-screen overflow-y-auto px-5 py-6 pt-20 md:px-8 md:py-8">
         {children}
       </main>
+      <AchievementToast />
     </div>
   )
 }

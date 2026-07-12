@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createWorkspace, updateWorkspace, deleteWorkspace, signOut, archiveWorkspace } from '@/actions/workspaces'
-import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive } from 'lucide-react'
+import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 
 interface Workspace {
@@ -143,6 +143,9 @@ export default function Sidebar({ workspaces }: { workspaces: Workspace[] }) {
               </Link>
               <Link href="/dashboard/grafo" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/grafo') ? 'nav-item-active' : ''}`}>
                 <Network className="size-4" /> Rede de Conexões
+              </Link>
+              <Link href="/dashboard/conquistas" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/conquistas') ? 'nav-item-active' : ''}`}>
+                <Trophy className="size-4" /> Minhas Conquistas
               </Link>
             </nav>
           </div>

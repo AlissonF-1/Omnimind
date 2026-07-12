@@ -444,7 +444,16 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const handleReview = async (grade: Rating) => {
     setIsSubmitting(true)
     try {
-      await submitReview(activeCard.id, activeCard, grade)
+      const res = await submitReview(activeCard.id, activeCard, grade)
+
+      // Dispara eventos para as conquistas recém desbloqueadas nesta revisão
+      if (res && 'newlyUnlocked' in res && Array.isArray(res.newlyUnlocked)) {
+        res.newlyUnlocked.forEach((achievement: any) => {
+          window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+            detail: achievement
+          }))
+        })
+      }
 
       if (grade === Rating.Good || grade === Rating.Easy) {
         setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }))

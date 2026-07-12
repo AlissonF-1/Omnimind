@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { fsrs, Rating, Card as FSRSCard } from 'ts-fsrs'
 import { revalidatePath } from 'next/cache'
+import { checkAndUnlockAchievements } from '@/actions/achievements'
 
 // Tipagem mais forte para o estado do card (vindo do banco)
 interface FsrsCardState {
@@ -201,6 +202,26 @@ export async function submitReview(
       // Não falha a operação principal
     }
 
+    // 4.1. Verifica se completou a meta diária (10 revisões) no stats
+    try {
+      const todayStr = new Date().toISOString().split('T')[0]
+      const { data: logToday } = await supabase
+        .from('daily_study_logs')
+        .select('review_count')
+        .eq('user_id', user.id)
+        .eq('study_date', todayStr)
+        .maybeSingle()
+
+      if (logToday && logToday.review_count >= 10) {
+        await supabase
+          .from('user_study_stats')
+          .update({ daily_goal_completed: true })
+          .eq('user_id', user.id)
+      }
+    } catch (goalErr) {
+      console.error('[submitReview] Erro ao verificar meta diária:', goalErr)
+    }
+
     // 5. Revalida paths
     revalidatePath('/dashboard/revisoes')
     revalidatePath('/dashboard')
@@ -214,7 +235,10 @@ export async function submitReview(
       revalidatePath(`/dashboard/${wsData.workspace_id}`)
     }
 
-    return { success: true }
+    // 6. Roda a checagem de conquistas após as atualizações de estudos
+    const newlyUnlocked = await checkAndUnlockAchievements()
+
+    return { success: true, newlyUnlocked }
   } catch (error) {
     console.error('[submitReview] Erro inesperado:', error)
     return { error: error instanceof Error ? error.message : 'Erro interno no processamento' }

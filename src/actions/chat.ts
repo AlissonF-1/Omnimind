@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { embedQuery } from '@/lib/embeddings'
 import { randomUUID } from 'crypto'
+import { incrementTutorQueriesCount } from '@/actions/achievements'
 
 interface RAGResponse {
   answer: string
@@ -201,6 +202,9 @@ ${truncatedChunks.join('\n\n')}
     cache.set(cacheKey, { response: result, timestamp: Date.now() })
 
     console.log(`[RAG] Query processada em ${Date.now() - startTime}ms, fontes: ${sources.length}`)
+
+    // Incrementa contagem de consultas ao tutor (não bloqueante)
+    incrementTutorQueriesCount().catch(err => console.error('Erro ao incrementar estatísticas do tutor:', err))
 
     return result
   } catch (error: any) {

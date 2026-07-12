@@ -4,8 +4,12 @@ import DashboardStatsCards from '@/components/DashboardStatsCards'
 import DashboardRelearningAlert from '@/components/DashboardRelearningAlert'
 import BlindSpotsPanel from '@/components/BlindSpotsPanel'
 import ReviewAlarm from '@/components/ReviewAlarm'
+import DailyProgressCircle from '@/components/DailyProgressCircle'
+import AchievementNotifier from '@/components/AchievementNotifier'
 import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, CriticalAlert } from '@/actions/stats'
 import { getBlindSpots } from '@/actions/blindspots'
+import { getUserStudyStats, checkAndUnlockAchievements } from '@/actions/achievements'
+import { createClient } from '@/utils/supabase/server'
 import { Suspense } from 'react'
 import Link from 'next/link'
 
@@ -126,11 +130,26 @@ export default async function DashboardPage() {
 
 async function DashboardContent() {
   try {
-    const [studyLogs, stats, criticalAlerts, blindSpots] = await Promise.all([
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Não autenticado')
+
+    // 1. Busca estatísticas concorrentemente em paralelo
+    const [
+      studyLogs,
+      stats,
+      criticalAlerts,
+      blindSpots,
+      userStats,
+      newlyUnlocked
+    ] = await Promise.all([
       getDailyStudyLogs(),
       getUserDashboardStats(),
       getCriticalReviewAlerts(),
       getBlindSpots(),
+      getUserStudyStats(),
+      checkAndUnlockAchievements()
     ])
 
     const hasActivity = studyLogs && studyLogs.length > 0
@@ -143,17 +162,43 @@ async function DashboardContent() {
     // 4. Blindagem para garantir que o stats existe
     const isNewUser = (stats?.totalCards || 0) === 0 && !hasActivity
 
+    // Contagem de notas para exibir no progresso das conquistas
+    const { count: notesCount } = await supabase
+      .from('notes')
+      .select('id, workspaces!inner(user_id)', { count: 'exact', head: true })
+      .eq('workspaces.user_id', user.id)
+
+    // Hoje e totais de revisões
+    const todayStr = new Date().toISOString().split('T')[0]
+    const todayLog = studyLogs?.find((log: any) => log.study_date === todayStr)
+    const todayReviewCount = todayLog?.review_count || 0
+    const totalReviews = studyLogs?.reduce((acc: number, cur: any) => acc + (cur.review_count || 0), 0) || 0
+
     return (
       <div className="space-y-6">
 
+        {/* Notificador de conquistas recém-adquiridas */}
+        <AchievementNotifier newlyUnlocked={newlyUnlocked} />
+
         {topAlert && <DashboardRelearningAlert topAlert={topAlert} />}
 
-        <DashboardStatsCards
-          totalCards={stats?.totalCards || 0}
-          overdueCards={stats?.overdueCards || 0}
-          streak={stats?.streak || 0}
-          retentionRate={stats?.retentionRate || 0}
-        />
+        {/* Grid de Estatísticas e Progresso Diário */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <DashboardStatsCards
+              totalCards={stats?.totalCards || 0}
+              overdueCards={stats?.overdueCards || 0}
+              streak={stats?.streak || 0}
+              retentionRate={stats?.retentionRate || 0}
+            />
+          </div>
+          <DailyProgressCircle
+            reviewCount={todayReviewCount}
+            streak={stats?.streak || 0}
+            multiplier={userStats?.streak_multiplier || 1.0}
+            isGoalCompleted={userStats?.daily_goal_completed || false}
+          />
+        </div>
 
         {hasActivity ? (
           <Heatmap logs={studyLogs} />
@@ -174,6 +219,8 @@ async function DashboardContent() {
         )}
 
         <ReviewAlarm />
+
+
 
         {/* Nossa nova feature acionável */}
         {blindSpots && blindSpots.length > 0 && (
