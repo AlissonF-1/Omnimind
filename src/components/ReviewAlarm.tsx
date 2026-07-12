@@ -80,16 +80,13 @@ export default function ReviewAlarm() {
           throw new Error('Permissão de notificações recusada pelo usuário.')
         }
 
-        // 2. Registra o Service Worker customizado dependendo do ambiente
-        let registration
-        if (process.env.NODE_ENV === 'development') {
+        // 2. Registra o Service Worker de forma robusta e imediata
+        let registration = await navigator.serviceWorker.getRegistration()
+        if (!registration) {
           registration = await navigator.serviceWorker.register('/sw-custom.js', {
             scope: '/'
           })
           await navigator.serviceWorker.ready
-        } else {
-          // Em produção, next-pwa já registra o sw.js (que importa o sw-custom.js)
-          registration = await navigator.serviceWorker.ready
         }
 
         // 3. Inscreve no Push Manager
