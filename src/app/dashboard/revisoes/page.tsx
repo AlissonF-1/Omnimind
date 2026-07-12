@@ -51,9 +51,11 @@ export default async function ReviewsPage({
     )
   }
 
-  // Passando o objeto de filtro atualizado para buscar os cards pendentes
-  const cards = await getDueFlashcards({ workspaceId, noteId })
-  const workspace = workspaceId ? await getWorkspaceById(workspaceId).catch(() => null) : null
+  // Busca os cards pendentes e dados do workspace em paralelo
+  const [cards, workspace] = await Promise.all([
+    getDueFlashcards({ workspaceId, noteId }),
+    workspaceId ? getWorkspaceById(workspaceId).catch(() => null) : Promise.resolve(null)
+  ])
   const cardCount = cards.length
 
   return (

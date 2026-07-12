@@ -107,7 +107,7 @@ function ChatPageContent() {
     return <ChatErrorFallback error={error} />
   }
 
-  if (isLoading || !activeWorkspaceId) {
+  if (isLoading) {
     return (
       <div className="flex h-full flex-col items-center justify-center py-20">
         <Loader2 className="size-8 animate-spin text-primary" />

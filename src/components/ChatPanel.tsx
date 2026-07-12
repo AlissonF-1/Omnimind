@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText } from 'lucide-react'
+import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -39,10 +39,10 @@ interface ChatStorageState {
 }
 
 const SUGGESTIONS = [
-  "Resuma minhas anotações mais recentes",
-  "O que é repetição espaçada?",
-  "Me teste sobre os flashcards de hoje",
-  "Explique um conceito das minhas notas"
+  "🎲 Me faça uma pergunta desafiadora sobre minhas anotações",
+  "⚡ Analise minhas notas e ache contradições conceituais",
+  "📝 Resuma minhas anotações de estudo mais recentes",
+  "🧠 Explique um conceito das minhas notas de forma simples"
 ]
 
 const MAX_STORED_MESSAGES = 40
@@ -212,8 +212,8 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceChange }: ChatPanelProps) {
-  const isWorkspaceValid = Boolean(workspaceId)
-  const storageKey = `omnimind_chat_${workspaceId || 'invalid'}`
+  const isWorkspaceValid = true // Sempre válido (vazio significa busca global em todo o app)
+  const storageKey = workspaceId ? `omnimind_chat_${workspaceId}` : 'omnimind_chat_global'
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -587,7 +587,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
   }
 
   return (
-    <div className="flex h-full w-full gap-4 relative overflow-hidden flex-col lg:flex-row">
+    <div className="flex h-[calc(100dvh-115px)] md:h-[calc(100vh-125px)] w-[calc(100%+2.5rem)] md:w-[calc(100%+4rem)] -mx-5 -mb-6 md:-mx-8 md:-mb-8 relative overflow-hidden flex-col lg:flex-row gap-0 bg-surface">
       {/* Overlay para fechar a sidebar no mobile */}
       {isSidebarOpen && (
         <div 
@@ -598,7 +598,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
 
       {/* Sidebar de Histórico (Slide-in mobile + Fixo desktop) */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 flex w-72 max-w-[80vw] flex-col border-r border-border bg-surface transition-transform duration-300 ease-in-out lg:static lg:z-0 lg:w-80 lg:min-w-80 lg:translate-x-0
+        fixed inset-y-0 left-0 z-40 flex w-72 max-w-[80vw] flex-col border-r border-border bg-slate-50 dark:bg-slate-950/20 transition-transform duration-300 ease-in-out lg:static lg:z-0 lg:w-72 lg:min-w-72 lg:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="border-b border-border p-4">
@@ -703,26 +703,36 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
             </div>
           </div>
 
-          {/* Seletor Dropdown de Workspace */}
+          {/* Seletor de Workspace em formato de Badge compacta e discreta */}
           {workspaces.length > 0 && onWorkspaceChange && (
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="hidden sm:inline text-[10px] text-text-muted font-bold uppercase tracking-wider">Workspace:</span>
+            <div className="flex items-center gap-1.5 shrink-0">
               <select
                 value={workspaceId || ''}
                 onChange={(e) => onWorkspaceChange(e.target.value)}
-                className="h-8 rounded-lg border border-border bg-surface-muted/50 px-2.5 text-xs font-semibold text-text-strong outline-none focus:border-primary/50 cursor-pointer max-w-[150px] truncate"
+                className={`h-7 rounded-full border px-2.5 text-[10px] font-bold outline-none cursor-pointer transition-all shadow-sm max-w-[130px] sm:max-w-[200px] truncate ${
+                  workspaceId
+                    ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
+                    : 'border-dashed border-border bg-surface text-text-muted hover:text-text-strong hover:border-primary/50'
+                }`}
               >
+                <option value="" className="bg-surface text-text-strong text-xs">🔍 Todo o App (Sem filtro)</option>
                 {workspaces.map((ws) => (
-                  <option key={ws.id} value={ws.id}>
-                    {ws.name}
+                  <option key={ws.id} value={ws.id} className="bg-surface text-text-strong text-xs">
+                    🧠 {ws.name}
                   </option>
                 ))}
               </select>
             </div>
           )}
 
-          <button type="button" onClick={handleStartNewConversation} className="btn-secondary h-9 shrink-0 px-3 text-xs">
-            Nova conversa
+          <button 
+            type="button" 
+            onClick={handleStartNewConversation} 
+            className="btn-secondary h-9 shrink-0 px-2.5 sm:px-4 text-xs flex items-center gap-1.5 border border-border"
+            title="Nova conversa"
+          >
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">Nova conversa</span>
           </button>
         </div>
 
@@ -932,27 +942,6 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
 
         {/* Input e botões rápidos */}
         <div className="border-t border-border bg-surface p-4 shrink-0">
-          {/* Quick Commands */}
-          {isWorkspaceValid && !isLoading && (
-            <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-none py-1">
-              <button
-                type="button"
-                onClick={() => handleAsk("Me faça uma pergunta desafiadora sobre minhas anotações para testar meu conhecimento.")}
-                className="px-3 py-1.5 rounded-lg border border-border bg-surface text-text-medium hover:bg-surface-hover hover:border-primary/30 transition-all text-[11px] font-semibold flex items-center gap-1.5 shrink-0"
-              >
-                <span>🎲</span>
-                <span>Me faça uma pergunta</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAsk("Analise minhas anotações deste workspace e aponte se existe alguma contradição conceitual ou inconsistência.")}
-                className="px-3 py-1.5 rounded-lg border border-border bg-surface text-text-medium hover:bg-surface-hover hover:border-primary/30 transition-all text-[11px] font-semibold flex items-center gap-1.5 shrink-0"
-              >
-                <span>⚡</span>
-                <span>Ache contradições</span>
-              </button>
-            </div>
-          )}
 
           <form onSubmit={(e) => { e.preventDefault(); handleAsk(); }}>
             <div className="relative flex items-end gap-2">

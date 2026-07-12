@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/utils/supabase/server'
 import { embedQuery } from '@/lib/embeddings'
+import { incrementTutorQueriesCount } from '@/actions/achievements'
 
 const MAX_CONTEXT_TOKENS = 6000
 
@@ -52,6 +53,9 @@ export async function POST(req: Request) {
     if (authError || !user) {
       return Response.json({ error: 'Usuário não autenticado.' }, { status: 401 })
     }
+
+    // Incrementa contagem de consultas ao tutor em background
+    incrementTutorQueriesCount().catch(err => console.error('Erro ao incrementar contagem do tutor:', err))
 
     const queryEmbedding = await embedQuery(trimmedQuery)
 
