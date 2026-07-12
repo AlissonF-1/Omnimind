@@ -16,11 +16,24 @@ export const metadata: Metadata = {
   title: "OmniMind",
   description: "Sua central de estudos, notas e revisões inteligentes.",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "OmniMind",
+  },
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/icon-192x192.png",
-  }
+    icon: [
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/icon-192x192.png",
+    apple: [
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
