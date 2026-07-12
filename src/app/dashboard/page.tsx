@@ -79,11 +79,11 @@ export default async function DashboardPage() {
 
   let greeting, IconComponent, iconColor
 
-  if (hour < 12) {
+  if (hour >= 5 && hour < 12) {
     greeting = 'Bom dia'
     IconComponent = Sun
     iconColor = 'text-amber-400'
-  } else if (hour < 18) {
+  } else if (hour >= 12 && hour < 18) {
     greeting = 'Boa tarde'
     IconComponent = Sun
     iconColor = 'text-orange-400'

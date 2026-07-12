@@ -83,18 +83,30 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,var(--primary-soft)_0%,transparent_50%)] opacity-30" />
 
         {/* Avatar com moldura evolutiva */}
-        <div className={`relative flex size-20 sm:size-28 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 ${getAvatarRingClass(currentLevel)} transition-all duration-300`}>
-          {data.user.avatarUrl ? (
-            <img 
-              src={data.user.avatarUrl} 
-              alt={data.user.name} 
-              className="size-full rounded-full object-cover"
-            />
-          ) : (
-            <span className="text-2xl sm:text-4xl font-black text-text-strong tracking-tight">
-              {getInitials(data.user.name)}
-            </span>
-          )}
+        <div className="relative shrink-0 size-20 sm:size-28">
+          {/* Anel externo animado — separado para não afetar a opacidade da imagem */}
+          <div className={`absolute inset-0 rounded-full transition-all duration-300 ${
+            currentLevel <= 5
+              ? 'ring-4 ring-slate-300 dark:ring-slate-700'
+              : currentLevel <= 15
+              ? 'ring-4 ring-primary shadow-[0_0_20px_rgba(99,102,241,0.4)] animate-pulse'
+              : 'ring-4 ring-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.6)] animate-pulse'
+          }`} />
+
+          {/* Imagem ou iniciais — nunca afetado pelo animate-pulse */}
+          <div className="size-full rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+            {data.user.avatarUrl ? (
+              <img
+                src={data.user.avatarUrl}
+                alt={data.user.name}
+                className="size-full rounded-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl sm:text-4xl font-black text-text-strong tracking-tight">
+                {getInitials(data.user.name)}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Informações textuais */}
