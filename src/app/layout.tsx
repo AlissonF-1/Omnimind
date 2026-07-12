@@ -15,6 +15,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "OmniMind",
   description: "Sua central de estudos, notas e revisões inteligentes.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/icon-192x192.png",
+  }
 };
 
 export default function RootLayout({
