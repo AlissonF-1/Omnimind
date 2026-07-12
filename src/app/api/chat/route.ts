@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { embedQuery } from '@/lib/embeddings'
 import { incrementTutorQueriesCount, addXp, incrementQuestProgress, checkAndUnlockAchievements } from '@/actions/achievements'
 import { XP_CONFIG } from '@/types/achievements'
+import { createExamGoal } from '@/actions/calendar'
 
 const MAX_CONTEXT_TOKENS = 6000
 
@@ -36,7 +37,7 @@ function streamJsonLines(lines: Array<{ type: string; data: unknown }>) {
 
 export async function POST(req: Request) {
   try {
-    const { question, workspaceId, persona, history } = await req.json()
+    const { question, workspaceId, persona, history, model: reqModel, ecoMode } = await req.json()
     const trimmedQuery = typeof question === 'string' ? question.trim() : ''
 
     if (!trimmedQuery || trimmedQuery.length < 3) {
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
       return new Response(
         streamJsonLines([
           { type: 'sources', data: [] },
-          { type: 'model', data: 'Gemini 2.5 Flash' },
+          { type: 'model', data: ecoMode ? 'Gemini 1.5 Flash-8B (Eco)' : 'Gemini 2.5 Flash' },
           {
             type: 'text',
             data: 'Não encontrei nenhuma informação nas suas anotações sobre este assunto. Tente reformular.',
@@ -145,13 +146,18 @@ ${personaPrompt}
   - Ao usar informações do contexto, cite a fonte no formato [Fonte X].
   - Estruture a resposta em tópicos curtos e objetivos quando fizer sentido.
   - Responda em português (pt-BR).
+  - Se o usuário pedir para criar, agendar ou marcar uma prova/meta de estudo (ex: "Marca uma prova de Cálculo para 20/08"), você OBRIGATORIAMENTE deve responder de forma prestativa e amigável confirmando a prova e incluindo no final da resposta exatamente esta tag silenciosa de ação: [ACTION:CREATE_EXAM_GOAL|title=Título da Prova|date=AAAA-MM-DD]. Calcule o ano atual como ${new Date().getFullYear()} caso o usuário fale apenas dia/mês (ex: 20/08 vira 2026-08-20). Fale quantos dias faltam e quantos cards ele deve revisar por dia para se preparar.
+
 
   **CONTEXTO EXTRAÍDO DAS ANOTAÇÕES:**
   ${truncatedChunks.join('\n\n')}`
 
+    let geminiModelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+    if (ecoMode) geminiModelName = 'gemini-1.5-flash-8b'
+
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      model: geminiModelName,
       systemInstruction: systemPrompt
     })
 
@@ -209,12 +215,28 @@ ${personaPrompt}
           }
 
           controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'sources', data: sources })}\n`))
-          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'model', data: 'Gemini 2.5 Flash' })}\n`))
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'model', data: ecoMode ? 'Gemini 1.5 Flash-8B (Eco)' : 'Gemini 2.5 Flash' })}\n`))
 
+          let accumulatedText = ''
           for await (const chunk of resultStream.stream) {
             const chunkText = chunk.text()
             if (chunkText) {
+              accumulatedText += chunkText
               controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'text', data: chunkText })}\n`))
+            }
+          }
+
+          // Executa a action de agendamento de prova se detectada no stream
+          const actionRegex = /\[ACTION:CREATE_EXAM_GOAL\|title=([^|]+)\|date=([^\]]+)\]/
+          const actionMatch = accumulatedText.match(actionRegex)
+          if (actionMatch) {
+            const title = actionMatch[1].trim()
+            const dateStr = actionMatch[2].trim()
+            try {
+              await createExamGoal(title, dateStr)
+              controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'action-complete', data: { action: 'create_exam_goal', title, date: dateStr } })}\n`))
+            } catch (actionErr) {
+              console.error('[Tutor Agent Action] Erro ao criar meta de prova:', actionErr)
             }
           }
 

@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { getUserStudyStats } from '@/actions/achievements'
+import { getUserStudyStats, getUserStreak } from '@/actions/achievements'
 
 export async function getDailyStudyLogs() {
   const supabase = await createClient()
@@ -110,24 +110,7 @@ export async function getUserDashboardStats() {
   const neverLapsed = neverLapsedRes.count || 0
   const logs = logsRes.data
 
-  let streak = 0
-  if (logs && logs.length > 0) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    let currentDate = new Date(today)
-    for (const log of logs) {
-      const logDate = new Date(log.study_date)
-      logDate.setHours(0, 0, 0, 0)
-      
-      if (logDate.getTime() === currentDate.getTime()) {
-        streak++
-        currentDate.setDate(currentDate.getDate() - 1)
-      } else {
-        break
-      }
-    }
-  }
+  const streak = await getUserStreak(user.id)
 
   const retentionRate = totalCards > 0 ? Math.round((neverLapsed / totalCards) * 100) : 0
 

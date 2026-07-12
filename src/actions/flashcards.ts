@@ -278,3 +278,122 @@ Diretrizes:
     return { error: error.message }
   }
 }
+
+export async function previewGeneratedFlashcards(content: string, mode: 'default' | 'concurso' = 'default') {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Usuário não autenticado')
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+    
+    let systemInstruction = "Você é um especialista em neurociência, cognição profunda e criação de flashcards para retenção de memória. Sua missão é escanear o texto fornecido e mapear Entidades de Conhecimento. Extraia camadas inteligentes de estudo utilizando a Técnica de Feynman para analogias e Gatilhos de Memória para mnemônicos. OBRIGATORIAMENTE, para cada flashcard, extraia e devolva o bloco de texto exato da nota que serviu de base para aquele card no campo 'source_chunk'. Preencha o JSON estritamente conforme o schema solicitado."
+
+    if (mode === 'concurso') {
+      systemInstruction += " **MODO CONCURSO ATIVADO:** O foco principal deve ser na criação de perguntas sobre Lei Seca, exceções, pegadinhas e jurisprudência. Para cada conceito ou artigo, priorize perguntas do tipo: 'Qual a exceção a essa regra?', 'Quando este artigo NÃO se aplica?', 'O que a lei diz sobre X?'. Evite perguntas abertas demais; foque na literalidade e nas pegadinhas clássicas de prova."
+    }
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          description: "Lista de flashcards extraídos da nota",
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              front: {
+                type: SchemaType.STRING,
+                description: "A pergunta do flashcard (curta e direta)."
+              },
+              back: {
+                type: SchemaType.STRING,
+                description: "A resposta do flashcard (precisa e focada em aprendizado ativo)."
+              },
+              analogia: {
+                type: SchemaType.STRING,
+                nullable: true,
+                description: "Feynman Engine: Se o conceito for abstrato ou complexo, gere uma analogia simples do dia a dia. Caso contrário, retorne null."
+              },
+              mnemonico: {
+                type: SchemaType.STRING,
+                nullable: true,
+                description: "Módulo de Mnemônicos: Se for uma regra extensa, lista, lei ou exceção, crie um mnemônico eficaz. Caso contrário, retorne null."
+              },
+              source_chunk: {
+                type: SchemaType.STRING,
+                description: "Copie exatamente o parágrafo ou sentença do texto original que originou este flashcard."
+              }
+            },
+            required: ["front", "back", "source_chunk"]
+          }
+        }
+      },
+      systemInstruction: systemInstruction
+    })
+
+    const prompt = `
+      Analise o texto Markdown abaixo e extraia os conceitos mais importantes, gerando os flashcards.
+      
+      Texto para análise:
+      ${content}
+    `
+
+    const result = await model.generateContent(prompt)
+    const responseText = result.response.text()
+    const cards: any[] = JSON.parse(responseText)
+
+    return { success: true, cards }
+  } catch (error: any) {
+    console.error('Erro na geração de preview de cards:', error)
+    return { error: error.message || 'Erro ao gerar preview de flashcards' }
+  }
+}
+
+export async function saveGeneratedFlashcards(
+  noteId: string,
+  cards: Array<{ front: string; back: string; analogia?: string | null; mnemonico?: string | null; source_chunk: string }>
+) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Usuário não autenticado')
+
+    const flashcardsToInsert = cards.map(card => {
+      const hash = createHash('md5').update(card.source_chunk).digest('hex')
+      return {
+        user_id: user.id,
+        note_id: noteId,
+        front: card.front,
+        back: card.back,
+        analogia: card.analogia || null,
+        mnemonico: card.mnemonico || null,
+        source_anchor: hash
+      }
+    })
+
+    const { data: insertedCards, error } = await supabase
+      .from('flashcards')
+      .insert(flashcardsToInsert)
+      .select(`
+        id, front, back, analogia, mnemonico, note_id, user_id, source_anchor,
+        notes!inner ( workspace_id )
+      `)
+
+    if (error) throw new Error(`Erro ao salvar cards: ${error.message}`)
+
+    for (const card of insertedCards ?? []) {
+      try {
+        await indexFlashcard(card)
+      } catch (err) {
+        console.error('Falha ao indexar card:', err)
+      }
+    }
+
+    return { success: true, count: insertedCards.length }
+  } catch (error: any) {
+    console.error('Erro ao salvar cards:', error)
+    return { error: error.message || 'Erro desconhecido ao salvar cards' }
+  }
+}

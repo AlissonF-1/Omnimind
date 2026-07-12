@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useSettings } from '@/contexts/SettingsContext'
+import { getBestVoice } from '@/utils/audio'
 
 interface Source {
   id: string
@@ -212,6 +214,7 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceChange }: ChatPanelProps) {
+  const { settings } = useSettings()
   const isWorkspaceValid = true // Sempre válido (vazio significa busca global em todo o app)
   const storageKey = workspaceId ? `omnimind_chat_${workspaceId}` : 'omnimind_chat_global'
 
@@ -368,6 +371,10 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = 'pt-BR'
     utterance.rate = 0.95
+    const selectedVoice = getBestVoice(settings.tts_voice)
+    if (selectedVoice) {
+      utterance.voice = selectedVoice
+    }
     window.speechSynthesis.speak(utterance)
   }
 
@@ -491,7 +498,9 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
           question: trimmed,
           workspaceId,
           persona: currentPersona,
-          history
+          history,
+          model: settings.ai_default_model,
+          ecoMode: settings.eco_mode
         }),
       })
 
@@ -553,6 +562,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
               )
             } else if (parsed.type === 'text') {
               aiContent += parsed.data
+              const cleanContent = aiContent.replace(/\[ACTION:CREATE_EXAM_GOAL\|title=[^|]+\|date=[^\]]+\]/g, '')
               setConversations((prev) =>
                 prev.map((conversation) => {
                   if (conversation.id !== targetConversationId) return conversation
@@ -560,7 +570,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                   return normalizeConversation({
                     ...conversation,
                     messages: conversation.messages.map((message) =>
-                      message.id === aiMsgId ? { ...message, content: aiContent } : message
+                      message.id === aiMsgId ? { ...message, content: cleanContent } : message
                     ),
                     updatedAt: Date.now(),
                   })
@@ -573,6 +583,15 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
             } else if (parsed.type === 'achievement-unlocked') {
               window.dispatchEvent(new CustomEvent('achievement-unlocked', {
                 detail: parsed.data
+              }))
+            } else if (parsed.type === 'action-complete') {
+              window.dispatchEvent(new CustomEvent('calendar-updated'))
+              window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+                detail: {
+                  id: 'exam_created_agent',
+                  title: '📅 Prova Agendada!',
+                  description: `O Agente de Estudos marcou sua prova "${parsed.data.title}" para ${parsed.data.date}!`
+                }
               }))
             }
           } catch (streamError) {
@@ -886,10 +905,12 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                                 {msg.content}
                               </div>
                             ) : (
-                              <div className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:border prose-pre:border-border prose-pre:bg-surface-muted prose-p:text-text-strong prose-li:text-text-strong">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                  {msg.content}
-                                </ReactMarkdown>
+                              <div className="flex-1 min-w-0 pb-1 w-full max-w-full overflow-hidden text-left">
+                                <div className={`prose ${settings.ai_font_size === 'small' ? 'prose-sm text-xs' : settings.ai_font_size === 'large' ? 'prose-base' : 'prose-sm'} max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:border prose-pre:border-border prose-pre:bg-surface-muted prose-p:text-text-strong prose-li:text-text-strong`}>
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {msg.content}
+                                  </ReactMarkdown>
+                                </div>
                               </div>
                             )}
 

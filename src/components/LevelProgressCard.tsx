@@ -6,12 +6,14 @@ interface LevelProgressCardProps {
   totalXp: number
   currentLevel: number
   streakShields: number
+  isJeopardy?: boolean
 }
 
 export default function LevelProgressCard({
   totalXp,
   currentLevel,
-  streakShields
+  streakShields,
+  isJeopardy
 }: LevelProgressCardProps) {
   // Fórmula de nível reversa para progresso
   const xpForCurrentLevel = Math.pow(currentLevel - 1, 2) * 5
@@ -53,21 +55,23 @@ export default function LevelProgressCard({
         </div>
       </div>
 
-      {/* Streak Shields Badge */}
+      {/* Status da Sequência */}
       <div className="flex items-center justify-between border-t border-border/40 pt-3.5 z-10 relative">
         <div className="flex items-center gap-2">
-          <Shield className={`size-4 ${streakShields > 0 ? 'text-primary fill-primary/10' : 'text-text-muted'}`} />
+          <Shield className={`size-4 ${isJeopardy ? 'text-rose-500 fill-rose-500/10' : 'text-emerald-500 fill-emerald-500/10'}`} />
           <span className="text-xs font-medium text-text-strong">
-            Escudo de Streak:
+            Status da Sequência:
           </span>
         </div>
-        <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${
-          streakShields > 0 
-            ? 'bg-primary-soft text-primary border border-primary/20' 
-            : 'bg-surface-muted text-text-muted border border-border/40'
-        }`}>
-          {streakShields} ativo{streakShields !== 1 ? 's' : ''}
-        </span>
+        {isJeopardy ? (
+          <span className="text-xs font-extrabold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 animate-pulse">
+            EM RISCO 🔥
+          </span>
+        ) : (
+          <span className="text-xs font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+            SAUDÁVEL ✨
+          </span>
+        )}
       </div>
     </div>
   )

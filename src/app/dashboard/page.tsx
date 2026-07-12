@@ -3,13 +3,16 @@ import Heatmap from '@/components/Heatmap'
 import DashboardStatsCards from '@/components/DashboardStatsCards'
 import DashboardRelearningAlert from '@/components/DashboardRelearningAlert'
 import BlindSpotsPanel from '@/components/BlindSpotsPanel'
-import ReviewAlarm from '@/components/ReviewAlarm'
 import DailyProgressCircle from '@/components/DailyProgressCircle'
 import AchievementNotifier from '@/components/AchievementNotifier'
 import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, CriticalAlert } from '@/actions/stats'
 import { getDynamicDailyGoal } from '@/actions/calendar'
 import { getBlindSpots } from '@/actions/blindspots'
-import { getUserStudyStats, checkAndUnlockAchievements, getDailyQuests } from '@/actions/achievements'
+import { getUserStudyStats, checkAndUnlockAchievements, getDailyQuests, getStreakJeopardyStatus } from '@/actions/achievements'
+import StreakRescueModal from '@/components/StreakRescueModal'
+import { getWorkspacesHealth } from '@/actions/workspaces'
+import { getUserPreferences } from '@/actions/settings'
+import WorkspaceHealthGrid from '@/components/WorkspaceHealthGrid'
 import { createClient } from '@/utils/supabase/server'
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -147,7 +150,10 @@ async function DashboardContent() {
       userStats,
       newlyUnlocked,
       dailyQuests,
-      dynamicGoalData
+      dynamicGoalData,
+      streakJeopardy,
+      workspacesHealth,
+      settings
     ] = await Promise.all([
       getDailyStudyLogs(),
       getUserDashboardStats(),
@@ -156,7 +162,10 @@ async function DashboardContent() {
       getUserStudyStats(),
       checkAndUnlockAchievements(),
       getDailyQuests(),
-      getDynamicDailyGoal()
+      getDynamicDailyGoal(),
+      getStreakJeopardyStatus(),
+      getWorkspacesHealth(),
+      getUserPreferences()
     ])
 
     const hasActivity = studyLogs && studyLogs.length > 0
@@ -216,6 +225,8 @@ async function DashboardContent() {
                 </div>
               </div>
             )}
+            
+            <DailyQuestsCard quests={dailyQuests} />
           </div>
 
           <div className="flex flex-col gap-6">
@@ -224,7 +235,7 @@ async function DashboardContent() {
               streak={stats?.streak || 0}
               multiplier={userStats?.streak_multiplier || 1.0}
               isGoalCompleted={userStats?.daily_goal_completed || false}
-              dailyGoal={dynamicGoalData?.goal}
+              dailyGoal={dynamicGoalData?.goal || settings?.daily_goal_default || 10}
               activeGoalTitle={dynamicGoalData?.activeGoal?.title}
             />
             
@@ -232,13 +243,13 @@ async function DashboardContent() {
               totalXp={userStats?.total_xp || 0}
               currentLevel={userStats?.current_level || 1}
               streakShields={userStats?.streak_shields || 0}
+              isJeopardy={streakJeopardy?.isJeopardy}
             />
-
-            <DailyQuestsCard quests={dailyQuests} />
           </div>
         </div>
 
-        <ReviewAlarm />
+        {/* Grid de Saúde de Retenção dos Workspaces */}
+        <WorkspaceHealthGrid healths={workspacesHealth} />
 
 
 
@@ -278,6 +289,12 @@ async function DashboardContent() {
             </div>
           </section>
         )}
+        
+        {/* Modal de Resgate de Streak se estiver em perigo */}
+        <StreakRescueModal
+          isJeopardy={!!streakJeopardy?.isJeopardy}
+          potentialStreak={streakJeopardy?.potentialStreak || 0}
+        />
 
       </div>
     )

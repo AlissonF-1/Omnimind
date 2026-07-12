@@ -80,3 +80,43 @@ export function playLevelUpSound() {
     console.warn('Web Audio API level up error:', err)
   }
 }
+
+export function getBestVoice(voicePref: 'default' | 'male' | 'female'): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return null
+  const voices = window.speechSynthesis.getVoices()
+  
+  // Filtra vozes em português
+  const ptVoices = voices.filter(v => v.lang.toLowerCase().replace('_', '-').startsWith('pt'))
+  if (ptVoices.length === 0) return null
+
+  if (voicePref === 'default') {
+    return ptVoices.find(v => v.lang.toLowerCase().replace('_', '-').includes('pt-br')) || ptVoices[0]
+  }
+
+  const maleKeywords = ['daniel', 'felipe', 'helder', 'rodrigo', 'ricardo', 'junior', 'male', 'homem', 'masculino', 'cosme']
+  const femaleKeywords = ['maria', 'francisca', 'heloisa', 'luciana', 'joana', 'vitoria', 'fernanda', 'raquel', 'female', 'mulher', 'feminino', 'google português']
+
+  if (voicePref === 'male') {
+    const maleVoice = ptVoices.find(v => 
+      maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
+    )
+    if (maleVoice) return maleVoice
+    const fallbackMale = ptVoices.find(v => 
+      !femaleKeywords.some(kw => v.name.toLowerCase().includes(kw))
+    )
+    return fallbackMale || ptVoices[0]
+  }
+
+  if (voicePref === 'female') {
+    const femaleVoice = ptVoices.find(v => 
+      femaleKeywords.some(kw => v.name.toLowerCase().includes(kw))
+    )
+    if (femaleVoice) return femaleVoice
+    const fallbackFemale = ptVoices.find(v => 
+      !maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
+    )
+    return fallbackFemale || ptVoices[0]
+  }
+
+  return ptVoices[0]
+}

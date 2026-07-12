@@ -55,5 +55,11 @@ export const ACHIEVEMENTS: Record<string, AchievementDetails> = {
     title: '🧠 O Tutor',
     description: 'Consultou o assistente IA do OmniMind por 20 vezes.',
     icon: 'Brain'
+  },
+  o_planejador: {
+    id: 'o_planejador',
+    title: '📅 O Planejador',
+    description: 'Agendou uma prova no calendário de estudos.',
+    icon: 'Calendar'
   }
 }

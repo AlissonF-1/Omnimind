@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react'
 import { Sparkles, Trophy, X } from 'lucide-react'
 import { playLevelUpSound } from '@/utils/audio'
+import { useSettings } from '@/contexts/SettingsContext'
 
 export default function LevelUpModal() {
   const [isOpen, setIsOpen] = useState(false)
   const [levelInfo, setLevelInfo] = useState<{ oldLevel: number; newLevel: number } | null>(null)
+  const { settings } = useSettings()
 
   useEffect(() => {
     const handleLevelUp = (e: Event) => {
@@ -17,13 +19,15 @@ export default function LevelUpModal() {
           newLevel: customEvent.detail.newLevel
         })
         setIsOpen(true)
-        playLevelUpSound()
+        if (settings.enable_sounds) {
+          playLevelUpSound()
+        }
       }
     }
 
     window.addEventListener('level-up', handleLevelUp)
     return () => window.removeEventListener('level-up', handleLevelUp)
-  }, [])
+  }, [settings.enable_sounds])
 
   if (!isOpen || !levelInfo) return null
 
@@ -45,27 +49,29 @@ export default function LevelUpModal() {
       `}</style>
 
       {/* Partículas de Confete geradas localmente */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(35)].map((_, i) => {
-          const colors = ['bg-primary', 'bg-indigo-500', 'bg-amber-400', 'bg-emerald-400', 'bg-rose-400', 'bg-sky-400']
-          const randomColor = colors[Math.floor(Math.random() * colors.length)]
-          const randomLeft = `${Math.random() * 100}%`
-          const randomDelay = `${Math.random() * 2}s`
-          const randomDuration = `${2 + Math.random() * 2}s`
-          return (
-            <div 
-              key={i} 
-              className={`confetti-particle ${randomColor}`}
-              style={{
-                left: randomLeft,
-                bottom: '-20px',
-                animationDelay: randomDelay,
-                animationDuration: randomDuration
-              }}
-            />
-          )
-        })}
-      </div>
+      {settings.enable_confetti && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(35)].map((_, i) => {
+            const colors = ['bg-primary', 'bg-indigo-500', 'bg-amber-400', 'bg-emerald-400', 'bg-rose-400', 'bg-sky-400']
+            const randomColor = colors[Math.floor(Math.random() * colors.length)]
+            const randomLeft = `${Math.random() * 100}%`
+            const randomDelay = `${Math.random() * 2}s`
+            const randomDuration = `${2 + Math.random() * 2}s`
+            return (
+              <div 
+                key={i} 
+                className={`confetti-particle ${randomColor}`}
+                style={{
+                  left: randomLeft,
+                  bottom: '-20px',
+                  animationDelay: randomDelay,
+                  animationDuration: randomDuration
+                }}
+              />
+            )
+          })}
+        </div>
+      )}
 
       {/* Modal Principal Glassmorphic */}
       <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-primary/20 bg-surface/85 p-8 text-center shadow-2xl backdrop-blur-xl animate-in zoom-in-95 duration-300">

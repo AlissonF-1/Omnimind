@@ -142,3 +142,44 @@ Gere os 3 distratores plausíveis em português (pt-BR).
     }
   }
 }
+
+/**
+ * Transcreve um arquivo de áudio enviado como FormData usando a API do Groq Whisper
+ */
+export async function transcribeAudio(formData: FormData): Promise<{ text: string; error?: string }> {
+  try {
+    const groqApiKey = process.env.GROQ_API_KEY
+    if (!groqApiKey) {
+      throw new Error('GROQ_API_KEY não configurada no ambiente.')
+    }
+
+    const file = formData.get('file') as File
+    if (!file) {
+      throw new Error('Nenhum arquivo de áudio enviado.')
+    }
+
+    const apiFormData = new FormData()
+    apiFormData.append('file', file)
+    apiFormData.append('model', 'whisper-large-v3-turbo')
+    apiFormData.append('language', 'pt')
+
+    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqApiKey}`,
+      },
+      body: apiFormData,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Erro na API do Groq Whisper (Status ${response.status}): ${errorText}`)
+    }
+
+    const data = await response.json()
+    return { text: data.text || '' }
+  } catch (error: any) {
+    console.error('Groq Whisper Transcription Error:', error)
+    return { text: '', error: error.message || 'Erro inesperado na transcrição' }
+  }
+}

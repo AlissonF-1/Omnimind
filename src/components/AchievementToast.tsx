@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Trophy } from 'lucide-react'
 import { playTrophySound } from '@/utils/audio'
+import { useSettings } from '@/contexts/SettingsContext'
 
 interface AchievementData {
   id: string
@@ -13,14 +14,17 @@ interface AchievementData {
 export default function AchievementToast() {
   const [current, setCurrent] = useState<AchievementData | null>(null)
   const [isVisible, setIsVisible] = useState(false)
+  const { settings } = useSettings()
 
   useEffect(() => {
     const handleUnlock = (e: Event) => {
       const customEvent = e as CustomEvent<AchievementData>
       if (!customEvent.detail) return
 
-      // Toca o efeito de duplo carrilhão do console
-      playTrophySound()
+      // Toca o efeito de duplo carrilhão do console, caso ativado
+      if (settings.enable_sounds) {
+        playTrophySound()
+      }
 
       // Exibe a conquista
       setCurrent(customEvent.detail)
@@ -38,7 +42,7 @@ export default function AchievementToast() {
 
     window.addEventListener('achievement-unlocked', handleUnlock)
     return () => window.removeEventListener('achievement-unlocked', handleUnlock)
-  }, [])
+  }, [settings.enable_sounds])
 
   if (!current) return null
 

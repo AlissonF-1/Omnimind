@@ -1,8 +1,11 @@
 import { getWorkspaces } from '@/actions/workspaces'
 import { getUserStudyStats } from '@/actions/achievements'
 import { getUserDashboardStats } from '@/actions/stats'
+import { getUserPreferences } from '@/actions/settings'
 import { createClient } from '@/utils/supabase/server'
 import DashboardShell from '@/components/DashboardShell'
+import { SettingsProvider } from '@/contexts/SettingsContext'
+import { DEFAULT_PREFERENCES } from '@/types/settings'
 
 export default async function DashboardLayout({
   children,
@@ -13,6 +16,7 @@ export default async function DashboardLayout({
   let workspaces: any[] = []
   let userStats: any = null
   let dashStats: any = null
+  let settings: any = { ...DEFAULT_PREFERENCES, user_id: 'default' }
   let user: any = null
 
   try {
@@ -28,10 +32,12 @@ export default async function DashboardLayout({
       getWorkspaces(),
       getUserStudyStats(),
       getUserDashboardStats(),
+      getUserPreferences(),
     ])
     if (results[0].status === 'fulfilled') workspaces = results[0].value ?? []
     if (results[1].status === 'fulfilled') userStats = results[1].value
     if (results[2].status === 'fulfilled') dashStats = results[2].value
+    if (results[3].status === 'fulfilled') settings = results[3].value
   } catch (e) {
     console.error('[layout] Erro nos fetches paralelos:', e)
   }
@@ -42,14 +48,16 @@ export default async function DashboardLayout({
   const overdueCards = dashStats?.overdueCards || 0
 
   return (
-    <DashboardShell
-      workspaces={workspaces}
-      userName={userName}
-      avatarUrl={avatarUrl}
-      currentLevel={currentLevel}
-      overdueCards={overdueCards}
-    >
-      {children}
-    </DashboardShell>
+    <SettingsProvider initialSettings={settings}>
+      <DashboardShell
+        workspaces={workspaces}
+        userName={userName}
+        avatarUrl={avatarUrl}
+        currentLevel={currentLevel}
+        overdueCards={overdueCards}
+      >
+        {children}
+      </DashboardShell>
+    </SettingsProvider>
   )
 }

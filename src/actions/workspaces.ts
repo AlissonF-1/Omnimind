@@ -142,3 +142,103 @@ export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
 }
+
+export async function getWorkspacesHealth(): Promise<Array<{
+  id: string
+  name: string
+  description: string | null
+  score: number
+  status: 'green' | 'yellow' | 'red'
+  totalCards: number
+  reviewedCards: number
+}>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    // 1. Busca todos os workspaces ativos do usuário
+    const { data: workspaces, error: wsErr } = await supabase
+      .from('workspaces')
+      .select('id, name, description')
+      .eq('user_id', user.id)
+      .eq('is_archived', false)
+
+    if (wsErr || !workspaces) {
+      console.error('Erro ao buscar workspaces para health:', wsErr)
+      return []
+    }
+
+    // 2. Busca todos os flashcards do usuário com o workspace_id correspondente
+    const { data: cards, error: cardsErr } = await supabase
+      .from('flashcards')
+      .select('reps, lapses, notes!inner(workspace_id)')
+      .eq('user_id', user.id)
+
+    if (cardsErr) {
+      console.error('Erro ao buscar cards para health:', cardsErr)
+      return workspaces.map(w => ({
+        id: w.id,
+        name: w.name,
+        description: w.description,
+        score: 100,
+        status: 'green',
+        totalCards: 0,
+        reviewedCards: 0
+      }))
+    }
+
+    // 3. Agrupa os cards por workspace_id
+    const cardsByWorkspace: Record<string, typeof cards> = {}
+    for (const card of cards || []) {
+      const wsId = (card.notes as any)?.workspace_id
+      if (wsId) {
+        if (!cardsByWorkspace[wsId]) {
+          cardsByWorkspace[wsId] = []
+        }
+        cardsByWorkspace[wsId].push(card)
+      }
+    }
+
+    // 4. Calcula o score de saúde de cada workspace
+    return workspaces.map(workspace => {
+      const wsCards = cardsByWorkspace[workspace.id] || []
+      const totalCards = wsCards.length
+      
+      let reviewedCards = 0
+      let totalCorrectness = 0
+
+      for (const card of wsCards) {
+        if (card.reps && card.reps > 0) {
+          reviewedCards++
+          const cardCorrectness = Math.max(0, Math.min(1, (card.reps - (card.lapses || 0)) / card.reps))
+          totalCorrectness += cardCorrectness
+        }
+      }
+
+      const score = reviewedCards > 0 
+        ? Math.round((totalCorrectness / reviewedCards) * 100) 
+        : 100 // 100% por padrão se não houver revisões realizadas
+
+      let status: 'green' | 'yellow' | 'red' = 'green'
+      if (score < 65) {
+        status = 'red'
+      } else if (score < 85) {
+        status = 'yellow'
+      }
+
+      return {
+        id: workspace.id,
+        name: workspace.name,
+        description: workspace.description,
+        score,
+        status,
+        totalCards,
+        reviewedCards
+      }
+    })
+  } catch (err) {
+    console.error('Erro em getWorkspacesHealth:', err)
+    return []
+  }
+}

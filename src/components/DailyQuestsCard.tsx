@@ -76,7 +76,7 @@ export default function DailyQuestsCard({ quests }: DailyQuestsCardProps) {
                   }`}>
                     <Icon className="size-4" />
                   </span>
-                  <span className={`text-xs font-bold truncate ${quest.completed ? 'text-emerald-500 dark:text-emerald-400' : 'text-text-strong'}`}>
+                  <span className={`text-xs font-bold leading-tight ${quest.completed ? 'text-emerald-500 dark:text-emerald-400' : 'text-text-strong'}`}>
                     {info.title}
                   </span>
                 </div>

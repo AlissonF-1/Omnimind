@@ -5,6 +5,7 @@ import { fsrs, Rating, Card as FSRSCard } from 'ts-fsrs'
 import { revalidatePath } from 'next/cache'
 import { checkAndUnlockAchievements, addXp, incrementQuestProgress, getUserStreak, getUserStudyStats } from '@/actions/achievements'
 import { AchievementDetails, XP_CONFIG } from '@/types/achievements'
+import { getDynamicDailyGoal } from '@/actions/calendar'
 
 // Tipagem mais forte para o estado do card (vindo do banco)
 interface FsrsCardState {
@@ -118,7 +119,7 @@ export async function submitReview(
   cardId: string,
   currentFsrsState: FsrsCardState,
   grade: Rating
-): Promise<{ success?: boolean; error?: string; newlyUnlocked?: AchievementDetails[]; leveledUp?: { oldLevel: number; newLevel: number } | null }> {
+): Promise<{ success?: boolean; error?: string; newlyUnlocked?: AchievementDetails[]; leveledUp?: { oldLevel: number; newLevel: number } | null; earnedDisciplineBadge?: boolean }> {
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()
 
@@ -205,9 +206,29 @@ export async function submitReview(
 
     // 4.1. Verifica e atualiza estatísticas de gamificação (XP, Quests e Escudo)
     let levelUpData = null
+    let earnedDisciplineBadge = false
     try {
-      // Adiciona XP por card revisado usando configuração centralizada
-      const xpRes = await addXp(XP_CONFIG.REVIEW_CARD)
+      // Multiplicador FSRS-XP
+      let xpAwarded = XP_CONFIG.REVIEW_CARD // Padrão: 10
+      if (currentFsrsState.due) {
+        const dueDate = new Date(currentFsrsState.due)
+        const dueDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+        const today = new Date()
+        const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+        const diffTime = todayDay.getTime() - dueDay.getTime()
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+
+        if (diffDays === -1 || diffDays === 0 || diffDays === 1) {
+          xpAwarded = 15
+          earnedDisciplineBadge = true
+        } else if (diffDays > 3 || diffDays < -3) {
+          xpAwarded = 5
+        }
+      }
+
+      // Adiciona XP calculado
+      const xpRes = await addXp(xpAwarded)
       if (xpRes?.leveledUp) {
         levelUpData = { oldLevel: xpRes.oldLevel, newLevel: xpRes.newLevel }
       }
@@ -229,27 +250,20 @@ export async function submitReview(
       if (logToday) {
         const reviewCount = logToday.review_count
 
-        // Se completou a meta diária (10 revisões), marca no stats
-        if (reviewCount >= 10) {
+        // Busca meta dinâmica do calendário
+        const { goal: dynamicGoal } = await getDynamicDailyGoal()
+
+        // Se completou a meta diária dinâmica, marca no stats
+        if (reviewCount >= dynamicGoal) {
           await supabase
             .from('user_study_stats')
             .update({ daily_goal_completed: true })
             .eq('user_id', user.id)
         }
 
-        // Se for a primeira revisão do dia, calcula a streak e concede escudo de streak se for múltiplo de 7
+        // Se for a primeira revisão do dia, calcula a streak e atualiza
         if (reviewCount === 1) {
-          const streak = await getUserStreak(user.id)
-          if (streak > 0 && streak % 7 === 0) {
-            const stats = await getUserStudyStats()
-            await supabase
-              .from('user_study_stats')
-              .update({ 
-                streak_shields: (stats?.streak_shields || 0) + 1,
-                updated_at: new Date().toISOString()
-              })
-              .eq('user_id', user.id)
-          }
+          await getUserStreak(user.id)
         }
       }
     } catch (goalErr) {
@@ -272,7 +286,7 @@ export async function submitReview(
     // 6. Roda a checagem de conquistas após as atualizações de estudos
     const newlyUnlocked = await checkAndUnlockAchievements()
 
-    return { success: true, newlyUnlocked, leveledUp: levelUpData }
+    return { success: true, newlyUnlocked, leveledUp: levelUpData, earnedDisciplineBadge }
   } catch (error) {
     console.error('[submitReview] Erro inesperado:', error)
     return { error: error instanceof Error ? error.message : 'Erro interno no processamento' }

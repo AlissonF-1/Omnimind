@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Rating } from 'ts-fsrs'
 import { submitReview } from '@/actions/reviews'
 import { deleteFlashcard } from '@/actions/flashcards'
-import { addXp } from '@/actions/achievements'
+import { addXp, getStreakJeopardyStatus, rescueStreak } from '@/actions/achievements'
 import { XP_CONFIG } from '@/types/achievements'
 import { checkNoteRelearningAlert } from '@/actions/stats'
 import Link from 'next/link'
@@ -30,8 +30,11 @@ import {
   BrainCircuit,
   Volume2,     // NOVO
   PlayCircle,  // Substitui 'Youtube'
+  Flame,
 } from 'lucide-react'
 import RelearningAlert from './RelearningAlert'
+import { useSettings } from '@/contexts/SettingsContext'
+import { getBestVoice } from '@/utils/audio'
 import { evaluateAnswerWithGroq, generateDistractorsWithGroq } from '@/actions/groq'
 import { searchYoutubeExplanation } from '@/actions/externalContent' // NOVA IMPORT
 
@@ -59,6 +62,7 @@ interface ReviewCard {
 }
 
 export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard[] }) {
+  const { settings } = useSettings()
   const [cards, setCards] = useState<ReviewCard[]>(initialCards)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
@@ -78,9 +82,23 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const [videoUrl, setVideoUrl] = useState('')
   const [isSearchingVideo, setIsSearchingVideo] = useState(false)
 
+  const [isUsingAdvancedSpeech, setIsUsingAdvancedSpeech] = useState(false)
+
+  useEffect(() => {
+    if (settings?.transcription_mode) {
+      setIsUsingAdvancedSpeech(settings.transcription_mode === 'whisper')
+    }
+  }, [settings?.transcription_mode])
   const recognitionRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const contextModalRef = useRef<HTMLDivElement>(null)
+
+  const [isJeopardy, setIsJeopardy] = useState(false)
+  const [potentialStreak, setPotentialStreak] = useState(0)
+  const [consecutiveCorrect, setConsecutiveCorrect] = useState(0)
+  const [rescueSuccess, setRescueSuccess] = useState(false)
 
   // Estado para alerta de reaprendizagem
   const [noteAlerts, setNoteAlerts] = useState<
@@ -137,6 +155,16 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
     }
   }, [userAnswerText, responseMethod])
+
+  // --- Busca status de Jeopardy da Streak ---
+  useEffect(() => {
+    getStreakJeopardyStatus().then((res) => {
+      if (res && res.isJeopardy) {
+        setIsJeopardy(true)
+        setPotentialStreak(res.potentialStreak)
+      }
+    })
+  }, [])
 
   // --- Verificação de alerta de reaprendizagem ---
   useEffect(() => {
@@ -342,6 +370,10 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
     utterance.lang = 'pt-BR';
     utterance.rate = 0.9;
     utterance.pitch = 1.2;
+    const selectedVoice = getBestVoice(settings.tts_voice)
+    if (selectedVoice) {
+      utterance.voice = selectedVoice
+    }
     window.speechSynthesis.speak(utterance);
   };
 
@@ -383,8 +415,102 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
     }
   }
 
+  // --- Funções de gravação avançada (Groq Whisper) ---
+  const startAdvancedRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      
+      let options = { mimeType: 'audio/webm' }
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        options = { mimeType: 'audio/ogg' }
+        if (!MediaRecorder.isTypeSupported('audio/ogg')) {
+          options = { mimeType: 'audio/mp4' }
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType })
+        stream.getTracks().forEach(track => track.stop())
+        
+        setIsEvaluating(true)
+        try {
+          const formData = new FormData()
+          formData.append('file', audioBlob, 'audio.webm')
+          const apiRes = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          })
+          const resData = await apiRes.json()
+          if (!apiRes.ok || resData.error) {
+            alert(`Erro ao transcrever com Groq Whisper: ${resData.error || 'Erro na requisição'}`)
+            setUserAnswerText('')
+            setResponseMethod(null)
+          } else {
+            setUserAnswerText(resData.text)
+          }
+        } catch (err: any) {
+          console.error(err)
+          alert('Erro ao se conectar ao Groq Whisper.')
+          setUserAnswerText('')
+          setResponseMethod(null)
+        } finally {
+          setIsEvaluating(false)
+          setIsRecording(false)
+        }
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+      setResponseMethod('voice')
+      setUserAnswerText('Gravando áudio... Fale agora.')
+    } catch (err) {
+      console.error('Erro ao acessar microfone:', err)
+      alert('Não foi possível acessar seu microfone. Verifique as permissões de áudio no seu navegador.')
+      setIsRecording(false)
+    }
+  }
+
+  const stopAdvancedRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+  }
+
+  const handleCancelRecording = () => {
+    if (isRecording) {
+      if (isUsingAdvancedSpeech && mediaRecorderRef.current) {
+        const stream = mediaRecorderRef.current.stream
+        stream.getTracks().forEach(track => track.stop())
+        setIsRecording(false)
+      } else {
+        recognitionRef.current?.stop()
+      }
+    }
+    setResponseMethod(null)
+    setUserAnswerText('')
+  }
+
   // --- Funções principais ---
   const toggleRecording = () => {
+    if (isUsingAdvancedSpeech) {
+      if (isRecording) {
+        stopAdvancedRecording()
+      } else {
+        startAdvancedRecording()
+      }
+      return
+    }
+
     if (!recognitionRef.current) {
       alert('Seu navegador não suporta reconhecimento de voz nativo.')
       return
@@ -446,6 +572,32 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   }
 
   const handleReview = async (grade: Rating) => {
+    // Desafio de Resgate de Streak
+    if (isJeopardy && !rescueSuccess) {
+      if (grade === Rating.Good || grade === Rating.Easy) {
+        const nextCorrect = consecutiveCorrect + 1
+        setConsecutiveCorrect(nextCorrect)
+        if (nextCorrect >= 2) {
+          setRescueSuccess(true)
+          rescueStreak().then((res) => {
+            if (res.success) {
+              window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+                detail: {
+                  id: 'rescue_success',
+                  title: '⚡ Sequência Resgatada!',
+                  description: `Você acertou 2 cards consecutivos e salvou sua streak de ${potentialStreak + 1} dias!`
+                }
+              }))
+            } else {
+              alert(`Erro ao resgatar streak: ${res.error}`)
+            }
+          })
+        }
+      } else {
+        setConsecutiveCorrect(0)
+      }
+    }
+
     // 1. Atualiza estatísticas locais da sessão de forma instantânea
     if (grade === Rating.Good || grade === Rating.Easy) {
       setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }))
@@ -551,6 +703,19 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
             cardsWithLapses={noteAlerts[activeCard.notes.id].cardsWithLapses}
             totalCards={noteAlerts[activeCard.notes.id].totalCards}
           />
+        </div>
+      )}
+
+      {/* Banner de Resgate de Streak */}
+      {isJeopardy && !rescueSuccess && (
+        <div className="w-full mb-4 p-3 rounded-xl border border-orange-500/20 bg-orange-500/5 text-orange-500 text-xs font-semibold flex items-center justify-between gap-3 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-1.5">
+            <Flame className="size-4 animate-pulse fill-orange-500/10" />
+            <span>Desafio de Resgate: Acerte 2 cards seguidos para salvar sua streak de {potentialStreak} dias!</span>
+          </div>
+          <span className="bg-orange-500/10 px-2 py-0.5 rounded-md font-mono">
+            {consecutiveCorrect}/2 acertos
+          </span>
         </div>
       )}
 
@@ -876,10 +1041,10 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
                 setAiFeedback(null)
                 setIsFlipped(false)
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
                 isSimuladoMode
-                  ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/30'
-                  : 'bg-surface-muted text-text-muted border-border hover:bg-surface-hover'
+                  ? 'bg-primary/20 text-primary border-primary/30 hover:bg-primary/30'
+                  : 'bg-surface-muted text-text-medium border-border hover:border-border-strong hover:bg-surface-elevated hover:text-text-strong'
               }`}
               title="Alternar para Simulado de Múltipla Escolha"
             >
@@ -889,7 +1054,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
 
             <button
               onClick={() => speakText(`${activeCard.front}. A resposta é: ${activeCard.back}`)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-border bg-surface-muted text-text-muted hover:bg-surface-hover flex items-center gap-1.5 transition-all"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-border bg-surface-muted text-text-medium hover:text-text-strong hover:border-border-strong hover:bg-surface-elevated flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               title="Ouvir o card em áudio (Podcast)"
             >
               <Volume2 className="size-3.5" />
@@ -913,7 +1078,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
             </div>
           ) : responseMethod ? (
             <div className="flex gap-3 w-full">
-              <button onClick={() => { if (isRecording) recognitionRef.current?.stop(); setResponseMethod(null); setUserAnswerText('') }} className="btn-secondary h-14 text-sm font-semibold rounded-2xl flex-1 hover:bg-surface-hover" disabled={isEvaluating}>
+              <button onClick={handleCancelRecording} className="btn-secondary h-14 text-sm font-semibold rounded-2xl flex-1 hover:bg-surface-hover" disabled={isEvaluating}>
                 Cancelar
               </button>
               {responseMethod === 'voice' && isRecording ? (
@@ -932,16 +1097,31 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 w-full">
-              <button onClick={() => { setResponseMethod('voice'); toggleRecording() }} className="col-span-1 flex items-center justify-center gap-2 btn-secondary h-14 text-base font-semibold rounded-2xl flex-1 hover:bg-surface-hover transition-colors">
-                <Mic className="size-5 text-primary" /><span>Voz</span>
-              </button>
-              <button onClick={() => { setResponseMethod('text'); setUserAnswerText(''); setTimeout(() => { const textarea = document.querySelector('textarea'); textarea?.focus() }, 50) }} className="col-span-1 flex items-center justify-center gap-2 btn-secondary h-14 text-base font-semibold rounded-2xl flex-1 hover:bg-surface-hover transition-colors">
-                <Keyboard className="size-5 text-primary" /><span>Texto</span>
-              </button>
-              <button onClick={() => setIsFlipped(true)} className="col-span-2 btn-primary h-14 text-base font-semibold rounded-2xl flex-1 sm:flex-[1.5] bg-primary hover:bg-primary-hover text-white flex items-center justify-center shadow-[var(--shadow-soft)]">
-                Mostrar Resposta
-              </button>
+            <div className="w-full flex flex-col gap-3">
+              {/* Opção de Transcrição Avançada */}
+              <div className="flex items-center justify-end gap-2 px-1">
+                <label className="text-xs font-semibold text-text-muted cursor-pointer flex items-center gap-1.5 select-none">
+                  <input
+                    type="checkbox"
+                    checked={isUsingAdvancedSpeech}
+                    onChange={(e) => setIsUsingAdvancedSpeech(e.target.checked)}
+                    className="rounded border-border text-primary focus:ring-primary size-3.5"
+                  />
+                  <span>Transcrição Avançada (Groq Whisper ⚡)</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 w-full">
+                <button onClick={() => { setResponseMethod('voice'); toggleRecording() }} className="col-span-1 flex items-center justify-center gap-2 btn-secondary h-14 text-base font-semibold rounded-2xl flex-1 hover:bg-surface-hover transition-colors">
+                  <Mic className="size-5 text-primary" /><span>Voz</span>
+                </button>
+                <button onClick={() => { setResponseMethod('text'); setUserAnswerText(''); setTimeout(() => { const textarea = document.querySelector('textarea'); textarea?.focus() }, 50) }} className="col-span-1 flex items-center justify-center gap-2 btn-secondary h-14 text-base font-semibold rounded-2xl flex-1 hover:bg-surface-hover transition-colors">
+                  <Keyboard className="size-5 text-primary" /><span>Texto</span>
+                </button>
+                <button onClick={() => setIsFlipped(true)} className="col-span-2 btn-primary h-14 text-base font-semibold rounded-2xl flex-1 sm:flex-[1.5] bg-primary hover:bg-primary-hover text-white flex items-center justify-center shadow-[var(--shadow-soft)]">
+                  Mostrar Resposta
+                </button>
+              </div>
             </div>
           )
         ) : (

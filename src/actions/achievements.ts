@@ -105,6 +105,16 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
     newlyUnlocked.push(ACHIEVEMENTS.o_tutor)
   }
 
+  // 📅 O Planejador
+  const { count: examGoalsCount } = await supabase
+    .from('exam_goals')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+
+  if (!unlocked.has('o_planejador') && (examGoalsCount || 0) >= 1) {
+    newlyUnlocked.push(ACHIEVEMENTS.o_planejador)
+  }
+
   // 🎓 A Banca
   if (!unlocked.has('a_banca') && stats.perfect_exams_count >= 10) {
     newlyUnlocked.push(ACHIEVEMENTS.a_banca)
@@ -190,9 +200,7 @@ export async function getUserStreak(userId: string): Promise<number> {
         streak++
         currentDate.setDate(currentDate.getDate() - 1)
       } else {
-        // A streak quebrou. Verifica escudo.
-        // Se for apenas o dia de hoje que ainda não foi estudado,
-        // apenas mudamos o currentDate para ontem e continuamos.
+        // Se hoje ainda não foi estudado, permitimos pular hoje para ontem
         const yesterday = new Date(today)
         yesterday.setDate(yesterday.getDate() - 1)
 
@@ -201,34 +209,113 @@ export async function getUserStreak(userId: string): Promise<number> {
           continue
         }
 
-        // Se ontem ou antes foi perdido, consome escudo
-        const { data: stats } = await supabase
-          .from('user_study_stats')
-          .select('streak_shields')
-          .eq('user_id', userId)
-          .maybeSingle()
-
-        if (stats && (stats.streak_shields || 0) > 0) {
-          // Consome o escudo e mantém a streak!
-          await supabase
-            .from('user_study_stats')
-            .update({ 
-              streak_shields: (stats.streak_shields || 0) - 1,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', userId)
-
-          // Incrementa streak pelo dia protegido
-          streak++
-          // Ajusta currentDate para pular o dia perdido e continuar verificando
-          currentDate.setDate(currentDate.getDate() - 2)
-        } else {
-          break // A streak quebra de verdade
-        }
+        break // A streak quebra de verdade
       }
     }
   }
   return streak
+}
+
+/**
+ * Verifica se a streak do usuário está em perigo (ontem não estudado, mas anteontem sim)
+ */
+export async function getStreakJeopardyStatus(): Promise<{
+  isJeopardy: boolean
+  potentialStreak: number
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { isJeopardy: false, potentialStreak: 0 }
+
+  const today = new Date()
+  const todayStr = today.toISOString().split('T')[0]
+
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+  const twoDaysAgo = new Date()
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+  const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0]
+
+  // Busca se existem logs para ontem e anteontem
+  const { data: logs } = await supabase
+    .from('daily_study_logs')
+    .select('study_date')
+    .eq('user_id', user.id)
+    .in('study_date', [yesterdayStr, twoDaysAgoStr])
+
+  const hasYesterday = logs?.some(l => l.study_date === yesterdayStr)
+  const hasTwoDaysAgo = logs?.some(l => l.study_date === twoDaysAgoStr)
+
+  if (!hasYesterday && hasTwoDaysAgo) {
+    // Ontem foi pulado, mas anteontem teve estudo. A streak pode ser resgatada!
+    // Para calcular a potentialStreak (a streak até anteontem), vamos buscar todos os logs anteriores
+    const { data: allLogs } = await supabase
+      .from('daily_study_logs')
+      .select('study_date')
+      .eq('user_id', user.id)
+      .order('study_date', { ascending: false })
+      .limit(365)
+
+    let potentialStreak = 0
+    if (allLogs) {
+      let currentDate = new Date(twoDaysAgo)
+      currentDate.setHours(0, 0, 0, 0)
+
+      for (const log of allLogs) {
+        const logDate = new Date(log.study_date)
+        logDate.setHours(0, 0, 0, 0)
+
+        // Ignoramos hoje/amanhã se houver
+        if (logDate.getTime() > currentDate.getTime()) {
+          continue
+        }
+
+        if (logDate.getTime() === currentDate.getTime()) {
+          potentialStreak++
+          currentDate.setDate(currentDate.getDate() - 1)
+        } else {
+          break
+        }
+      }
+    }
+
+    return { isJeopardy: true, potentialStreak }
+  }
+
+  return { isJeopardy: false, potentialStreak: 0 }
+}
+
+/**
+ * Resgata a streak inserindo um log de estudos dummy para o dia de ontem
+ */
+export async function rescueStreak(): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Não autenticado' }
+
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+  // Insere um log de estudo fictício para ontem
+  const { error } = await supabase
+    .from('daily_study_logs')
+    .insert({
+      user_id: user.id,
+      study_date: yesterdayStr,
+      review_count: 1
+    })
+
+  if (error) {
+    console.error('[rescueStreak] Erro ao resgatar streak:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/revisoes')
+  return { success: true }
 }
 
 export async function addXp(amount: number) {
@@ -382,8 +469,12 @@ export async function getDailyQuests() {
     }))
 
     if (inserts.length > 0) {
-      await supabase.from('daily_quests').insert(inserts)
+      const { error: insertError } = await supabase.from('daily_quests').insert(inserts)
       
+      if (insertError) {
+        console.error('Erro ao inserir daily_quests:', insertError)
+      }
+
       const { data: reloaded } = await supabase
         .from('daily_quests')
         .select('*')

@@ -77,6 +77,9 @@ export default function AchievementsPanel({
           } else if (item.id === 'o_tutor') {
             currentVal = tutorCount
             targetVal = 20
+          } else if (item.id === 'o_planejador') {
+            currentVal = unlockedSet.has('o_planejador') ? 1 : 0
+            targetVal = 1
           }
 
           const progressPercent = Math.min(100, Math.round((currentVal / targetVal) * 100))

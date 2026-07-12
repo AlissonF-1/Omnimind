@@ -7,7 +7,7 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { updateNoteContent } from '@/actions/notes'
-import { generateFlashcardsFromNote, createFlashcard, generateAIClozeCard } from '@/actions/flashcards'
+import { generateFlashcardsFromNote, createFlashcard, generateAIClozeCard, previewGeneratedFlashcards, saveGeneratedFlashcards } from '@/actions/flashcards'
 import { formatMarkdownWithGroq } from '@/actions/groq'
 import { createClient } from '@/utils/supabase/client'
 import {
@@ -35,6 +35,7 @@ import {
   Target,
   CheckCircle2,
   AlertCircle,
+  Check,
 } from 'lucide-react'
 
 interface Note {
@@ -153,6 +154,18 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
   const [selectedText, setSelectedText] = useState('')
   const [isPendingCloze, setIsPendingCloze] = useState(false)
+
+  // Estados do Painel de Preview de Flashcards
+  const [previewCards, setPreviewCards] = useState<Array<{
+    front: string
+    back: string
+    analogia?: string | null
+    mnemonico?: string | null
+    source_chunk: string
+    selected: boolean
+  }>>([])
+  const [showPreviewPanel, setShowPreviewPanel] = useState(false)
+  const [isSavingGenerated, setIsSavingGenerated] = useState(false)
 
   const handleSelectionChange = () => {
     const textarea = textareaRef.current
@@ -392,21 +405,46 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
 
-  // 🔹 PASSO 2: Função handleGenerateCards atualizada
+  // 🔹 PASSO 2: Geração de Flashcards com Pré-visualização Inline
   const handleGenerateCards = async () => {
     if (content.trim().length < 50) {
       showToast('Escreva mais conteúdo para gerar cards.', 'error')
       return
     }
     setIsGenerating(true)
-    // Passamos o generationMode como terceiro argumento
-    const response = await generateFlashcardsFromNote(initialNote.id, content, generationMode)
+    const response = await previewGeneratedFlashcards(content, generationMode)
+    setIsGenerating(false)
+
+    if (response.error) {
+      showToast(response.error, 'error')
+    } else if (response.cards) {
+      setPreviewCards(response.cards.map((c: any) => ({ ...c, selected: true })))
+      setShowPreviewPanel(true)
+    }
+  }
+
+  const handleCardFieldChange = (index: number, field: 'front' | 'back' | 'selected', value: any) => {
+    setPreviewCards(prev => prev.map((c, idx) => idx === index ? { ...c, [field]: value } : c))
+  }
+
+  const handleSavePreviewCards = async () => {
+    const selected = previewCards.filter(c => c.selected)
+    if (selected.length === 0) {
+      showToast('Selecione pelo menos um flashcard para salvar.', 'error')
+      return
+    }
+
+    setIsSavingGenerated(true)
+    const response = await saveGeneratedFlashcards(initialNote.id, selected)
+    setIsSavingGenerated(false)
+
     if (response.error) {
       showToast(response.error, 'error')
     } else {
-      showToast(`${response.count} flashcards gerados!`, 'success')
+      showToast(`${response.count} flashcards adicionados com sucesso!`, 'success')
+      setShowPreviewPanel(false)
+      setPreviewCards([])
     }
-    setIsGenerating(false)
   }
 
   return (
@@ -803,6 +841,124 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         ref={cameraInputRef}
         onChange={handleCameraInputChange}
       />
+
+      {/* Mini Painel de Preview de Flashcards */}
+      {showPreviewPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-3xl border border-border bg-surface shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+            
+            {/* Header do Painel */}
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-surface-muted/30 shrink-0">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-black text-text-strong flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary fill-primary/10" /> Flashcards Gerados por IA
+                </h3>
+                <p className="text-xs text-text-muted">Selecione, edite e adicione os cards ao seu Segundo Cérebro.</p>
+              </div>
+              <button 
+                onClick={() => setShowPreviewPanel(false)}
+                className="rounded-full p-1.5 text-text-muted hover:bg-surface-hover hover:text-text-strong transition-colors"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Lista Scrollable de Cards */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-surface/50">
+              {previewCards.map((card, idx) => (
+                <div 
+                  key={idx} 
+                  className={`p-4 rounded-2xl border transition-all flex items-start gap-4 ${
+                    card.selected 
+                      ? 'border-primary/20 bg-primary-soft/5 shadow-[0_4px_12px_rgba(249,115,22,0.02)]' 
+                      : 'border-border bg-surface opacity-60'
+                  }`}
+                >
+                  {/* Checkbox de Seleção */}
+                  <input
+                    type="checkbox"
+                    checked={card.selected}
+                    onChange={(e) => handleCardFieldChange(idx, 'selected', e.target.checked)}
+                    className="size-4 mt-1 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
+                  />
+
+                  {/* Inputs Editáveis */}
+                  <div className="flex-1 space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold text-text-muted uppercase tracking-wider">Pergunta</label>
+                      <textarea
+                        value={card.front}
+                        onChange={(e) => handleCardFieldChange(idx, 'front', e.target.value)}
+                        disabled={!card.selected}
+                        className="w-full text-xs font-semibold text-text-strong bg-surface border border-border rounded-xl px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none min-h-[50px]"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold text-text-muted uppercase tracking-wider">Resposta</label>
+                      <textarea
+                        value={card.back}
+                        onChange={(e) => handleCardFieldChange(idx, 'back', e.target.value)}
+                        disabled={!card.selected}
+                        className="w-full text-xs text-text-medium bg-surface border border-border rounded-xl px-3 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none min-h-[50px]"
+                      />
+                    </div>
+                    
+                    {/* Analogia e Mnemônicos info */}
+                    {(card.analogia || card.mnemonico) && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {card.analogia && (
+                          <span className="text-[10px] font-medium bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" title={card.analogia}>
+                            💡 Contém Analogia
+                          </span>
+                        )}
+                        {card.mnemonico && (
+                          <span className="text-[10px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" title={card.mnemonico}>
+                            🔑 Contém Mnemônico
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Rodapé de Ações */}
+            <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-surface-muted/30 shrink-0">
+              <span className="text-xs font-semibold text-text-muted">
+                {previewCards.filter(c => c.selected).length} de {previewCards.length} selecionados
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPreviewPanel(false)}
+                  className="btn-secondary h-9 px-4 text-xs font-semibold rounded-xl"
+                  disabled={isSavingGenerated}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSavePreviewCards}
+                  className="btn-primary h-9 px-4 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5"
+                  disabled={isSavingGenerated}
+                >
+                  {isSavingGenerated ? (
+                    <>
+                      <Loader2 className="size-3 animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="size-3.5" />
+                      <span>Adicionar Selecionados</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   )
 }

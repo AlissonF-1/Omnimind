@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createWorkspace, updateWorkspace, deleteWorkspace, signOut, archiveWorkspace } from '@/actions/workspaces'
-import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy, User, CalendarDays } from 'lucide-react'
+import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy, User, CalendarDays, Mic, Settings } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 
 interface Workspace {
@@ -157,6 +157,9 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
               <Link href="/dashboard/revisoes" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/revisoes') ? 'nav-item-active' : ''}`}>
                 <BrainCircuit className="size-4" /> Revisão ativa
               </Link>
+              <Link href="/dashboard/feynman" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/feynman') ? 'nav-item-active' : ''}`}>
+                <Mic className="size-4" /> Feynman Sandbox
+              </Link>
               <Link href="/dashboard/busca" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/busca') ? 'nav-item-active' : ''}`}>
                 <Search className="size-4" /> Busca semântica
               </Link>
@@ -174,6 +177,9 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
               </Link>
               <Link href="/dashboard/perfil" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/perfil') ? 'nav-item-active' : ''}`}>
                 <User className="size-4" /> Meu Perfil
+              </Link>
+              <Link href="/dashboard/configuracoes" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/configuracoes') ? 'nav-item-active' : ''}`}>
+                <Settings className="size-4" /> Configurações
               </Link>
             </nav>
           </div>
