@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/utils/supabase/server'
 import { embedQuery } from '@/lib/embeddings'
-import { incrementTutorQueriesCount } from '@/actions/achievements'
+import { incrementTutorQueriesCount, addXp, incrementQuestProgress, checkAndUnlockAchievements } from '@/actions/achievements'
+import { XP_CONFIG } from '@/types/achievements'
 
 const MAX_CONTEXT_TOKENS = 6000
 
@@ -54,8 +55,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Usuário não autenticado.' }, { status: 401 })
     }
 
-    // Incrementa contagem de consultas ao tutor em background
-    incrementTutorQueriesCount().catch(err => console.error('Erro ao incrementar contagem do tutor:', err))
+
 
     const queryEmbedding = await embedQuery(trimmedQuery)
 
@@ -165,6 +165,32 @@ ${personaPrompt}
         const encoder = new TextEncoder()
 
         try {
+          // Incrementa contagem de consultas e avança quest Curioso de forma assíncrona
+          incrementTutorQueriesCount().catch(err => console.error('Erro ao somar query:', err))
+          incrementQuestProgress('curioso', 1).catch(err => console.error('Erro ao somar quest:', err))
+          
+          // Adiciona o XP do chat usando configuração centralizada e verifica se subiu de nível
+          const xpRes = await addXp(XP_CONFIG.CHAT_MESSAGE).catch(err => {
+            console.error('Erro ao adicionar XP do chat:', err)
+            return null
+          })
+
+          if (xpRes && xpRes.leveledUp) {
+            controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'level-up', data: { oldLevel: xpRes.oldLevel, newLevel: xpRes.newLevel } })}\n`))
+          }
+
+          // Verifica conquistas desbloqueadas durante o chat
+          const newlyUnlocked = await checkAndUnlockAchievements().catch(err => {
+            console.error('Erro ao checar conquistas:', err)
+            return []
+          })
+
+          if (newlyUnlocked && newlyUnlocked.length > 0) {
+            newlyUnlocked.forEach((achievement) => {
+              controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'achievement-unlocked', data: achievement })}\n`))
+            })
+          }
+
           controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'sources', data: sources })}\n`))
           controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'model', data: 'Gemini 2.5 Flash' })}\n`))
 

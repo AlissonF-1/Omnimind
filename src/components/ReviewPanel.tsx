@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Rating } from 'ts-fsrs'
 import { submitReview } from '@/actions/reviews'
 import { deleteFlashcard } from '@/actions/flashcards'
+import { addXp } from '@/actions/achievements'
+import { XP_CONFIG } from '@/types/achievements'
 import { checkNoteRelearningAlert } from '@/actions/stats'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -432,6 +434,8 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         correct: true,
         feedback: 'Parabéns! Você escolheu a alternativa correta.'
       })
+      // Adiciona XP por acertar o simulado usando configuração centralizada
+      addXp(XP_CONFIG.PERFECT_SIMULADO).catch(console.error)
     } else {
       setAiFeedback({
         correct: false,
@@ -473,6 +477,12 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
               detail: achievement
             }))
           })
+        }
+        // Dispara subida de nível em background
+        if (res && res.leveledUp) {
+          window.dispatchEvent(new CustomEvent('level-up', {
+            detail: { oldLevel: res.leveledUp.oldLevel, newLevel: res.leveledUp.newLevel }
+          }))
         }
       })
       .catch((error) => {

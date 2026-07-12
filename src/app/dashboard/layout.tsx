@@ -1,6 +1,7 @@
 import Sidebar from '@/components/Sidebar'
 import { getWorkspaces } from '@/actions/workspaces'
 import AchievementToast from '@/components/AchievementToast'
+import LevelUpModal from '@/components/LevelUpModal'
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default async function DashboardLayout({
         {children}
       </main>
       <AchievementToast />
+      <LevelUpModal />
     </div>
   )
 }

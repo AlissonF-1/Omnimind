@@ -7,11 +7,14 @@ import ReviewAlarm from '@/components/ReviewAlarm'
 import DailyProgressCircle from '@/components/DailyProgressCircle'
 import AchievementNotifier from '@/components/AchievementNotifier'
 import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, CriticalAlert } from '@/actions/stats'
+import { getDynamicDailyGoal } from '@/actions/calendar'
 import { getBlindSpots } from '@/actions/blindspots'
-import { getUserStudyStats, checkAndUnlockAchievements } from '@/actions/achievements'
+import { getUserStudyStats, checkAndUnlockAchievements, getDailyQuests } from '@/actions/achievements'
 import { createClient } from '@/utils/supabase/server'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import LevelProgressCard from '@/components/LevelProgressCard'
+import DailyQuestsCard from '@/components/DailyQuestsCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -142,14 +145,18 @@ async function DashboardContent() {
       criticalAlerts,
       blindSpots,
       userStats,
-      newlyUnlocked
+      newlyUnlocked,
+      dailyQuests,
+      dynamicGoalData
     ] = await Promise.all([
       getDailyStudyLogs(),
       getUserDashboardStats(),
       getCriticalReviewAlerts(),
       getBlindSpots(),
       getUserStudyStats(),
-      checkAndUnlockAchievements()
+      checkAndUnlockAchievements(),
+      getDailyQuests(),
+      getDynamicDailyGoal()
     ])
 
     const hasActivity = studyLogs && studyLogs.length > 0
@@ -184,39 +191,52 @@ async function DashboardContent() {
 
         {/* Grid de Estatísticas e Progresso Diário */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 flex flex-col gap-6">
             <DashboardStatsCards
               totalCards={stats?.totalCards || 0}
               overdueCards={stats?.overdueCards || 0}
               streak={stats?.streak || 0}
               retentionRate={stats?.retentionRate || 0}
             />
-          </div>
-          <DailyProgressCircle
-            reviewCount={todayReviewCount}
-            streak={stats?.streak || 0}
-            multiplier={userStats?.streak_multiplier || 1.0}
-            isGoalCompleted={userStats?.daily_goal_completed || false}
-          />
-        </div>
 
-        {hasActivity ? (
-          <Heatmap logs={studyLogs} />
-        ) : (
-          <div className="panel-muted flex flex-col items-center justify-center gap-3 rounded-xl px-6 py-10 text-center">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-              <CalendarDays className="size-6" />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-text-strong">
-                Sua sequência de estudos aparece aqui
-              </p>
-              <p className="mt-1 text-xs text-text-muted max-w-sm">
-                Complete sua primeira sessão de revisão para começar a construir sua sequência.
-              </p>
-            </div>
+            {hasActivity ? (
+              <Heatmap logs={studyLogs} />
+            ) : (
+              <div className="panel-muted flex flex-col items-center justify-center gap-3 rounded-xl px-6 py-10 text-center">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+                  <CalendarDays className="size-6" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-text-strong">
+                    Sua sequência de estudos aparece aqui
+                  </p>
+                  <p className="mt-1 text-xs text-text-muted max-w-sm">
+                    Complete sua primeira sessão de revisão para começar a construir sua sequência.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="flex flex-col gap-6">
+            <DailyProgressCircle
+              reviewCount={todayReviewCount}
+              streak={stats?.streak || 0}
+              multiplier={userStats?.streak_multiplier || 1.0}
+              isGoalCompleted={userStats?.daily_goal_completed || false}
+              dailyGoal={dynamicGoalData?.goal}
+              activeGoalTitle={dynamicGoalData?.activeGoal?.title}
+            />
+            
+            <LevelProgressCard 
+              totalXp={userStats?.total_xp || 0}
+              currentLevel={userStats?.current_level || 1}
+              streakShields={userStats?.streak_shields || 0}
+            />
+
+            <DailyQuestsCard quests={dailyQuests} />
+          </div>
+        </div>
 
         <ReviewAlarm />
 

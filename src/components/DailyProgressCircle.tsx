@@ -1,50 +1,69 @@
-'use client'
+﻿'use client'
 
-import { CheckCircle2, Flame, Award } from 'lucide-react'
+import { CheckCircle2, Flame, Award, Target } from 'lucide-react'
+import Link from 'next/link'
 
 interface DailyProgressCircleProps {
   reviewCount: number
   streak: number
   multiplier: number
   isGoalCompleted: boolean
+  dailyGoal?: number
+  activeGoalTitle?: string | null
 }
 
 export default function DailyProgressCircle({
   reviewCount,
   streak,
   multiplier,
-  isGoalCompleted
+  isGoalCompleted,
+  dailyGoal,
+  activeGoalTitle
 }: DailyProgressCircleProps) {
-  const goal = 10
+  const goal = dailyGoal || 10
+  const isDynamic = !!dailyGoal && dailyGoal !== 10
   const percentage = Math.min(100, Math.round((reviewCount / goal) * 100))
   
-  // Constantes do círculo SVG de progresso
+  // Constantes do circulo SVG de progresso
   const radius = 38
   const circumference = 2 * Math.PI * radius
   const strokeDashoffset = circumference - (percentage / 100) * circumference
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-sm flex items-center justify-between gap-5 group">
-      {/* Background glow sutil se concluído */}
+      {/* Background glow sutil se concluido */}
       {isGoalCompleted && (
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 opacity-100 transition-opacity duration-300 pointer-events-none" />
       )}
 
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <span className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
           Progresso de Hoje
         </span>
         <h3 className="font-extrabold text-base text-text-strong tracking-wide">
           Jornada de Estudos
         </h3>
-        <p className="text-xs text-text-muted mt-1 leading-snug">
+
+        {/* Badge de meta ajustada (so aparece se tiver prova cadastrada) */}
+        {isDynamic && activeGoalTitle && (
+          <Link href="/dashboard/calendario" className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-md px-2 py-0.5 hover:bg-primary/20 transition-all">
+            <Target className="size-3" /> Meta ajustada: {activeGoalTitle}
+          </Link>
+        )}
+        {isDynamic && !activeGoalTitle && (
+          <Link href="/dashboard/calendario" className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-md px-2 py-0.5 hover:bg-primary/20 transition-all">
+            <Target className="size-3" /> Meta ajustada para prova
+          </Link>
+        )}
+
+        <p className="text-xs text-text-muted mt-2 leading-snug">
           {isGoalCompleted 
-            ? '🎉 Meta diária concluída! Seu multiplicador está ativo.' 
+            ? '🎉 Meta diaria concluida! Seu multiplicador esta ativo.' 
             : `Revise mais ${Math.max(0, goal - reviewCount)} cards hoje para completar a meta.`}
         </p>
 
         {/* XP Multiplier & Streak Badges */}
-        <div className="flex items-center gap-2 mt-3.5">
+        <div className="flex items-center gap-2 mt-3">
           <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20 rounded-md px-2 py-0.5 uppercase tracking-wider">
             <Award className="size-3" /> XP {multiplier.toFixed(1)}x
           </span>
@@ -54,7 +73,7 @@ export default function DailyProgressCircle({
         </div>
       </div>
 
-      {/* Círculo SVG de Progresso */}
+      {/* Circulo SVG de Progresso */}
       <div className="relative flex items-center justify-center shrink-0">
         <svg className="size-24 transform -rotate-90">
           <circle
@@ -71,7 +90,7 @@ export default function DailyProgressCircle({
             className={`fill-none transition-all duration-500 ease-out ${
               isGoalCompleted 
                 ? 'stroke-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
-                : 'stroke-primary'
+                : isDynamic ? 'stroke-violet-500' : 'stroke-primary'
             }`}
             strokeWidth="7"
             strokeDasharray={circumference}
@@ -80,7 +99,7 @@ export default function DailyProgressCircle({
           />
         </svg>
 
-        {/* Elemento central do círculo */}
+        {/* Elemento central do circulo */}
         <div className="absolute inset-0 flex flex-col items-center justify-center select-none text-center">
           {isGoalCompleted ? (
             <CheckCircle2 className="size-8 text-emerald-500 animate-bounce" />

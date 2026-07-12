@@ -3,8 +3,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { fsrs, Rating, Card as FSRSCard } from 'ts-fsrs'
 import { revalidatePath } from 'next/cache'
-import { checkAndUnlockAchievements } from '@/actions/achievements'
-import { AchievementDetails } from '@/types/achievements'
+import { checkAndUnlockAchievements, addXp, incrementQuestProgress, getUserStreak, getUserStudyStats } from '@/actions/achievements'
+import { AchievementDetails, XP_CONFIG } from '@/types/achievements'
 
 // Tipagem mais forte para o estado do card (vindo do banco)
 interface FsrsCardState {
@@ -118,7 +118,7 @@ export async function submitReview(
   cardId: string,
   currentFsrsState: FsrsCardState,
   grade: Rating
-): Promise<{ success?: boolean; error?: string; newlyUnlocked?: AchievementDetails[] }> {
+): Promise<{ success?: boolean; error?: string; newlyUnlocked?: AchievementDetails[]; leveledUp?: { oldLevel: number; newLevel: number } | null }> {
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()
 
@@ -203,8 +203,21 @@ export async function submitReview(
       // Não falha a operação principal
     }
 
-    // 4.1. Verifica se completou a meta diária (10 revisões) no stats
+    // 4.1. Verifica e atualiza estatísticas de gamificação (XP, Quests e Escudo)
+    let levelUpData = null
     try {
+      // Adiciona XP por card revisado usando configuração centralizada
+      const xpRes = await addXp(XP_CONFIG.REVIEW_CARD)
+      if (xpRes?.leveledUp) {
+        levelUpData = { oldLevel: xpRes.oldLevel, newLevel: xpRes.newLevel }
+      }
+
+      // Incrementa progresso da quest "Guerreiro do Dia"
+      const questRes = await incrementQuestProgress('guerreiro', 1)
+      if (questRes?.leveledUp?.leveledUp) {
+        levelUpData = { oldLevel: questRes.leveledUp.oldLevel, newLevel: questRes.leveledUp.newLevel }
+      }
+
       const todayStr = new Date().toISOString().split('T')[0]
       const { data: logToday } = await supabase
         .from('daily_study_logs')
@@ -213,14 +226,34 @@ export async function submitReview(
         .eq('study_date', todayStr)
         .maybeSingle()
 
-      if (logToday && logToday.review_count >= 10) {
-        await supabase
-          .from('user_study_stats')
-          .update({ daily_goal_completed: true })
-          .eq('user_id', user.id)
+      if (logToday) {
+        const reviewCount = logToday.review_count
+
+        // Se completou a meta diária (10 revisões), marca no stats
+        if (reviewCount >= 10) {
+          await supabase
+            .from('user_study_stats')
+            .update({ daily_goal_completed: true })
+            .eq('user_id', user.id)
+        }
+
+        // Se for a primeira revisão do dia, calcula a streak e concede escudo de streak se for múltiplo de 7
+        if (reviewCount === 1) {
+          const streak = await getUserStreak(user.id)
+          if (streak > 0 && streak % 7 === 0) {
+            const stats = await getUserStudyStats()
+            await supabase
+              .from('user_study_stats')
+              .update({ 
+                streak_shields: (stats?.streak_shields || 0) + 1,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', user.id)
+          }
+        }
       }
     } catch (goalErr) {
-      console.error('[submitReview] Erro ao verificar meta diária:', goalErr)
+      console.error('[submitReview] Erro ao processar gamificação e meta diária:', goalErr)
     }
 
     // 5. Revalida paths
@@ -239,7 +272,7 @@ export async function submitReview(
     // 6. Roda a checagem de conquistas após as atualizações de estudos
     const newlyUnlocked = await checkAndUnlockAchievements()
 
-    return { success: true, newlyUnlocked }
+    return { success: true, newlyUnlocked, leveledUp: levelUpData }
   } catch (error) {
     console.error('[submitReview] Erro inesperado:', error)
     return { error: error instanceof Error ? error.message : 'Erro interno no processamento' }

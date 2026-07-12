@@ -537,6 +537,14 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                   })
                 })
               )
+            } else if (parsed.type === 'level-up') {
+              window.dispatchEvent(new CustomEvent('level-up', {
+                detail: parsed.data
+              }))
+            } else if (parsed.type === 'achievement-unlocked') {
+              window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+                detail: parsed.data
+              }))
             }
           } catch (streamError) {
             console.warn('Erro ao ler pedaço do stream:', streamError)

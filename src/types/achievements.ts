@@ -1,3 +1,10 @@
+export const XP_CONFIG = {
+  REVIEW_CARD: 10,
+  PERFECT_SIMULADO: 20,
+  CHAT_MESSAGE: 5,
+  DAILY_QUEST_COMPLETE: 30
+}
+
 export interface UserStudyStats {
   user_id: string
   daily_goal_completed: boolean
@@ -5,6 +12,10 @@ export interface UserStudyStats {
   tutor_queries_count: number
   perfect_exams_count: number
   unlocked_achievements: string[]
+  total_xp?: number
+  current_level?: number
+  streak_shields?: number
+  updated_at?: string
 }
 
 export interface AchievementDetails {

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createWorkspace, updateWorkspace, deleteWorkspace, signOut, archiveWorkspace } from '@/actions/workspaces'
-import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy } from 'lucide-react'
+import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy, User, CalendarDays } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 
 interface Workspace {
@@ -146,6 +146,12 @@ export default function Sidebar({ workspaces }: { workspaces: Workspace[] }) {
               </Link>
               <Link href="/dashboard/conquistas" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/conquistas') ? 'nav-item-active' : ''}`}>
                 <Trophy className="size-4" /> Minhas Conquistas
+              </Link>
+              <Link href="/dashboard/calendario" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/calendario') ? 'nav-item-active' : ''}`}>
+                <CalendarDays className="size-4" /> Calendário
+              </Link>
+              <Link href="/dashboard/perfil" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/perfil') ? 'nav-item-active' : ''}`}>
+                <User className="size-4" /> Meu Perfil
               </Link>
             </nav>
           </div>

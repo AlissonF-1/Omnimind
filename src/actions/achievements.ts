@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { UserStudyStats, AchievementDetails, ACHIEVEMENTS } from '@/types/achievements'
+import { UserStudyStats, AchievementDetails, ACHIEVEMENTS, XP_CONFIG } from '@/types/achievements'
 
 export async function getUserStudyStats(): Promise<UserStudyStats | null> {
   const supabase = await createClient()
@@ -167,7 +167,7 @@ export async function incrementPerfectExamsCount() {
   }
 }
 
-async function getUserStreak(userId: string): Promise<number> {
+export async function getUserStreak(userId: string): Promise<number> {
   const supabase = await createClient()
   const { data: logs } = await supabase
     .from('daily_study_logs')
@@ -190,9 +190,291 @@ async function getUserStreak(userId: string): Promise<number> {
         streak++
         currentDate.setDate(currentDate.getDate() - 1)
       } else {
-        break
+        // A streak quebrou. Verifica escudo.
+        // Se for apenas o dia de hoje que ainda não foi estudado,
+        // apenas mudamos o currentDate para ontem e continuamos.
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+
+        if (currentDate.getTime() === today.getTime() && logDate.getTime() === yesterday.getTime()) {
+          currentDate.setDate(currentDate.getDate() - 1)
+          continue
+        }
+
+        // Se ontem ou antes foi perdido, consome escudo
+        const { data: stats } = await supabase
+          .from('user_study_stats')
+          .select('streak_shields')
+          .eq('user_id', userId)
+          .maybeSingle()
+
+        if (stats && (stats.streak_shields || 0) > 0) {
+          // Consome o escudo e mantém a streak!
+          await supabase
+            .from('user_study_stats')
+            .update({ 
+              streak_shields: (stats.streak_shields || 0) - 1,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId)
+
+          // Incrementa streak pelo dia protegido
+          streak++
+          // Ajusta currentDate para pular o dia perdido e continuar verificando
+          currentDate.setDate(currentDate.getDate() - 2)
+        } else {
+          break // A streak quebra de verdade
+        }
       }
     }
   }
   return streak
+}
+
+export async function addXp(amount: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const stats = await getUserStudyStats()
+  if (!stats) return null
+
+  const currentXp = stats.total_xp || 0
+  const newXp = currentXp + amount
+
+  // Fórmula de nível: Nível = (Raiz quadrada do XP / 5) + 1
+  const newLevel = Math.floor(Math.sqrt(newXp / 5)) + 1
+  const oldLevel = stats.current_level || 1
+  const leveledUp = newLevel > oldLevel
+
+  await supabase
+    .from('user_study_stats')
+    .update({ 
+      total_xp: newXp, 
+      current_level: newLevel,
+      updated_at: new Date().toISOString()
+    })
+    .eq('user_id', user.id)
+
+  revalidatePath('/dashboard')
+
+  return { leveledUp, oldLevel, newLevel }
+}
+
+export async function incrementQuestProgress(questId: 'guerreiro' | 'escritor' | 'curioso', amount = 1) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const todayStr = new Date().toISOString().split('T')[0]
+  
+  // 1. Busca a quest de hoje
+  let { data: quest } = await supabase
+    .from('daily_quests')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('date', todayStr)
+    .eq('quest_id', questId)
+    .maybeSingle()
+
+  const stats = await getUserStudyStats()
+  const level = stats?.current_level || 1
+
+  const targets = { 
+    guerreiro: Math.min(30, 5 + Math.floor(level * 1.5)), 
+    escritor: 1, 
+    curioso: 1 
+  }
+  const rewardXps = { 
+    guerreiro: XP_CONFIG.DAILY_QUEST_COMPLETE, 
+    escritor: XP_CONFIG.DAILY_QUEST_COMPLETE, 
+    curioso: XP_CONFIG.DAILY_QUEST_COMPLETE 
+  }
+
+  const target = targets[questId]
+  const rewardXp = rewardXps[questId]
+
+  let levelUpRes = null
+
+  if (!quest) {
+    // Insere nova quest para hoje
+    const newProgress = Math.min(amount, target)
+    const completed = newProgress >= target
+    
+    const { data: inserted } = await supabase
+      .from('daily_quests')
+      .insert({
+        user_id: user.id,
+        date: todayStr,
+        quest_id: questId,
+        progress: newProgress,
+        target: target,
+        completed: completed,
+        reward_xp: rewardXp
+      })
+      .select()
+      .single()
+
+    if (completed && inserted) {
+      levelUpRes = await addXp(rewardXp)
+    }
+    return { quest: inserted, newlyCompleted: completed, leveledUp: levelUpRes }
+  } else {
+    if (quest.completed) return { quest, newlyCompleted: false }
+
+    const newProgress = Math.min((quest.progress || 0) + amount, target)
+    const completed = newProgress >= target
+
+    const { data: updated } = await supabase
+      .from('daily_quests')
+      .update({
+        progress: newProgress,
+        completed: completed
+      })
+      .eq('id', quest.id)
+      .select()
+      .single()
+
+    if (completed && !quest.completed && updated) {
+      levelUpRes = await addXp(rewardXp)
+    }
+    return { quest: updated, newlyCompleted: completed && !quest.completed, leveledUp: levelUpRes }
+  }
+}
+
+export async function getDailyQuests() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  // Busca as quests de hoje
+  let { data: quests } = await supabase
+    .from('daily_quests')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('date', todayStr)
+
+  // Se não tem as 3 quests, inicializa
+  const questTypes = ['guerreiro', 'escritor', 'curioso']
+  if (!quests || quests.length < 3) {
+    const existingIds = quests?.map(q => q.quest_id) || []
+    const missingTypes = questTypes.filter(t => !existingIds.includes(t))
+
+    const stats = await getUserStudyStats()
+    const level = stats?.current_level || 1
+
+    const targets = { 
+      guerreiro: Math.min(30, 5 + Math.floor(level * 1.5)), 
+      escritor: 1, 
+      curioso: 1 
+    }
+    
+    const inserts = missingTypes.map(type => ({
+      user_id: user.id,
+      date: todayStr,
+      quest_id: type,
+      progress: 0,
+      target: targets[type as 'guerreiro' | 'escritor' | 'curioso'],
+      completed: false,
+      reward_xp: XP_CONFIG.DAILY_QUEST_COMPLETE
+    }))
+
+    if (inserts.length > 0) {
+      await supabase.from('daily_quests').insert(inserts)
+      
+      const { data: reloaded } = await supabase
+        .from('daily_quests')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', todayStr)
+      quests = reloaded
+    }
+  }
+
+  return quests || []
+}
+
+export async function generatePlayerTitle(force = false): Promise<string> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return 'Estudante Dedicado'
+
+  // Se já tem título e não estamos forçando a geração, retorna o atual
+  const currentTitle = user.user_metadata?.player_title
+  if (currentTitle && !force) {
+    return currentTitle
+  }
+
+  // Verificador de timestamp (Rate limit: 1 hora)
+  const lastGenerated = user.user_metadata?.last_title_generated_at
+  if (lastGenerated && force) {
+    const lastTime = new Date(lastGenerated).getTime()
+    const nowTime = new Date().getTime()
+    const diffHours = (nowTime - lastTime) / (1000 * 60 * 60)
+    if (diffHours < 1) {
+      // Retorna o título atual silenciosamente se for clicado antes de 1 hora
+      return currentTitle || 'Estudante Dedicado'
+    }
+  }
+
+  // 1. Busca os nomes das workspaces do usuário
+  const { data: workspaces } = await supabase
+    .from('workspaces')
+    .select('name')
+    .eq('is_archived', false)
+
+  const stats = await getUserStudyStats()
+  const level = stats?.current_level || 1
+
+  const workspaceNames = workspaces?.map(w => w.name).join(', ') || 'Estudos Gerais'
+
+  // 2. Chama a API do Groq para gerar um título criativo de 3 palavras em português
+  const groqApiKey = process.env.GROQ_API_KEY
+  if (!groqApiKey) return `Especialista Nível ${level}`
+
+  try {
+    const prompt = `Você é um gerador de títulos honoríficos de RPG para um aplicativo de estudos gamificado chamado OmniMind.
+O usuário estuda os seguintes temas: "${workspaceNames}" e está no Nível ${level}.
+Gere um título honorífico curto de 2 a 4 palavras em português que descreva essa jornada de forma épica ou divertida.
+Exemplos:
+- Se estuda Direito: "O Intérprete da Lei" ou "Defensor da Justiça"
+- Se estuda Computação: "Arquiteto de Algoritmos" ou "Mestre dos Bits"
+- Se estuda Medicina: "Guardião da Saúde" ou "Anatomista do Amanhã"
+- Se estuda vários temas: "Polímata Aprendiz" ou "Buscador do Conhecimento"
+
+Retorne APENAS o título gerado, sem explicações, sem aspas, sem introduções. Não use markdown.`
+
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 30
+      })
+    })
+
+    if (!res.ok) throw new Error('Falha na chamada do Groq')
+    const json = await res.json()
+    const title = json.choices?.[0]?.message?.content?.trim() || `Conquistador Nível ${level}`
+
+    // 3. Salva o título gerado e o timestamp de geração no metadata do usuário
+    await supabase.auth.updateUser({
+      data: { 
+        player_title: title,
+        last_title_generated_at: new Date().toISOString()
+      }
+    })
+
+    return title
+  } catch (err) {
+    console.error('Erro ao gerar título:', err)
+    return `Explorador Nível ${level}`
+  }
 }

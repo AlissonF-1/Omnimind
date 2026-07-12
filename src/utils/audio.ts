@@ -36,3 +36,47 @@ export function playTrophySound() {
     console.warn('Web Audio API não pôde ser reproduzida (possível bloqueio de autoplay):', err)
   }
 }
+
+export function playLevelUpSound() {
+  if (typeof window === 'undefined') return
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContextClass) return
+    
+    const ctx = new AudioContextClass()
+    const now = ctx.currentTime
+
+    const playNote = (freq: number, startOffset: number, duration: number, vol = 0.2) => {
+      const osc = ctx.createOscillator()
+      const gainNode = ctx.createGain()
+
+      osc.connect(gainNode)
+      gainNode.connect(ctx.destination)
+
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + startOffset)
+
+      gainNode.gain.setValueAtTime(0, now + startOffset)
+      gainNode.gain.linearRampToValueAtTime(vol, now + startOffset + 0.05)
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + startOffset + duration)
+
+      osc.start(now + startOffset)
+      osc.stop(now + startOffset + duration)
+    }
+
+    // Arpejo ascendente clássico de level up (C4 -> E4 -> G4 -> C5 -> E5 -> G5 -> C6)
+    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50]
+    notes.forEach((freq, idx) => {
+      playNote(freq, idx * 0.08, 0.4, 0.15)
+    })
+
+    // Nota final festiva e harmônica sustentada: C6 com vibrato leve
+    const finalFreq = 1046.50
+    const finalOffset = notes.length * 0.08
+    playNote(finalFreq, finalOffset, 1.2, 0.2)
+    playNote(finalFreq * 1.5, finalOffset + 0.08, 1.0, 0.1) // Adiciona quinta justa (G6) para brilho
+
+  } catch (err) {
+    console.warn('Web Audio API level up error:', err)
+  }
+}

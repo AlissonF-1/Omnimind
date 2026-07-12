@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { indexNote } from '@/actions/embeddings'
+import { incrementQuestProgress } from '@/actions/achievements'
 
 export async function getNotes(workspaceId: string) {
   const supabase = await createClient()
@@ -113,6 +114,9 @@ export async function createNote(workspaceId: string) {
 
   revalidatePath(`/dashboard/${workspaceId}`)
   revalidatePath(`/dashboard/${workspaceId}/note/${data.id}`)
+
+  // Incrementa progresso da quest diária "Escritor" em background
+  incrementQuestProgress('escritor', 1).catch(err => console.error('Erro ao incrementar quest Escritor:', err))
 
   return data.id
 }

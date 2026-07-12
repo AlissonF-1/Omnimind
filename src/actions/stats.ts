@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { getUserStudyStats } from '@/actions/achievements'
 
 export async function getDailyStudyLogs() {
   const supabase = await createClient()
@@ -262,5 +263,92 @@ export async function getCriticalCards(): Promise<CriticalCard[]> {
   } catch (error) {
     console.error('Erro ao buscar cards críticos:', error)
     return []
+  }
+}
+
+export async function getProfileStats() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Não autenticado')
+
+  // 1. Busca estatísticas do usuário (XP, Nível, Escudos, Conquistas)
+  const userStats = await getUserStudyStats()
+
+  // 2. Busca todos os logs de estudo diário para calcular streak recorde, contagem total de revisões e atividade recente
+  const { data: logs } = await supabase
+    .from('daily_study_logs')
+    .select('study_date, review_count')
+    .eq('user_id', user.id)
+    .order('study_date', { ascending: true })
+
+  let maxStreak = 0
+  let currentStreak = 0
+  let prevDate: Date | null = null
+  let totalReviews = 0
+
+  if (logs && logs.length > 0) {
+    for (const log of logs) {
+      totalReviews += log.review_count || 0
+      const currentDate = new Date(log.study_date)
+      currentDate.setHours(0, 0, 0, 0)
+      
+      if (!prevDate) {
+        currentStreak = 1
+      } else {
+        const diffTime = Math.abs(currentDate.getTime() - prevDate.getTime())
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        
+        if (diffDays === 1) {
+          currentStreak++
+        } else if (diffDays > 1) {
+          if (currentStreak > maxStreak) {
+            maxStreak = currentStreak
+          }
+          currentStreak = 1
+        }
+      }
+      prevDate = currentDate
+    }
+    if (currentStreak > maxStreak) {
+      maxStreak = currentStreak
+    }
+  }
+
+  // 3. Busca a contagem de notas criadas
+  const { count: notesCount } = await supabase
+    .from('notes')
+    .select('id, workspaces!inner(user_id)', { count: 'exact', head: true })
+    .eq('workspaces.user_id', user.id)
+
+  // 4. Gera a atividade recente dos últimos 7 dias
+  const last7Days = []
+  const today = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    const dateStr = d.toISOString().split('T')[0]
+    const matchingLog = logs?.find((log: any) => log.study_date === dateStr)
+    last7Days.push({
+      date: new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric' }).format(d),
+      reviews: matchingLog?.review_count || 0
+    })
+  }
+
+  return {
+    user: {
+      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Estudante',
+      email: user.email,
+      avatarUrl: user.user_metadata?.avatar_url || null,
+      playerTitle: user.user_metadata?.player_title || 'Estudante Dedicado'
+    },
+    totalXp: userStats?.total_xp || 0,
+    currentLevel: userStats?.current_level || 1,
+    streakShields: userStats?.streak_shields || 0,
+    maxStreak: maxStreak,
+    cardsReviewed: totalReviews,
+    notesCreated: notesCount || 0,
+    perfectExams: userStats?.perfect_exams_count || 0,
+    unlockedAchievements: userStats?.unlocked_achievements || [],
+    recentActivity: last7Days
   }
 }
