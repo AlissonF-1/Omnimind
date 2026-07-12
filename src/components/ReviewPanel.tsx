@@ -442,44 +442,42 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   }
 
   const handleReview = async (grade: Rating) => {
-    setIsSubmitting(true)
-    try {
-      const res = await submitReview(activeCard.id, activeCard, grade)
-
-      // Dispara eventos para as conquistas recém desbloqueadas nesta revisão
-      if (res && 'newlyUnlocked' in res && Array.isArray(res.newlyUnlocked)) {
-        res.newlyUnlocked.forEach((achievement: any) => {
-          window.dispatchEvent(new CustomEvent('achievement-unlocked', {
-            detail: achievement
-          }))
-        })
-      }
-
-      if (grade === Rating.Good || grade === Rating.Easy) {
-        setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }))
-      } else if (grade === Rating.Again) {
-        setSessionStats(prev => ({ ...prev, wrong: prev.wrong + 1 }))
-      } else if (grade === Rating.Hard) {
-        setSessionStats(prev => ({ ...prev, hard: prev.hard + 1 }))
-      }
-
-      setIsFlipped(false)
-      setTranscript('')
-      setOpenAccordion(null)
-      setIsConfirmingDelete(false)
-      setResponseMethod(null)
-      setAiFeedback(null)
-      setUserAnswerText('')
-      setSelectedQuizOption(null)
-      setQuizOptions([])
-      setTimeout(() => {
-        setCurrentIndex(prev => prev + 1)
-        setIsSubmitting(false)
-      }, 150)
-    } catch (error) {
-      console.error('Erro ao enviar revisão:', error)
-      setIsSubmitting(false)
+    // 1. Atualiza estatísticas locais da sessão de forma instantânea
+    if (grade === Rating.Good || grade === Rating.Easy) {
+      setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }))
+    } else if (grade === Rating.Again) {
+      setSessionStats(prev => ({ ...prev, wrong: prev.wrong + 1 }))
+    } else if (grade === Rating.Hard) {
+      setSessionStats(prev => ({ ...prev, hard: prev.hard + 1 }))
     }
+
+    // 2. Reseta estados visuais de resposta e avança para o próximo card instantaneamente
+    setIsFlipped(false)
+    setTranscript('')
+    setOpenAccordion(null)
+    setIsConfirmingDelete(false)
+    setResponseMethod(null)
+    setAiFeedback(null)
+    setUserAnswerText('')
+    setSelectedQuizOption(null)
+    setQuizOptions([])
+    setCurrentIndex(prev => prev + 1)
+
+    // 3. Salva a revisão no banco em background sem bloquear a interface do usuário
+    submitReview(activeCard.id, activeCard, grade)
+      .then((res) => {
+        // Dispara conquistas em background se houver alguma desbloqueada
+        if (res && 'newlyUnlocked' in res && Array.isArray(res.newlyUnlocked)) {
+          res.newlyUnlocked.forEach((achievement: any) => {
+            window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+              detail: achievement
+            }))
+          })
+        }
+      })
+      .catch((error) => {
+        console.error('Erro ao salvar revisão em background:', error)
+      })
   }
 
   const handleDeleteCard = async () => {
