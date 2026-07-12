@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { fsrs, Rating, Card as FSRSCard } from 'ts-fsrs'
 import { revalidatePath } from 'next/cache'
 import { checkAndUnlockAchievements } from '@/actions/achievements'
+import { AchievementDetails } from '@/types/achievements'
 
 // Tipagem mais forte para o estado do card (vindo do banco)
 interface FsrsCardState {
@@ -117,7 +118,7 @@ export async function submitReview(
   cardId: string,
   currentFsrsState: FsrsCardState,
   grade: Rating
-): Promise<{ success?: boolean; error?: string }> {
+): Promise<{ success?: boolean; error?: string; newlyUnlocked?: AchievementDetails[] }> {
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()
 
