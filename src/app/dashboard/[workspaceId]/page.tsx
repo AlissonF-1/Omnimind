@@ -20,11 +20,14 @@ export default async function WorkspacePage({
   const searchParamsObj = await searchParams
   const workspaceId = resolvedParams.workspaceId
 
-  const workspace = await getWorkspaceById(workspaceId)
-  if (!workspace) notFound()
+  const [workspace, notesRes, flashcardCounts] = await Promise.all([
+    getWorkspaceById(workspaceId),
+    getNotes(workspaceId),
+    getWorkspaceFlashcardCounts(workspaceId)
+  ])
 
-  let notes = await getNotes(workspaceId)
-  const flashcardCounts = await getWorkspaceFlashcardCounts(workspaceId)
+  if (!workspace) notFound()
+  let notes = notesRes
 
   // Filtro por busca (case-insensitive)
   if (searchParamsObj.search) {

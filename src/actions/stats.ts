@@ -141,22 +141,30 @@ export async function getUserDashboardStats() {
 export async function getWorkspaceFlashcardCounts(workspaceId: string) {
   const supabase = await createClient()
 
-  const { data: notes } = await supabase
-    .from('notes')
-    .select('id')
-    .eq('workspace_id', workspaceId)
+  // Busca as notas e os cards do workspace de forma concorrente em paralelo
+  const [notesRes, cardsRes] = await Promise.all([
+    supabase
+      .from('notes')
+      .select('id')
+      .eq('workspace_id', workspaceId),
+    supabase
+      .from('flashcards')
+      .select('note_id, notes!inner(workspace_id)')
+      .eq('notes.workspace_id', workspaceId)
+  ])
 
-  if (!notes) return {}
-
-  const noteIds = notes.map(n => n.id)
-  const { data: cards } = await supabase
-    .from('flashcards')
-    .select('note_id')
-    .in('note_id', noteIds)
+  const notes = notesRes.data || []
+  const cards = cardsRes.data || []
 
   const counts: Record<string, number> = {}
   notes.forEach(note => {
-    counts[note.id] = cards?.filter(c => c.note_id === note.id).length ?? 0
+    counts[note.id] = 0
+  })
+
+  cards.forEach((card: any) => {
+    if (counts[card.note_id] !== undefined) {
+      counts[card.note_id]++
+    }
   })
 
   return counts

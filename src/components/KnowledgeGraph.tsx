@@ -278,6 +278,54 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
     setDraggedNodeId(null)
   }
 
+  // 5.1. Suporte a Gestos e Toques para Dispositivos Móveis (Touch Events)
+  const handleNodeTouchStart = (nodeId: string, e: React.TouchEvent) => {
+    e.stopPropagation()
+    setDraggedNodeId(nodeId)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return
+    const touch = e.touches[0]
+    setIsPanning(true)
+    setPanStart({ x: touch.clientX - transform.x, y: touch.clientY - transform.y })
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return
+    const touch = e.touches[0]
+
+    // Arrastando nó no mobile
+    if (draggedNodeId) {
+      e.preventDefault()
+      const rect = svgRef.current?.getBoundingClientRect()
+      if (!rect) return
+
+      const clientX = touch.clientX - rect.left
+      const clientY = touch.clientY - rect.top
+      const svgX = (clientX - transform.x) / transform.scale
+      const svgY = (clientY - transform.y) / transform.scale
+
+      setNodes(prev => prev.map(n => n.id === draggedNodeId ? { ...n, x: svgX, y: svgY, vx: 0, vy: 0 } : n))
+      return
+    }
+
+    // Movendo canvas (panning) no mobile
+    if (isPanning) {
+      e.preventDefault()
+      setTransform(prev => ({
+        ...prev,
+        x: touch.clientX - panStart.x,
+        y: touch.clientY - panStart.y
+      }))
+    }
+  }
+
+  const handleTouchEnd = () => {
+    setIsPanning(false)
+    setDraggedNodeId(null)
+  }
+
   // 6. Carrega detalhes da nota selecionada no painel lateral
   const handleNodeClick = async (nodeId: string) => {
     setFocusedNodeId(nodeId)
@@ -330,7 +378,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
   const hasConnections = graphData.links.length > 0
 
   return (
-    <div className="relative flex flex-col h-[calc(100vh-120px)] min-h-[500px] bg-background text-text-strong rounded-2xl border border-border overflow-hidden">
+    <div className="relative flex flex-col h-[calc(100dvh-110px)] md:h-[calc(100vh-120px)] min-h-[500px] bg-background text-text-strong rounded-2xl border border-border overflow-hidden">
       
       {/* 🟢 Header de controle */}
       <header className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-border bg-surface shrink-0">
@@ -386,11 +434,15 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
         {/* Canvas de Desenho */}
         <div 
           ref={containerRef}
-          className={`flex-1 relative overflow-hidden select-none outline-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex-1 relative overflow-hidden select-none outline-none touch-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
           onMouseDown={handleSvgMouseDown}
           onMouseMove={handleSvgMouseMove}
           onMouseUp={handleSvgMouseUp}
           onMouseLeave={handleSvgMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
         >
           {nodes.length === 0 && !isLoading ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
@@ -501,6 +553,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                             strokeWidth: isFocused ? 3 : 1.5
                           }}
                           onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
+                          onTouchStart={(e) => handleNodeTouchStart(node.id, e)}
                         />
 
                         {/* Rótulo de Texto */}
@@ -531,10 +584,12 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
         {/* 🟢 Painel Lateral de Detalhes */}
         <aside 
-          className={`absolute top-0 bottom-0 right-0 z-20 w-80 bg-surface border-l border-border shadow-2xl p-5 flex flex-col justify-between transition-transform duration-300 pointer-events-auto ${focusedNodeId ? 'translate-x-0' : 'translate-x-full'}`}
+          className={`absolute top-0 bottom-0 right-0 z-20 w-full sm:w-80 bg-surface border-l border-border shadow-2xl p-5 flex flex-col justify-between transition-transform duration-300 pointer-events-auto ${focusedNodeId ? 'translate-x-0' : 'translate-x-full'}`}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseMove={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
         >
           <div className="flex-1 overflow-y-auto pr-1">
             <header className="flex items-start justify-between gap-3 mb-5 shrink-0">
