@@ -79,7 +79,7 @@ export async function callAIWithFallback(
         headers: {
           'Authorization': `Bearer ${openRouterApiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'http://localhost:3000',
+          'HTTP-Referer': 'https://omnimind-tau.vercel.app',
           'X-Title': 'OmniMind',
         },
         body: JSON.stringify(body)

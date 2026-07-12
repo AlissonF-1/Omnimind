@@ -95,7 +95,7 @@ export async function POST(req: Request) {
         const payload = JSON.stringify({
           title: '🔥 Hora de Estudo OmniMind!',
           body: `Você tem ${dueCount} cards pendentes. Isso vai demorar apenas ${estimatedMinutes} minutos. Vamos revisar?`,
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard/revisoes`
+          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`
         })
 
         try {
