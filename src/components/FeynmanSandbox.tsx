@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Mic, Square, Loader2, Sparkles, AlertCircle, ArrowLeft, RefreshCw, BookOpen, Layers, CheckCircle2, Copy, Check } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSettings } from '@/contexts/SettingsContext'
 import ReactMarkdown from 'react-markdown'
 
@@ -199,7 +200,11 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
       <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            <h1 className="page-title text-2xl sm:text-3xl">Feynman Sandbox</h1>
+            <Image src="/images/empty_state_astronaut.png" alt="Astronauta" width={40} height={40} className="object-contain drop-shadow-md hidden sm:block" />
+            <h1 className="page-title text-2xl sm:text-3xl flex items-center gap-2">
+              <span className="sm:hidden"><Image src="/images/empty_state_astronaut.png" alt="Astronauta" width={28} height={28} className="object-contain drop-shadow-md" /></span>
+              Feynman Sandbox
+            </h1>
             <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
               Técnica Feynman
             </span>
@@ -225,7 +230,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
         <div className="lg:col-span-1 space-y-6">
           <div className="panel p-5 space-y-4">
             <h3 className="font-bold text-sm text-text-strong uppercase tracking-wider flex items-center gap-2">
-              <Layers className="size-4 text-primary" /> Foco do RAG
+              <Image src="/images/stat_cards_3d.png" alt="Foco RAG" width={20} height={20} className="object-contain" /> Foco do RAG
             </h3>
             <p className="text-xs text-text-muted leading-relaxed">
               Escolha a pasta/workspace para cruzar as informações. A busca RAG priorizará as notas contidas nele.
@@ -249,7 +254,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
 
           <div className="panel p-5 bg-gradient-to-br from-indigo-500/5 via-primary/5 to-surface text-xs leading-relaxed space-y-2">
             <h4 className="font-bold text-text-strong flex items-center gap-1.5">
-              <BookOpen className="size-4 text-indigo-500" /> Como funciona?
+              <Image src="/images/profile_revisoes_3d.png" alt="Como funciona" width={20} height={20} className="object-contain" /> Como funciona?
             </h4>
             <p>1. Selecione o assunto ou workspace em que você deseja testar seus conhecimentos.</p>
             <p>2. Clique no microfone e comece a explicar o conceito como se estivesse ensinando uma criança de 10 anos.</p>
@@ -351,7 +356,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-bold text-text-strong flex items-center gap-1.5">
-                      <Sparkles className="size-4 text-indigo-500 fill-indigo-500/10" /> Feedback do Tutor IA
+                      <Image src="/images/nobel_3d.png" alt="Feedback" width={20} height={20} className="object-contain" /> Feedback do Tutor IA
                     </h4>
                     <button
                       onClick={handleCopyFeedback}

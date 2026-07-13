@@ -181,53 +181,53 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
       {/* 2. Grid de Estatísticas (O "Hall da Fama" pessoal) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-orange-500/20 transition-colors relative overflow-hidden group">
-          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
-            <Image src="/images/stat_streak_3d.png" alt="Streak" fill className="object-cover" />
+        <div className="panel p-4 flex flex-col justify-between h-32 sm:h-28 hover:border-orange-500/20 transition-colors group">
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider leading-tight">Recorde Streak</span>
+            <div className="size-8 sm:size-10 shrink-0 relative drop-shadow-md transition-transform group-hover:scale-110 -mt-1 -mr-1">
+              <Image src="/images/stat_streak_3d.png" alt="Streak" fill className="object-contain" />
+            </div>
           </div>
-          <div className="flex justify-between items-start relative z-10">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Recorde Streak</span>
-          </div>
-          <div className="relative z-10">
+          <div>
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.maxStreak}</h4>
             <p className="text-[10px] font-medium text-text-muted">Dias seguidos de estudo</p>
           </div>
         </div>
 
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-primary/20 transition-colors relative overflow-hidden group">
-          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
-            <Image src="/images/profile_revisoes_3d.png" alt="Revisões" fill className="object-cover" />
+        <div className="panel p-4 flex flex-col justify-between h-32 sm:h-28 hover:border-primary/20 transition-colors group">
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider leading-tight">Revisões</span>
+            <div className="size-8 sm:size-10 shrink-0 relative drop-shadow-md transition-transform group-hover:scale-110 -mt-1 -mr-1">
+              <Image src="/images/profile_revisoes_3d.png" alt="Revisões" fill className="object-contain" />
+            </div>
           </div>
-          <div className="flex justify-between items-start relative z-10">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Revisões</span>
-          </div>
-          <div className="relative z-10">
+          <div>
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.cardsReviewed}</h4>
             <p className="text-[10px] font-medium text-text-muted">Cards revisados no total</p>
           </div>
         </div>
 
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-emerald-500/20 transition-colors relative overflow-hidden group">
-          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
-            <Image src="/images/profile_notas_3d.png" alt="Notas" fill className="object-cover" />
+        <div className="panel p-4 flex flex-col justify-between h-32 sm:h-28 hover:border-emerald-500/20 transition-colors group">
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider leading-tight">Notas</span>
+            <div className="size-8 sm:size-10 shrink-0 relative drop-shadow-md transition-transform group-hover:scale-110 -mt-1 -mr-1">
+              <Image src="/images/profile_notas_3d.png" alt="Notas" fill className="object-contain" />
+            </div>
           </div>
-          <div className="flex justify-between items-start relative z-10">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Notas</span>
-          </div>
-          <div className="relative z-10">
+          <div>
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.notesCreated}</h4>
             <p className="text-[10px] font-medium text-text-muted">Notas escritas no cérebro</p>
           </div>
         </div>
 
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-indigo-500/20 transition-colors relative overflow-hidden group">
-          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
-            <Image src="/images/profile_gabaritadas_3d.png" alt="Gabaritadas" fill className="object-cover" />
+        <div className="panel p-4 flex flex-col justify-between h-32 sm:h-28 hover:border-indigo-500/20 transition-colors group">
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider leading-tight">Gabaritadas</span>
+            <div className="size-8 sm:size-10 shrink-0 relative drop-shadow-md transition-transform group-hover:scale-110 -mt-1 -mr-1">
+              <Image src="/images/profile_gabaritadas_3d.png" alt="Gabaritadas" fill className="object-contain" />
+            </div>
           </div>
-          <div className="flex justify-between items-start relative z-10">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Gabaritadas</span>
-          </div>
-          <div className="relative z-10">
+          <div>
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.perfectExams}</h4>
             <p className="text-[10px] font-medium text-text-muted">Simulados com 100% acertos</p>
           </div>
