@@ -85,13 +85,13 @@ export default async function DashboardPage() {
 
   if (hour >= 5 && hour < 12) {
     greeting = 'Bom dia'
-    iconImage = '/images/greeting_sun_3d.jpg'
+    iconImage = '/images/greeting_sun_3d.png'
   } else if (hour >= 12 && hour < 18) {
     greeting = 'Boa tarde'
-    iconImage = '/images/greeting_sun_3d.jpg'
+    iconImage = '/images/greeting_sun_3d.png'
   } else {
     greeting = 'Boa noite'
-    iconImage = '/images/greeting_moon_3d.jpg'
+    iconImage = '/images/greeting_moon_3d.png'
   }
 
   // 2. Formatação elegante da data atual com fuso horário blindado

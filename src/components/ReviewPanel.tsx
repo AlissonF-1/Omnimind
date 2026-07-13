@@ -688,7 +688,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         <div className="relative w-64 h-64 mb-2 drop-shadow-2xl opacity-90 hover:opacity-100 transition-opacity">
           {/* Subtle glow behind image */}
           <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
-          <img src="/images/empty_state_astronaut.jpg" alt="Tudo em dia" className="w-full h-full object-contain rounded-3xl" />
+          <img src="/images/empty_state_astronaut.png" alt="Tudo em dia" className="w-full h-full object-contain rounded-3xl" />
         </div>
         <h2 className="text-3xl font-bold text-text-strong tracking-tight mt-4">Tudo em dia!</h2>
         <p className="text-text-medium max-w-sm text-lg">

@@ -152,6 +152,6 @@ export const ACHIEVEMENTS: Record<string, AchievementDetails> = {
     icon: 'Award',
     tier: 'diamante',
     secret: true,
-    imageUrl: '/images/nobel_3d.jpg'
+    imageUrl: '/images/nobel_3d.png'
   }
 }

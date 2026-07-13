@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Trophy, Flame, BrainCircuit, NotebookPen, Award, Shield, Sparkles, RefreshCw } from 'lucide-react'
+import { Trophy, Shield, Sparkles, RefreshCw } from 'lucide-react'
 import { generatePlayerTitle } from '@/actions/achievements'
 import { ACHIEVEMENTS } from '@/types/achievements'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface ProfileData {
   user: {
@@ -180,45 +181,53 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
       {/* 2. Grid de Estatísticas (O "Hall da Fama" pessoal) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-orange-500/20 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Recorde Streak</span>
-            <Flame className="size-5 text-orange-500" />
+        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-orange-500/20 transition-colors relative overflow-hidden group">
+          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
+            <Image src="/images/stat_streak_3d.png" alt="Streak" fill className="object-cover" />
           </div>
-          <div>
+          <div className="flex justify-between items-start relative z-10">
+            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Recorde Streak</span>
+          </div>
+          <div className="relative z-10">
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.maxStreak}</h4>
             <p className="text-[10px] font-medium text-text-muted">Dias seguidos de estudo</p>
           </div>
         </div>
 
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-primary/20 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Revisões</span>
-            <BrainCircuit className="size-5 text-primary" />
+        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-primary/20 transition-colors relative overflow-hidden group">
+          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
+            <Image src="/images/profile_revisoes_3d.png" alt="Revisões" fill className="object-cover" />
           </div>
-          <div>
+          <div className="flex justify-between items-start relative z-10">
+            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Revisões</span>
+          </div>
+          <div className="relative z-10">
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.cardsReviewed}</h4>
             <p className="text-[10px] font-medium text-text-muted">Cards revisados no total</p>
           </div>
         </div>
 
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-emerald-500/20 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Notas</span>
-            <NotebookPen className="size-5 text-emerald-500" />
+        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-emerald-500/20 transition-colors relative overflow-hidden group">
+          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
+            <Image src="/images/profile_notas_3d.png" alt="Notas" fill className="object-cover" />
           </div>
-          <div>
+          <div className="flex justify-between items-start relative z-10">
+            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Notas</span>
+          </div>
+          <div className="relative z-10">
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.notesCreated}</h4>
             <p className="text-[10px] font-medium text-text-muted">Notas escritas no cérebro</p>
           </div>
         </div>
 
-        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-indigo-500/20 transition-colors">
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Gabaritadas</span>
-            <Award className="size-5 text-indigo-500" />
+        <div className="panel p-4 flex flex-col justify-between h-28 hover:border-indigo-500/20 transition-colors relative overflow-hidden group">
+          <div className="absolute top-3 right-3 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
+            <Image src="/images/profile_gabaritadas_3d.png" alt="Gabaritadas" fill className="object-cover" />
           </div>
-          <div>
+          <div className="flex justify-between items-start relative z-10">
+            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Gabaritadas</span>
+          </div>
+          <div className="relative z-10">
             <h4 className="text-2xl font-black text-text-strong tracking-tight">{data.perfectExams}</h4>
             <p className="text-[10px] font-medium text-text-muted">Simulados com 100% acertos</p>
           </div>
@@ -324,18 +333,15 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
       </div>
 
       {/* Streak Shield Status Extra */}
-      <div className="panel p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-border">
-        <div className="flex items-start gap-3 min-w-0">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary mt-0.5 sm:mt-0">
-            <Shield className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <h4 className="text-sm font-bold text-text-strong">Escudo de Streak do OmniMind</h4>
-            <p className="text-xs text-text-muted leading-relaxed">O escudo mantém seu combo ativo se você esquecer de estudar por um dia inteiro.</p>
+      <div className="panel p-4 sm:p-5 flex flex-col gap-3 border-border">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex size-12 sm:size-14 shrink-0 items-center justify-center">
+              <Image src="/images/streak_shield_3d.png" alt="Escudo de Streak" width={56} height={56} className="object-contain drop-shadow-lg" />
+            </span>
+            <h4 className="text-sm font-bold text-text-strong leading-tight">Escudo de Streak</h4>
           </div>
-        </div>
-        <div className="flex items-center sm:justify-end shrink-0">
-          <span className={`text-xs font-extrabold px-3 py-1 rounded-full ${
+          <span className={`shrink-0 text-[10px] sm:text-xs font-extrabold px-2.5 py-1 rounded-full ${
             data.streakShields > 0 
               ? 'bg-primary-soft text-primary border border-primary/20' 
               : 'bg-surface-muted text-text-muted border border-border/40'
@@ -343,6 +349,9 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
             {data.streakShields} ativo{data.streakShields !== 1 ? 's' : ''}
           </span>
         </div>
+        <p className="text-xs text-text-muted leading-relaxed sm:pl-[4.25rem]">
+          O escudo protege seu combo caso você esqueça de estudar por um dia.
+        </p>
       </div>
 
     </div>
