@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -40,10 +40,24 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false) // Estado de foco (Apenas Desktop)
   
   const [loading, setLoading] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Intercepta Ctrl+K (ou Cmd+K)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setIsOpen(false)
+        router.push('/dashboard/busca')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [router])
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -87,6 +101,29 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
     return false
   }
 
+  const getLinkClass = (path: string) => {
+    const active = isActive(path)
+    const base = `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 group relative ${isCollapsed ? 'justify-center' : ''}`
+    
+    if (active) {
+      // Estilo Pill Glow (Cyber)
+      return `${base} text-primary bg-primary/10 shadow-[inset_3px_0_0_0_#6366f1]`
+    }
+    return `${base} text-text-medium hover:bg-surface-muted hover:text-text-strong`
+  }
+
+  const MAIN_LINKS = [
+    { href: '/dashboard', icon: Home, label: 'Início' },
+    { href: '/dashboard/revisoes', icon: BrainCircuit, label: 'Revisão ativa' },
+    { href: '/dashboard/feynman', icon: Mic, label: 'Feynman Sandbox' },
+    { href: '/dashboard/busca', icon: Search, label: 'Busca semântica' },
+    { href: '/dashboard/grafo', icon: Network, label: 'Rede de Conexões' },
+    { href: '/dashboard/conquistas', icon: Trophy, label: 'Minhas Conquistas' },
+    { href: '/dashboard/calendario', icon: CalendarDays, label: 'Calendário' },
+    { href: '/dashboard/perfil', icon: User, label: 'Meu Perfil' },
+    { href: '/dashboard/configuracoes', icon: Settings, label: 'Configurações' },
+  ]
+
   return (
     <>
       {/* Overlay invisível para fechar o dropdown ao clicar fora */}
@@ -115,9 +152,9 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r border-border bg-surface transition-transform duration-200 md:sticky ${
+        className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-surface transition-all duration-300 md:sticky ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
+        } ${isCollapsed ? 'w-20' : 'w-72'}`}
       >
         {/* Botão de fechar DENTRO da sidebar (não sobrepõe a logo) */}
         {isOpen && (
@@ -130,66 +167,71 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
           </button>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
           
-          {/* Logo */}
-          <Link
-            href="/dashboard"
-            onClick={() => setIsOpen(false)}
-            className="mb-8 flex h-10 items-center gap-3 rounded-lg px-2"
-          >
-            <Image
-              src="/logo.png"
-              alt="OmniMind Logo"
-              width={32}
-              height={32}
-              className="shrink-0 rounded-lg object-contain"
-            />
-            <span className="text-lg font-semibold text-text-strong">OmniMind</span>
-          </Link>
+          {/* Logo e Toggle de Colapso (Mobile Only) */}
+          <div className="flex items-center justify-between mb-6 px-2">
+            <Link
+              href="/dashboard"
+              onClick={() => setIsOpen(false)}
+              className={`flex h-10 items-center gap-3 rounded-lg overflow-hidden ${isCollapsed ? 'justify-center w-full' : ''}`}
+            >
+              <Image
+                src="/logo.png"
+                alt="OmniMind Logo"
+                width={32}
+                height={32}
+                className="shrink-0 rounded-lg object-contain"
+              />
+              {!isCollapsed && <span className="text-lg font-semibold text-text-strong whitespace-nowrap">OmniMind</span>}
+            </Link>
+          </div>
+
+          {/* Fake Search Bar / Command Palette */}
+          <div className="mb-6 px-2">
+            <button 
+              onClick={() => {
+                setIsOpen(false)
+                router.push('/dashboard/busca')
+              }}
+              className={`flex items-center w-full gap-3 rounded-md border border-border/50 bg-surface-muted/50 p-2 text-text-muted hover:text-text-strong hover:bg-surface-muted transition-colors ${isCollapsed ? 'justify-center' : 'justify-between'}`} 
+              title="Buscar comandos (Ctrl+K)"
+            >
+              <div className="flex items-center gap-2">
+                <Search className="size-4 shrink-0" />
+                {!isCollapsed && <span className="text-sm truncate">Comandos...</span>}
+              </div>
+              {!isCollapsed && <span className="text-[10px] font-bold border border-border/60 rounded px-1.5 py-0.5 bg-surface-elevated shrink-0">Ctrl+K</span>}
+            </button>
+          </div>
 
           <div className="mb-8">
-            <p className="mb-2 px-3 text-xs font-semibold uppercase text-text-muted">Menu</p>
+            {!isCollapsed && <p className="mb-2 px-3 text-xs font-semibold uppercase text-text-muted">Menu</p>}
             <nav className="space-y-1">
-              <Link href="/dashboard" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard') ? 'nav-item-active' : ''}`}>
-                <Home className="size-4" /> Início
-              </Link>
-              <Link href="/dashboard/revisoes" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/revisoes') ? 'nav-item-active' : ''}`}>
-                <BrainCircuit className="size-4" /> Revisão ativa
-              </Link>
-              <Link href="/dashboard/feynman" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/feynman') ? 'nav-item-active' : ''}`}>
-                <Mic className="size-4" /> Feynman Sandbox
-              </Link>
-              <Link href="/dashboard/busca" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/busca') ? 'nav-item-active' : ''}`}>
-                <Search className="size-4" /> Busca semântica
-              </Link>
-              <Link href="/dashboard/chat" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/chat') ? 'nav-item-active' : ''}`}>
-                <MessageSquare className="size-4" /> Assistente (Chat)
-              </Link>
-              <Link href="/dashboard/grafo" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/grafo') ? 'nav-item-active' : ''}`}>
-                <Network className="size-4" /> Rede de Conexões
-              </Link>
-              <Link href="/dashboard/conquistas" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/conquistas') ? 'nav-item-active' : ''}`}>
-                <Trophy className="size-4" /> Minhas Conquistas
-              </Link>
-              <Link href="/dashboard/calendario" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/calendario') ? 'nav-item-active' : ''}`}>
-                <CalendarDays className="size-4" /> Calendário
-              </Link>
-              <Link href="/dashboard/perfil" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/perfil') ? 'nav-item-active' : ''}`}>
-                <User className="size-4" /> Meu Perfil
-              </Link>
-              <Link href="/dashboard/configuracoes" onClick={() => setIsOpen(false)} className={`nav-item ${isActive('/dashboard/configuracoes') ? 'nav-item-active' : ''}`}>
-                <Settings className="size-4" /> Configurações
-              </Link>
+              {MAIN_LINKS.map((link) => {
+                const Icon = link.icon
+                return (
+                  <Link 
+                    key={link.href} 
+                    href={link.href} 
+                    onClick={() => setIsOpen(false)} 
+                    className={getLinkClass(link.href)}
+                    title={isCollapsed ? link.label : undefined}
+                  >
+                    <Icon className="size-4 shrink-0" /> 
+                    {!isCollapsed && <span className="truncate">{link.label}</span>}
+                  </Link>
+                )
+              })}
             </nav>
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between px-3">
-              <p className="text-xs font-semibold uppercase text-text-muted">Workspaces</p>
+            <div className={`mb-2 flex items-center px-3 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+              {!isCollapsed && <p className="text-xs font-semibold uppercase text-text-muted">Workspaces</p>}
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="inline-flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-muted hover:text-text-strong focus-visible:outline-2 focus-visible:outline-primary"
+                className="inline-flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-muted hover:text-text-strong focus-visible:outline-2 focus-visible:outline-primary shrink-0"
                 title="Novo workspace"
               >
                 <Plus className="size-4" />
@@ -198,30 +240,38 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
 
             <nav className="space-y-1">
               {workspaces.filter(w => !w.is_archived).length === 0 ? (
-                <p className="px-3 py-2 text-sm text-text-muted">Nenhum workspace ativo.</p>
+                !isCollapsed && <p className="px-3 py-2 text-sm text-text-muted">Nenhum ativo.</p>
               ) : (
                 workspaces.filter(w => !w.is_archived).map((workspace) => (
                   <div 
                     key={workspace.id} 
-                    className={`group relative flex items-center justify-between rounded-md transition-colors ${isActive(`/dashboard/${workspace.id}`) ? 'nav-item-active' : 'hover:bg-surface-muted'}`}
+                    className="relative"
                   >
-                    <Link
-                      href={`/dashboard/${workspace.id}`}
-                      onClick={() => setIsOpen(false)}
-                      className="flex-1 min-w-0 flex items-center gap-3 px-3 py-2"
-                    >
-                      <Folder className="size-4 shrink-0" />
-                      <span className="truncate pr-2">{workspace.name}</span>
-                    </Link>
+                    <div className="flex items-center">
+                      <Link
+                        href={`/dashboard/${workspace.id}`}
+                        onClick={() => setIsOpen(false)}
+                        className={`flex-1 ${getLinkClass(`/dashboard/${workspace.id}`)} ${isCollapsed ? '!px-0 justify-center w-full' : ''}`}
+                        title={isCollapsed ? workspace.name : undefined}
+                      >
+                        <Folder className="size-4 shrink-0" />
+                        {!isCollapsed && <span className="truncate pr-8">{workspace.name}</span>}
+                      </Link>
 
-                    <button
-                      onClick={() => setOpenDropdownId(openDropdownId === workspace.id ? null : workspace.id)}
-                      className={`shrink-0 mr-1 p-1.5 rounded-md text-text-muted hover:text-text-strong hover:bg-border transition-all ${openDropdownId === workspace.id ? 'opacity-100 bg-border' : 'opacity-0 group-hover:opacity-100'}`}
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </button>
+                      {!isCollapsed && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setOpenDropdownId(openDropdownId === workspace.id ? null : workspace.id)
+                          }}
+                          className={`absolute right-1 p-1.5 rounded-md text-text-muted hover:text-text-strong hover:bg-surface-elevated transition-all ${openDropdownId === workspace.id ? 'opacity-100 bg-surface-elevated' : 'opacity-0 group-hover:opacity-100 peer-hover:opacity-100'}`}
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </button>
+                      )}
+                    </div>
 
-                    {openDropdownId === workspace.id && (
+                    {openDropdownId === workspace.id && !isCollapsed && (
                       <div className="absolute right-2 top-10 z-50 w-40 rounded-lg border border-border bg-surface p-1 shadow-lg panel animate-in fade-in zoom-in-95 duration-100">
                         <button
                           onClick={() => {
@@ -252,7 +302,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
             </nav>
 
             {/* Seção colapsável de Workspaces Arquivadas */}
-            {workspaces.some(w => w.is_archived) && (
+            {!isCollapsed && workspaces.some(w => w.is_archived) && (
               <div className="mt-4 pt-4 border-t border-border/50">
                 <button
                   onClick={() => setShowArchived(!showArchived)}
@@ -312,13 +362,24 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
           </div>
         </div>
 
-        <div className="border-t border-border p-4">
-          <div className="mb-2">
+        <div className="border-t border-border p-4 space-y-2">
+          {/* Botão de Colapso (Desktop) */}
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={`hidden md:flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-muted hover:bg-surface-muted hover:text-text-strong transition-colors ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? "Expandir Menu" : "Recolher Menu"}
+          >
+            <MoreHorizontal className="size-4 shrink-0" />
+            {!isCollapsed && <span>Encolher Sidebar</span>}
+          </button>
+
+          <div className={`${isCollapsed ? 'hidden' : 'block'}`}>
             <ThemeToggle />
           </div>
           <form action={signOut}>
-            <button type="submit" className="nav-item w-full hover:bg-error-soft hover:text-error">
-              <LogOut className="size-4" /> Sair da conta
+            <button type="submit" className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-medium transition-colors hover:bg-error-soft hover:text-error ${isCollapsed ? 'justify-center' : ''}`} title="Sair da conta">
+              <LogOut className="size-4 shrink-0" /> 
+              {!isCollapsed && <span>Sair da conta</span>}
             </button>
           </form>
         </div>

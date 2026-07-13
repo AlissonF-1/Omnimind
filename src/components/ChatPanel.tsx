@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X } from 'lucide-react'
+import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X, Settings } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -211,9 +211,11 @@ interface ChatPanelProps {
   workspaceId?: string
   workspaces?: { id: string; name: string }[]
   onWorkspaceChange?: (newId: string) => void
+  isFloatingMode?: boolean
+  onClose?: () => void
 }
 
-export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceChange }: ChatPanelProps) {
+export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceChange, isFloatingMode = false, onClose }: ChatPanelProps) {
   const { settings } = useSettings()
   const isWorkspaceValid = true
   const storageKey = workspaceId ? `omnimind_chat_${workspaceId}` : 'omnimind_chat_global'
@@ -247,6 +249,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
   const [copyError, setCopyError] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [showPersonaModal, setShowPersonaModal] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -643,7 +646,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
   }
 
   return (
-    <div className="flex h-[calc(100dvh-115px)] md:h-[calc(100vh-125px)] w-[calc(100%+2.5rem)] md:w-[calc(100%+4rem)] -mx-5 -mb-6 md:-mx-8 md:-mb-8 relative overflow-hidden flex-col lg:flex-row gap-0 bg-surface">
+    <div className={`flex ${isFloatingMode ? 'h-full w-full' : 'h-[calc(100dvh-115px)] md:h-[calc(100vh-125px)] w-[calc(100%+2.5rem)] md:w-[calc(100%+4rem)] -mx-5 -mb-6 md:-mx-8 md:-mb-8'} relative overflow-hidden flex-col ${isFloatingMode ? '' : 'lg:flex-row'} gap-0 bg-surface`}>
       {/* Overlay para fechar a sidebar no mobile */}
       {isSidebarOpen && (
         <div 
@@ -652,11 +655,13 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
         />
       )}
 
-      {/* Sidebar de Histórico (Slide-in mobile + Fixo desktop) */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-40 flex w-72 max-w-[80vw] flex-col border-r border-border bg-slate-50 dark:bg-slate-950/20 transition-transform duration-300 ease-in-out lg:static lg:z-0 lg:w-72 lg:min-w-72 lg:translate-x-0
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      {/* Sidebar de Histórico (Slide-in mobile/flutuante + Fixo desktop normal) */}
+      {(!isFloatingMode || isSidebarOpen) && (
+        <aside className={`
+          fixed inset-y-0 left-0 z-40 flex w-72 max-w-[80vw] flex-col border-r border-border bg-slate-50 dark:bg-slate-950/20 transition-transform duration-300 ease-in-out lg:static lg:z-0 lg:w-72 lg:min-w-72 lg:translate-x-0
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isFloatingMode ? 'absolute lg:absolute lg:translate-x-0 lg:w-full max-w-full shadow-2xl bg-surface' : ''}
+        `}>
         <div className="border-b border-border p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -732,30 +737,44 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
           )}
         </div>
       </aside>
+      )}
 
       {/* Área Principal de Chat */}
       <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden bg-surface relative h-full">
 
         {/* Top Header do Chat com trigger para sidebar mobile */}
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 shrink-0 bg-surface">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 shrink-0 bg-surface z-10">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="lg:hidden p-2 -ml-2 text-text-muted hover:text-text-strong rounded-lg hover:bg-surface-muted transition-colors shrink-0"
-              aria-label="Abrir menu"
-            >
-              <Menu className="size-5" />
-            </button>
+            {!isFloatingMode ? (
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="lg:hidden p-2 -ml-2 text-text-muted hover:text-text-strong rounded-lg hover:bg-surface-muted transition-colors shrink-0"
+                aria-label="Abrir menu"
+              >
+                <Menu className="size-5" />
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                className="p-1.5 -ml-1 text-text-muted hover:text-text-strong hover:bg-surface-muted rounded-md transition-colors"
+                aria-label="Fechar chat"
+              >
+                <X className="size-5" />
+              </button>
+            )}
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-text-muted">Conversa ativa</p>
-              <h3 className="mt-1 truncate text-sm font-semibold text-text-strong">
-                {activeConversation?.title || DEFAULT_CONVERSATION_TITLE}
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-text-muted">
+                {isFloatingMode ? 'OmniMind' : 'Conversa ativa'}
+              </p>
+              <h3 className="mt-0.5 truncate text-sm font-semibold text-text-strong flex items-center gap-2">
+                {isFloatingMode && <Sparkles className="size-3.5 text-primary" />}
+                {isFloatingMode ? 'Assistente' : (activeConversation?.title || DEFAULT_CONVERSATION_TITLE)}
               </h3>
             </div>
           </div>
 
           {/* Seletor de Workspace em formato de Badge compacta e discreta */}
-          {workspaces.length > 0 && onWorkspaceChange && (
+          {workspaces.length > 0 && onWorkspaceChange && !isFloatingMode && (
             <div className="flex items-center gap-1.5 shrink-0">
               <select
                 value={workspaceId || ''}
@@ -776,42 +795,82 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
             </div>
           )}
 
-          <button 
-            type="button" 
-            onClick={handleStartNewConversation} 
-            className="btn-secondary h-9 shrink-0 px-2.5 sm:px-4 text-xs flex items-center gap-1.5 border border-border"
-            title="Nova conversa"
-          >
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">Nova conversa</span>
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {isFloatingMode && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-surface-muted transition-colors"
+                title="Histórico"
+              >
+                <MessageSquare className="size-4" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowPersonaModal(true)}
+              className="p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-surface-muted transition-colors"
+              title="Mudar personalidade da IA"
+            >
+              <Settings className="size-4" />
+            </button>
+          </div>
+
+          {isFloatingMode ? (
+            <button
+              type="button"
+              onClick={handleStartNewConversation}
+              className="shrink-0 p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-surface-muted transition-colors"
+              title="Limpar conversa"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          ) : (
+            <button 
+              type="button" 
+              onClick={handleStartNewConversation} 
+              className="btn-secondary h-9 shrink-0 px-2.5 sm:px-4 text-xs flex items-center gap-1.5 border border-border"
+              title="Nova conversa"
+            >
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Nova conversa</span>
+            </button>
+          )}
         </div>
 
-        {/* Seletor de Persona de Estudo */}
-        {activeConversation && (
-          <div className="border-b border-border bg-surface-muted/20 px-4 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider mr-2 shrink-0">Modo:</span>
-            {[
-              { id: 'tutor', label: '📚 Tutor Socrático', desc: 'Explica com analogias e faz perguntas de fixação ao final' },
-              { id: 'grill', label: '🔥 Examinador (Grill)', desc: 'Banca rígida, faz perguntas difíceis e critica respostas' },
-              { id: 'eli5', label: '👶 Simplificado (ELI5)', desc: 'Explica tudo em termos infantis bem simples' }
-            ].map((p) => {
-              const isSel = (activeConversation.persona || 'tutor') === p.id
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => handleUpdatePersona(p.id as any)}
-                  className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border flex items-center gap-1.5 transition-all shrink-0 ${
-                    isSel
-                      ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
-                      : 'bg-surface text-text-muted border-border hover:bg-surface-hover'
-                  }`}
-                  title={p.desc}
-                >
-                  {p.label}
+        {/* Modal de Personas */}
+        {showPersonaModal && activeConversation && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="panel max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-text-strong">Modo da IA</h3>
+                <button onClick={() => setShowPersonaModal(false)} className="icon-button">
+                  <X className="size-4" />
                 </button>
-              )
-            })}
+              </div>
+              <div className="space-y-3">
+                {[
+                  { id: 'tutor', label: '📚 Tutor Socrático', desc: 'Explica com analogias e faz perguntas de fixação.' },
+                  { id: 'grill', label: '🔥 Examinador (Grill)', desc: 'Banca rígida, faz perguntas difíceis e testa seus limites.' },
+                  { id: 'eli5', label: '👶 Simplificado (ELI5)', desc: 'Explica tudo em termos infantis bem simples.' }
+                ].map((p) => {
+                  const isSel = (activeConversation.persona || 'tutor') === p.id
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => { handleUpdatePersona(p.id as any); setShowPersonaModal(false); }}
+                      className={`w-full flex flex-col text-left p-3 rounded-xl border transition-all ${
+                        isSel ? 'bg-primary/10 border-primary shadow-sm' : 'bg-surface border-border hover:bg-surface-hover'
+                      }`}
+                    >
+                      <span className={`font-bold text-sm ${isSel ? 'text-primary' : 'text-text-strong'}`}>{p.label}</span>
+                      <span className="text-xs text-text-muted mt-1">{p.desc}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         )}
 
@@ -835,29 +894,33 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                 Carregando chat...
               </div>
             ) : activeMessages.length === 0 ? (
-              <div className="mx-auto flex flex-col justify-center min-h-[80dvh] w-full max-w-2xl px-4 py-4 md:py-12 animate-in fade-in duration-500">
-                <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
+              <div className={`mx-auto flex flex-col justify-center w-full max-w-2xl px-4 animate-in fade-in duration-500 ${isFloatingMode ? 'min-h-[60dvh] py-4' : 'min-h-[80dvh] py-4 md:py-12'}`}>
+                <h1 className={`${isFloatingMode ? 'text-2xl md:text-3xl' : 'text-3xl md:text-5xl'} font-bold tracking-tight`}>
                   <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
                     Olá, {userName}
                   </span>
                 </h1>
-                <h2 className="text-2xl md:text-4xl font-semibold text-text-muted mt-2 mb-6 md:mb-8">
+                <h2 className={`${isFloatingMode ? 'text-xl md:text-2xl mt-1 mb-4' : 'text-2xl md:text-4xl mt-2 mb-6 md:mb-8'} font-semibold text-text-muted`}>
                   Como posso ajudar você hoje?
                 </h2>
 
-                <div className="flex sm:grid gap-3 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 w-full snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid-cols-2">
+                <div className={`gap-3 w-full ${isFloatingMode ? 'flex flex-col' : 'flex sm:grid sm:grid-cols-2 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
                   {SUGGESTIONS.map((sug, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleAsk(sug)}
                       disabled={!isWorkspaceValid}
                       aria-label={`Enviar sugestão: ${sug}`}
-                      className="group flex flex-col justify-between rounded-2xl border border-border bg-surface p-4 md:p-5 text-left text-sm transition-all hover:border-primary/50 hover:bg-surface-muted/20 disabled:cursor-not-allowed disabled:opacity-50 min-h-[100px] md:min-h-[120px] w-[240px] sm:w-auto shrink-0 sm:shrink snap-align-start shadow-sm hover:shadow-md"
+                      className={`group flex rounded-2xl border border-border bg-surface p-3 text-left transition-all hover:border-primary/50 hover:bg-surface-muted/20 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm hover:shadow-md ${
+                        isFloatingMode 
+                          ? 'flex-row items-center justify-between min-h-[60px]' 
+                          : 'flex-col justify-between p-4 md:p-5 min-h-[100px] md:min-h-[120px] w-[240px] sm:w-auto shrink-0 sm:shrink snap-align-start'
+                      }`}
                     >
-                      <span className="font-semibold text-text-strong leading-relaxed text-xs md:text-sm">{sug}</span>
-                      <div className="w-full flex justify-end mt-2 md:mt-4">
-                        <span className="flex size-7 md:size-8 items-center justify-center rounded-full bg-primary-soft text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Sparkles className="size-3.5 md:size-4" />
+                      <span className={`font-semibold text-text-strong leading-relaxed ${isFloatingMode ? 'text-xs' : 'text-xs md:text-sm'}`}>{sug}</span>
+                      <div className={`flex justify-end ${isFloatingMode ? 'ml-2 shrink-0' : 'w-full mt-2 md:mt-4'}`}>
+                        <span className={`flex items-center justify-center rounded-full bg-primary-soft text-primary opacity-0 group-hover:opacity-100 transition-opacity ${isFloatingMode ? 'size-6' : 'size-7 md:size-8'}`}>
+                          <Sparkles className={isFloatingMode ? 'size-3' : 'size-3.5 md:size-4'} />
                         </span>
                       </div>
                     </button>
@@ -1000,7 +1063,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
         {/* Input e botões rápidos */}
         <div className="bg-surface px-4 py-4 md:py-6 shrink-0 w-full max-w-3xl mx-auto z-10">
           <form onSubmit={(e) => { e.preventDefault(); handleAsk(); }}>
-            <div className="relative flex items-end gap-2 bg-surface-muted/40 border border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 rounded-[24px] pl-3 pr-12 py-2 shadow-sm transition-all focus-within:shadow-md">
+            <div className="relative flex items-end gap-2 bg-surface-muted/40 border border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 rounded-3xl pl-3 pr-12 py-2 shadow-sm transition-all focus-within:shadow-md">
               {/* Botão de gravação de voz */}
               <button
                 type="button"

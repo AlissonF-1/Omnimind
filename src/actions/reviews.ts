@@ -7,6 +7,16 @@ import { checkAndUnlockAchievements, addXp, incrementQuestProgress, getUserStrea
 import { AchievementDetails, XP_CONFIG } from '@/types/achievements'
 import { getDynamicDailyGoal } from '@/actions/calendar'
 
+// Helper para obter a data local (Brasil) no formato YYYY-MM-DD
+function getLocalISODate(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date)
+}
+
 // Tipagem mais forte para o estado do card (vindo do banco)
 interface FsrsCardState {
   due: string
@@ -239,7 +249,7 @@ export async function submitReview(
         levelUpData = { oldLevel: questRes.leveledUp.oldLevel, newLevel: questRes.leveledUp.newLevel }
       }
 
-      const todayStr = new Date().toISOString().split('T')[0]
+      const todayStr = getLocalISODate(new Date())
       const { data: logToday } = await supabase
         .from('daily_study_logs')
         .select('review_count')

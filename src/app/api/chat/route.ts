@@ -4,6 +4,7 @@ import { embedQuery } from '@/lib/embeddings'
 import { incrementTutorQueriesCount, addXp, incrementQuestProgress, checkAndUnlockAchievements } from '@/actions/achievements'
 import { XP_CONFIG } from '@/types/achievements'
 import { createExamGoal } from '@/actions/calendar'
+import { SYSTEM_MANUAL } from '@/lib/system-prompt'
 
 const MAX_CONTEXT_TOKENS = 6000
 
@@ -72,34 +73,19 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Falha ao buscar conteúdo relevante.' }, { status: 500 })
     }
 
-    if (!matches || matches.length === 0) {
-      return new Response(
-        streamJsonLines([
-          { type: 'sources', data: [] },
-          { type: 'model', data: ecoMode ? 'Gemini 1.5 Flash-8B (Eco)' : 'Gemini 2.5 Flash' },
-          {
-            type: 'text',
-            data: 'Não encontrei nenhuma informação nas suas anotações sobre este assunto. Tente reformular.',
-          },
-        ]),
-        {
-          headers: {
-            'Content-Type': 'text/event-stream; charset=utf-8',
-            'Cache-Control': 'no-cache, no-transform',
-            Connection: 'keep-alive',
-          },
-        }
-      )
-    }
+    const safeMatches = matches || []
 
-    const contextChunks = matches.map((m: any, idx: number) => `[Fonte ${idx + 1}]: ${m.chunk_text}`)
+    const contextChunks = safeMatches.map((m: any, idx: number) => `[Fonte ${idx + 1}]: ${m.chunk_text}`)
     const truncatedChunks = truncateContext(contextChunks, MAX_CONTEXT_TOKENS)
 
-    const noteIds = [...new Set(matches.map((m: any) => m.note_id).filter(Boolean))]
-    const { data: notes } = await supabase.from('notes').select('id, title').in('id', noteIds)
-    const noteMap = new Map(notes?.map((n: any) => [n.id, n.title]) || [])
+    const noteIds = [...new Set(safeMatches.map((m: any) => m.note_id).filter(Boolean))]
+    let noteMap = new Map()
+    if (noteIds.length > 0) {
+      const { data: notes } = await supabase.from('notes').select('id, title').in('id', noteIds)
+      noteMap = new Map(notes?.map((n: any) => [n.id, n.title]) || [])
+    }
 
-    const sources = matches.map((m: any) => ({
+    const sources = safeMatches.map((m: any) => ({
       id: m.id,
       title: m.note_id ? noteMap.get(m.note_id) : 'Flashcard',
       type: m.source_type,
@@ -137,13 +123,13 @@ Sua missão é guiar o estudante a raciocinar por conta própria.
     const systemPrompt = `Você é o assistente virtual do OmniMind.
 ${personaPrompt}
 
-  Regras obrigatórias:
-  - Responda diretamente, sem saudação, sem autoapresentação e sem frases de abertura.
-  - Não use títulos de introdução como "Olá", "Claro" ou similares.
-  - Não comece com markdown heading se ele não trouxer valor real para a resposta.
-  - Baseie-se UNICAMENTE no contexto fornecido.
-  - Se a informação não estiver no contexto, diga exatamente: "Com base nas suas anotações, não possuo informações suficientes para responder a esta pergunta."
-  - Ao usar informações do contexto, cite a fonte no formato [Fonte X].
+${SYSTEM_MANUAL}
+
+  Regras adicionais para Busca em Anotações:
+  - Se a pergunta for técnica/acadêmica, baseie-se UNICAMENTE no contexto fornecido.
+  - Se a informação sobre o TEMA ACADÊMICO não estiver no contexto, diga exatamente: "Com base nas suas anotações, não possuo informações suficientes para responder a esta pergunta."
+  - MAS ATENÇÃO: Se a pergunta for sobre COMO USAR O APP (funcionalidades, botões, Feynman, FSRS, etc), responda normalmente com base no MANUAL DE BORDO, sem dizer que faltam informações!
+  - Ao usar informações do contexto (das suas notas), cite a fonte no formato [Fonte X].
   - Estruture a resposta em tópicos curtos e objetivos quando fizer sentido.
   - Responda em português (pt-BR).
   - Se o usuário pedir para criar, agendar ou marcar uma prova/meta de estudo (ex: "Marca uma prova de Cálculo para 20/08"), você OBRIGATORIAMENTE deve responder de forma prestativa e amigável confirmando a prova e incluindo no final da resposta exatamente esta tag silenciosa de ação: [ACTION:CREATE_EXAM_GOAL|title=Título da Prova|date=AAAA-MM-DD]. Calcule o ano atual como ${new Date().getFullYear()} caso o usuário fale apenas dia/mês (ex: 20/08 vira 2026-08-20). Fale quantos dias faltam e quantos cards ele deve revisar por dia para se preparar.

@@ -43,26 +43,36 @@
 
 .dark {
   color-scheme: dark;
-  --background: #13161a;
+  --background: #050505;
   --foreground: #f4f6fb;
-  --surface: #1a1e24;
-  --surface-muted: #222732;
-  --surface-elevated: #1b1f28;
-  --border: #2b313d;
-  --border-strong: #3a4252;
+  --surface: #0f0f11;
+  --surface-muted: #17171a;
+  --surface-elevated: #1a1a1e;
+  --border: #222226;
+  --border-strong: #333338;
   --text-strong: #e2e8f0;
-  --text-medium: #b5bdcb;
-  --text-muted: #9ca3af;
-  --primary: #a5b4fc;
-  --primary-hover: #c7d2fe;
-  --primary-soft: #24284a;
-  --success: #34d399;
-  --success-soft: #073b2d;
-  --error: #f87171;
-  --error-soft: #451a1a;
-  --warning: #fbbf24;
-  --warning-soft: #422d08;
-  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.18), 0 14px 34px rgb(0 0 0 / 0.24);
+  --text-medium: #a1a1aa;
+  --text-muted: #71717a;
+  --primary: #6366f1;
+  --primary-hover: #818cf8;
+  --primary-soft: rgba(99, 102, 241, 0.15);
+  --success: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.15);
+  --error: #ef4444;
+  --error-soft: rgba(239, 68, 68, 0.15);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.15);
+  --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.04);
+}
+
+/* Linear / Cyber UI overrides for dark mode */
+.dark .panel {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .panel:hover {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.08);
 }
 
 @theme inline {

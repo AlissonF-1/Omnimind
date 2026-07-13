@@ -6,7 +6,7 @@ import { getNoteById } from '@/actions/notes'
 import { backfillEmbeddings } from '@/actions/embeddings'
 import { 
   Network, Loader2, ZoomIn, ZoomOut, Maximize2, 
-  BookOpen, MessageSquare, RefreshCw, X, ArrowRight 
+  BookOpen, MessageSquare, RefreshCw, X, ArrowRight, ListChecks 
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -26,19 +26,20 @@ interface SimulatedNode extends GraphNode {
   vy: number
 }
 
-// Lista de cores elegantes por tópico para criar visual agrupado
-const TOPIC_COLORS: Record<string, { fill: string; bg: string; border: string; glow: string; text: string }> = {
-  Geral: { fill: 'fill-indigo-500', bg: 'bg-indigo-500', border: 'border-indigo-400', glow: 'rgba(99, 102, 241, 0.4)', text: 'text-indigo-400' },
-  Clipper: { fill: 'fill-emerald-500', bg: 'bg-emerald-500', border: 'border-emerald-400', glow: 'rgba(16, 185, 129, 0.4)', text: 'text-emerald-400' },
-  'Web Clipper': { fill: 'fill-emerald-500', bg: 'bg-emerald-500', border: 'border-emerald-400', glow: 'rgba(16, 185, 129, 0.4)', text: 'text-emerald-400' },
-  Concurso: { fill: 'fill-amber-500', bg: 'bg-amber-500', border: 'border-amber-400', glow: 'rgba(245, 158, 11, 0.4)', text: 'text-amber-400' },
-  Faculdade: { fill: 'fill-rose-500', bg: 'bg-rose-500', border: 'border-rose-400', glow: 'rgba(244, 63, 94, 0.4)', text: 'text-rose-400' },
-  Importante: { fill: 'fill-violet-500', bg: 'bg-violet-500', border: 'border-violet-400', glow: 'rgba(139, 92, 246, 0.4)', text: 'text-violet-400' },
-}
-
-function getTopicTheme(topic: string) {
-  const norm = topic.trim()
-  return TOPIC_COLORS[norm] || { fill: 'fill-sky-500', bg: 'bg-sky-500', border: 'border-sky-400', glow: 'rgba(14, 165, 233, 0.4)', text: 'text-sky-400' }
+function getHealthTheme(health: number | null | undefined) {
+  if (health === null || health === undefined) {
+    return { fill: 'fill-slate-500', bg: 'bg-slate-500', border: 'border-slate-400', glow: 'rgba(100, 116, 139, 0.4)', text: 'text-slate-400', label: 'Não Revisado' }
+  }
+  if (health >= 0.9) {
+    return { fill: 'fill-emerald-500', bg: 'bg-emerald-500', border: 'border-emerald-400', glow: 'rgba(16, 185, 129, 0.6)', text: 'text-emerald-400', label: 'Dominado' }
+  }
+  if (health >= 0.75) {
+    return { fill: 'fill-sky-500', bg: 'bg-sky-500', border: 'border-sky-400', glow: 'rgba(14, 165, 233, 0.6)', text: 'text-sky-400', label: 'Forte' }
+  }
+  if (health >= 0.60) {
+    return { fill: 'fill-amber-500', bg: 'bg-amber-500', border: 'border-amber-400', glow: 'rgba(245, 158, 11, 0.6)', text: 'text-amber-400', label: 'Atenção' }
+  }
+  return { fill: 'fill-rose-500', bg: 'bg-rose-500', border: 'border-rose-400', glow: 'rgba(244, 63, 94, 0.6)', text: 'text-rose-400', label: 'Ponto Cego' }
 }
 
 export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
@@ -56,9 +57,15 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
   // Estados de seleção e detalhes
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([])
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
   const [selectedNote, setSelectedNote] = useState<any>(null)
   const [isLoadingNote, setIsLoadingNote] = useState(false)
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
+
+  // Estados de toque para Pinch-to-Zoom
+  const [initialPinchDist, setInitialPinchDist] = useState<number | null>(null)
+  const [initialScale, setInitialScale] = useState<number>(1)
 
   // Estado de indexação automática
   const [isIndexing, setIsIndexing] = useState(false)
@@ -101,6 +108,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
       setNodes(simulated)
       setTransform({ x: 0, y: 0, scale: 1 }) // Reset zoom
       setFocusedNodeId(null)
+      setSelectedNodeIds([])
       setSelectedNote(null)
     } catch (err) {
       console.error(err)
@@ -285,6 +293,13 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      setInitialPinchDist(Math.sqrt(dx * dx + dy * dy))
+      setInitialScale(transform.scale)
+      return
+    }
     if (e.touches.length !== 1) return
     const touch = e.touches[0]
     setIsPanning(true)
@@ -292,6 +307,18 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && initialPinchDist) {
+      e.preventDefault()
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      
+      const nextScale = initialScale * (dist / initialPinchDist)
+      const boundedScale = Math.max(0.15, Math.min(nextScale, 3))
+      setTransform(prev => ({ ...prev, scale: boundedScale }))
+      return
+    }
+    
     if (e.touches.length !== 1) return
     const touch = e.touches[0]
 
@@ -324,10 +351,19 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
   const handleTouchEnd = () => {
     setIsPanning(false)
     setDraggedNodeId(null)
+    setInitialPinchDist(null)
   }
 
   // 6. Carrega detalhes da nota selecionada no painel lateral
-  const handleNodeClick = async (nodeId: string) => {
+  const handleNodeClick = async (nodeId: string, isMultiSelect: boolean) => {
+    if (isMultiSelect) {
+      setSelectedNodeIds(prev => prev.includes(nodeId) ? prev.filter(id => id !== nodeId) : [...prev, nodeId])
+      setFocusedNodeId(null)
+      setSelectedNote(null)
+      return
+    }
+    
+    setSelectedNodeIds([])
     setFocusedNodeId(nodeId)
     setIsLoadingNote(true)
     setSelectedNote(null)
@@ -361,7 +397,13 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
   // Determina quais nós e conexões destacar
   const connectedNodeIds = new Set<string>()
-  if (focusedNodeId) {
+  if (selectedNodeIds.length > 0) {
+    selectedNodeIds.forEach(id => connectedNodeIds.add(id))
+    graphData.links.forEach(l => {
+      if (selectedNodeIds.includes(l.source)) connectedNodeIds.add(l.target)
+      if (selectedNodeIds.includes(l.target)) connectedNodeIds.add(l.source)
+    })
+  } else if (focusedNodeId) {
     connectedNodeIds.add(focusedNodeId)
     graphData.links.forEach(l => {
       if (l.source === focusedNodeId) connectedNodeIds.add(l.target)
@@ -464,6 +506,14 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
             <>
               {/* Barra de controle flutuante do Canvas */}
               <div className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 p-1 bg-surface/90 border border-border rounded-full shadow-md backdrop-blur-xs">
+                <button 
+                  onClick={() => setIsMultiSelectMode(!isMultiSelectMode)} 
+                  className={`p-2 rounded-full transition-colors ${isMultiSelectMode ? 'bg-primary text-white shadow-lg' : 'hover:bg-surface-muted text-text-medium'}`} 
+                  title="Modo Multiseleção (Mobile/Touch)"
+                >
+                  <ListChecks className="size-4" />
+                </button>
+                <div className="w-px h-4 bg-border"></div>
                 <button onClick={() => zoom(1.15)} className="p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom In"><ZoomIn className="size-4" /></button>
                 <button onClick={() => zoom(0.85)} className="p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom Out"><ZoomOut className="size-4" /></button>
                 <button onClick={resetZoom} className="p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Focar Grafo"><Maximize2 className="size-4" /></button>
@@ -492,8 +542,8 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                     const targetNode = nodes.find(n => n.id === link.target)
                     if (!sourceNode || !targetNode) return null
 
-                    const isHighlighted = focusedNodeId || hoveredNodeId
-                      ? (link.source === focusedNodeId || link.target === focusedNodeId || link.source === hoveredNodeId || link.target === hoveredNodeId)
+                    const isHighlighted = focusedNodeId || hoveredNodeId || selectedNodeIds.length > 0
+                      ? (link.source === focusedNodeId || link.target === focusedNodeId || link.source === hoveredNodeId || link.target === hoveredNodeId || selectedNodeIds.includes(link.source) || selectedNodeIds.includes(link.target))
                       : true
 
                     return (
@@ -515,9 +565,9 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
                   {/* Círculos e Rótulos (Nós) */}
                   {nodes.map((node) => {
-                    const theme = getTopicTheme(node.topic)
-                    const isFocused = focusedNodeId === node.id
-                    const isDimmed = (focusedNodeId || hoveredNodeId) && !connectedNodeIds.has(node.id)
+                    const theme = getHealthTheme(node.health)
+                    const isFocused = focusedNodeId === node.id || selectedNodeIds.includes(node.id)
+                    const isDimmed = (focusedNodeId || hoveredNodeId || selectedNodeIds.length > 0) && !connectedNodeIds.has(node.id)
 
                     return (
                       <g
@@ -526,31 +576,33 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                         className="transition-all duration-150 ease-out cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleNodeClick(node.id)
+                          handleNodeClick(node.id, e.ctrlKey || e.metaKey || e.shiftKey || isMultiSelectMode)
                         }}
                         onMouseEnter={() => setHoveredNodeId(node.id)}
                         onMouseLeave={() => setHoveredNodeId(null)}
                       >
+                        <title>{node.label}
+{node.health !== null && node.health !== undefined ? `Saúde (Retenção): ${Math.round(node.health * 100)}%` : 'Saúde: Sem Flashcards'}</title>
                         {/* Glow effect on focused node */}
                         {isFocused && (
                           <circle
                             r={18}
                             fill="none"
-                            stroke="var(--primary)"
+                            stroke="currentColor"
                             strokeWidth={2.5}
-                            className="animate-ping opacity-25"
-                            style={{ stroke: 'var(--primary)' }}
+                            className={`animate-ping opacity-25 ${theme.text}`}
                           />
                         )}
 
                         {/* Corpo do Nó */}
                         <circle
-                          r={isFocused ? 12 : 9}
+                          r={isFocused ? 12 : (node.flashcardsCount && node.flashcardsCount > 0 ? 10 : 8)}
                           className={`transition-all duration-300 ${theme.fill} ${isDimmed ? 'opacity-20' : 'opacity-100 shadow-md'}`}
                           style={{
                             boxShadow: !isDimmed ? `0 0 16px ${theme.glow}` : undefined,
-                            stroke: isFocused ? 'var(--primary)' : 'rgba(255,255,255,0.15)',
-                            strokeWidth: isFocused ? 3 : 1.5
+                            stroke: isFocused ? 'currentColor' : 'rgba(255,255,255,0.15)',
+                            strokeWidth: isFocused ? 3 : 1.5,
+                            color: theme.fill.replace('fill-', 'var(--').replace('-500', ')') // quick hack to get currentColor for stroke if needed, but we use tailwind classes
                           }}
                           onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
                           onTouchStart={(e) => handleNodeTouchStart(node.id, e)}
@@ -574,10 +626,56 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                 </g>
               </svg>
               {/* Legenda Explicativa do Grafo */}
-              <div className="absolute bottom-4 right-4 z-10 pointer-events-none opacity-45 text-[10px] text-text-muted select-none text-right font-medium leading-normal">
-                Arraste os nós para reorganizar<br />
-                Scroll para Zoom | Clique para detalhar
+              <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
+                <div className="bg-surface/90 border border-border rounded-xl p-3 shadow-lg backdrop-blur-sm">
+                  <h4 className="text-[10px] font-bold text-text-strong uppercase tracking-wider mb-2">Saúde (Retenção)</h4>
+                  <div className="flex flex-col gap-1.5 text-xs font-medium text-text-medium">
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div> Dominado (&gt;90%)</div>
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div> Forte (&gt;75%)</div>
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div> Atenção (&gt;60%)</div>
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></div> Ponto Cego (&lt;60%)</div>
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-slate-500"></div> Não Revisado</div>
+                  </div>
+                </div>
+                <div className="pointer-events-none opacity-45 text-[10px] text-text-muted select-none text-right font-medium leading-normal">
+                  Ctrl/Shift+Click para multiseleção<br />
+                  Arraste para reorganizar
+                </div>
               </div>
+
+              {/* Mesa de Operações (Action Hub) */}
+              {selectedNodeIds.length > 1 && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-top-4 fade-in duration-200">
+                  <div className="flex items-center gap-3 bg-surface/95 border border-border shadow-xl backdrop-blur-md rounded-2xl p-2 px-4">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Ação em Lote</span>
+                      <span className="text-sm font-bold text-primary">{selectedNodeIds.length} selecionados</span>
+                    </div>
+                    <div className="h-8 w-px bg-border mx-2"></div>
+                    <Link 
+                      href={`/dashboard/chat?workspaceId=${selectedWorkspaceId}&focus=${selectedNodeIds.join(',')}&intent=simulado`}
+                      className="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
+                    >
+                      <BookOpen className="size-3.5" />
+                      Gerar Simulado
+                    </Link>
+                    <Link 
+                      href={`/dashboard/chat?workspaceId=${selectedWorkspaceId}&focus=${selectedNodeIds.join(',')}&intent=resumo`}
+                      className="btn-ghost py-1.5 px-3 text-xs flex items-center gap-1.5 border border-border hover:bg-surface-muted"
+                    >
+                      <MessageSquare className="size-3.5" />
+                      Resumir Relação
+                    </Link>
+                    <button 
+                      onClick={() => setSelectedNodeIds([])}
+                      className="p-1.5 ml-1 rounded-full text-text-muted hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
+                      title="Cancelar Seleção"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -593,7 +691,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
         >
           <div className="flex-1 overflow-y-auto pr-1">
             <header className="flex items-start justify-between gap-3 mb-5 shrink-0">
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${selectedNote ? getTopicTheme(selectedNote.topic).bg : 'bg-slate-700'} text-white`}>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${selectedNote ? getHealthTheme(nodes.find(n => n.id === selectedNote.id)?.health).bg : 'bg-slate-700'} text-white`}>
                 {selectedNote?.topic || 'Geral'}
               </span>
               <button 

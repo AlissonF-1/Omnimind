@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
 export async function getWorkspaces() {
   const supabase = await createClient()
@@ -141,6 +142,7 @@ export async function toggleSprintMode(workspaceId: string, isSprint: boolean, s
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
+  redirect('/login')
 }
 
 export async function getWorkspacesHealth(): Promise<Array<{

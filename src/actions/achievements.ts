@@ -4,6 +4,16 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { UserStudyStats, AchievementDetails, ACHIEVEMENTS, XP_CONFIG } from '@/types/achievements'
 
+// Helper para obter a data local (Brasil) no formato YYYY-MM-DD, ignorando a virada do UTC.
+function getLocalISODate(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date)
+}
+
 export async function getUserStudyStats(): Promise<UserStudyStats | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -43,8 +53,8 @@ export async function getUserStudyStats(): Promise<UserStudyStats | null> {
   }
 
   // Se for um novo dia, reseta a flag daily_goal_completed para false
-  const todayStr = new Date().toISOString().split('T')[0]
-  const lastUpdateStr = new Date(data.updated_at).toISOString().split('T')[0]
+  const todayStr = getLocalISODate(new Date())
+  const lastUpdateStr = getLocalISODate(new Date(data.updated_at))
 
   if (todayStr !== lastUpdateStr && data.daily_goal_completed) {
     const { data: updatedData } = await supabase
@@ -231,15 +241,14 @@ export async function getStreakJeopardyStatus(): Promise<{
   if (!user) return { isJeopardy: false, potentialStreak: 0 }
 
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = yesterday.toISOString().split('T')[0]
-
   const twoDaysAgo = new Date()
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
-  const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0]
+
+  const todayStr = getLocalISODate(today)
+  const yesterdayStr = getLocalISODate(yesterday)
+  const twoDaysAgoStr = getLocalISODate(twoDaysAgo)
 
   // Busca se existem logs para ontem e anteontem
   const { data: logs } = await supabase
@@ -300,7 +309,7 @@ export async function rescueStreak(): Promise<{ success: boolean; error?: string
 
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = yesterday.toISOString().split('T')[0]
+  const yesterdayStr = getLocalISODate(yesterday)
 
   // Insere um log de estudo fictício para ontem
   const { error } = await supabase
@@ -356,7 +365,7 @@ export async function incrementQuestProgress(questId: 'guerreiro' | 'escritor' |
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = getLocalISODate(new Date())
   
   // 1. Busca a quest de hoje
   let { data: quest } = await supabase
@@ -437,7 +446,7 @@ export async function getDailyQuests() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = getLocalISODate(new Date())
 
   // Busca as quests de hoje
   let { data: quests } = await supabase

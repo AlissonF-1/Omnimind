@@ -6,6 +6,8 @@ export interface GraphNode {
   id: string
   label: string
   topic: string
+  health?: number | null
+  flashcardsCount?: number
 }
 
 export interface GraphLink {
@@ -79,12 +81,45 @@ export async function getWorkspaceGraph(workspaceId: string): Promise<GraphData>
     }
   }
 
+  // 3. Busca todos os flashcards do workspace
+  const { data: flashcards } = await supabase
+    .from('flashcards')
+    .select('note_id, reps, lapses')
+    .in('note_id', notes.map(n => n.id))
+
+  // Agrupa os flashcards por nota e calcula a saúde média
+  const noteHealth = new Map<string, { totalReviewed: number; sumCorrectness: number; totalCards: number }>()
+  
+  if (flashcards) {
+    for (const card of flashcards) {
+      const d = noteHealth.get(card.note_id) || { totalReviewed: 0, sumCorrectness: 0, totalCards: 0 }
+      d.totalCards++
+      // Só conta na saúde os cards que já foram revisados pelo menos 1 vez
+      if (card.reps > 0) {
+        d.totalReviewed++
+        // health = (reps - lapses) / reps
+        const correctness = Math.max(0, Math.min(1, (card.reps - (card.lapses || 0)) / card.reps))
+        d.sumCorrectness += correctness
+      }
+      noteHealth.set(card.note_id, d)
+    }
+  }
+
   // Criar os nós do Grafo
-  const nodes: GraphNode[] = notes.map(n => ({
-    id: n.id,
-    label: n.title,
-    topic: n.topic || 'Geral'
-  }))
+  const nodes: GraphNode[] = notes.map(n => {
+    const stats = noteHealth.get(n.id)
+    let health = null
+    if (stats && stats.totalReviewed > 0) {
+      health = stats.sumCorrectness / stats.totalReviewed
+    }
+    return {
+      id: n.id,
+      label: n.title,
+      topic: n.topic || 'Geral',
+      health: health,
+      flashcardsCount: stats?.totalCards || 0
+    }
+  })
 
   const links: GraphLink[] = []
 

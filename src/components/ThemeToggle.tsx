@@ -36,6 +36,8 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
     const applyTheme = (t: Theme) => {
       const isDark = t === 'dark' || (t === 'system' && systemTheme === 'dark')
       document.documentElement.classList.toggle('dark', isDark)
+      // Limpa classe neo caso ainda exista no DOM
+      document.documentElement.classList.remove('neo')
     }
     applyTheme(theme)
     localStorage.setItem('omnimind-theme', theme)

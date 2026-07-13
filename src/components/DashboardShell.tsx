@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import MobileTopbar from '@/components/MobileTopbar'
 import AchievementToast from '@/components/AchievementToast'
 import LevelUpModal from '@/components/LevelUpModal'
+import ChatFloatingLauncher from '@/components/ChatFloatingLauncher'
 
 interface Workspace {
   id: string
@@ -82,6 +83,7 @@ export default function DashboardShell({
 
       <AchievementToast />
       <LevelUpModal />
+      <ChatFloatingLauncher />
     </div>
   )
 }

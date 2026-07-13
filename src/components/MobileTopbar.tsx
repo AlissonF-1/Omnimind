@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { BellDot, Bell, Menu } from 'lucide-react'
+import { BellDot, Bell, Menu, Sparkles } from 'lucide-react'
 
 interface MobileTopbarProps {
   userName: string
@@ -63,7 +63,16 @@ export default function MobileTopbar({
       </Link>
 
       {/* Acoes da direita */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
+
+        {/* Botão do Assistente (Chat) */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
+          className="relative flex size-11 items-center justify-center rounded-xl text-primary hover:bg-primary/10 transition-all"
+          aria-label="Abrir Assistente"
+        >
+          <Sparkles className="size-5" />
+        </button>
 
         {/* Sino de alertas */}
         <Link

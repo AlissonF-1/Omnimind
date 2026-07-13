@@ -3,6 +3,16 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+// Helper para obter a data local (Brasil) no formato YYYY-MM-DD
+function getLocalISODate(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date)
+}
+
 export type ExamGoal = {
   id: string
   user_id: string
@@ -71,7 +81,7 @@ export async function getCalendarData(month: number, year: number): Promise<Cale
     .eq('user_id', user.id)
     .order('exam_date', { ascending: true })
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = getLocalISODate(new Date())
   const days: DayData[] = []
   const totalDays = endOfMonth.getDate()
 
@@ -108,7 +118,7 @@ export async function getDynamicDailyGoal(): Promise<{ goal: number; activeGoal:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { goal: 10, activeGoal: null }
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = getLocalISODate(new Date())
   
   // Unifica a busca: tenta achar a meta ativa OU a próxima meta mais próxima no futuro
   const { data: targetGoal } = await supabase
