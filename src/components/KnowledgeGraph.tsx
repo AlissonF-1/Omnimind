@@ -732,7 +732,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                         return (
                           <button
                             key={idx}
-                            onClick={() => handleNodeClick(targetNode.id)}
+                            onClick={() => handleNodeClick(targetNode.id, false)}
                             className="flex items-center justify-between w-full p-2 text-left rounded-lg text-xs bg-surface-muted hover:bg-border transition-colors group"
                           >
                             <span className="font-semibold text-text-medium truncate pr-2 group-hover:text-text-strong transition-colors">{targetNode.label}</span>
