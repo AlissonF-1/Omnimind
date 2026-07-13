@@ -151,6 +151,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
   // 🔹 PASSO 1: Estado para o modo de geração
   const [generationMode, setGenerationMode] = useState<'default' | 'concurso'>('default')
+  const [showSlashMenu, setShowSlashMenu] = useState(false)
 
   const [selectedText, setSelectedText] = useState('')
   const [isPendingCloze, setIsPendingCloze] = useState(false)
@@ -561,6 +562,70 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
             </div>
           </div>
 
+          {/* Barra de Ferramentas de Formatação (Movida para o topo) */}
+          {viewMode === 'edit' && (
+            <div className="flex items-center gap-0.5 overflow-x-auto px-2 py-1.5 border-t border-border/40 bg-surface scrollbar-none">
+              <button
+                type="button"
+                aria-label="Inserir Template de Aula"
+                onPointerDown={(e) => { e.preventDefault(); insertTemplateAtCursor() }}
+                className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-primary bg-primary/5 hover:bg-primary/10 active:bg-primary/20 transition-colors"
+              >
+                <LayoutTemplate className="size-4" />
+              </button>
+              <div className="mx-1 h-4 w-px shrink-0 bg-border" />
+              {TOOLBAR_ACTIONS.map(({ icon: Icon, title, action }) => (
+                <button
+                  key={title}
+                  type="button"
+                  title={title}
+                  aria-label={title}
+                  onPointerDown={(e) => { e.preventDefault(); handleToolbarAction(action) }}
+                  className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-text-medium transition-colors active:bg-primary/10 active:text-primary"
+                >
+                  <Icon className="size-4" />
+                </button>
+              ))}
+              <div className="mx-1 h-4 w-px shrink-0 bg-border" />
+              <button
+                type="button"
+                aria-label="Tirar foto do quadro"
+                onPointerDown={(e) => { e.preventDefault(); cameraInputRef.current?.click() }}
+                className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-text-medium active:bg-primary/10 active:text-primary"
+              >
+                <Camera className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Adicionar imagem"
+                onPointerDown={(e) => { e.preventDefault(); fileInputRef.current?.click() }}
+                className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-text-medium active:bg-primary/10 active:text-primary"
+              >
+                <ImagePlus className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Formatar com IA"
+                disabled={isPendingGroq || !content.trim()}
+                onPointerDown={(e) => { e.preventDefault(); handleAIAssist() }}
+                className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-indigo-500 disabled:opacity-40 active:bg-indigo-500/10"
+              >
+                {isPendingGroq ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+              </button>
+              <div className="mx-1 h-4 w-px shrink-0 bg-border" />
+              <button
+                type="button"
+                aria-label="Referência rápida"
+                onPointerDown={(e) => { e.preventDefault(); setShowQuickHelp((v) => !v) }}
+                className={`flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 transition-colors ${
+                  showQuickHelp ? 'bg-primary/10 text-primary' : 'text-text-muted active:bg-surface-muted'
+                }`}
+              >
+                <ChevronDown className={`size-4 transition-transform ${showQuickHelp ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+          )}
+
           {/* Barra de Status secundária e fina */}
           <div className="flex items-center justify-between px-3 py-1 bg-surface-muted/30 border-t border-border/40 text-[10px] text-text-muted select-none">
             <div className="flex items-center gap-1.5">
@@ -621,11 +686,60 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
           </div>
         )}
 
+        {/* ── Slash Command Menu ──────── */}
+        {showSlashMenu && viewMode === 'edit' && (
+          <div className="absolute inset-x-4 bottom-24 sm:bottom-1/2 sm:translate-y-1/2 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 bg-surface border border-border rounded-xl shadow-2xl p-2 flex flex-col gap-1 max-h-[250px] overflow-y-auto animate-in zoom-in-95 duration-200">
+            <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-2 py-1 flex justify-between items-center">
+              Ações Rápidas
+              <button onClick={() => setShowSlashMenu(false)} className="text-text-muted hover:text-text-strong"><X className="size-3" /></button>
+            </div>
+            <button onPointerDown={(e) => { e.preventDefault(); insertTemplateAtCursor(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left">
+              <LayoutTemplate className="size-4 text-primary" />
+              <div>
+                <div className="font-semibold text-text-strong">Template de Aula</div>
+                <div className="text-[10px] text-text-muted">Insere a estrutura padrão</div>
+              </div>
+            </button>
+            <button onPointerDown={(e) => { e.preventDefault(); handleAIAssist(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left" disabled={isPendingGroq || !content.trim()}>
+              <Wand2 className="size-4 text-indigo-500" />
+              <div>
+                <div className="font-semibold text-text-strong">Formatar com IA</div>
+                <div className="text-[10px] text-text-muted">Melhora e formata o texto</div>
+              </div>
+            </button>
+            <button onPointerDown={(e) => { e.preventDefault(); handleCreateClozeAI(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left">
+              <Sparkles className="size-4 text-amber-500" />
+              <div>
+                <div className="font-semibold text-text-strong">Criar Lacuna com IA</div>
+                <div className="text-[10px] text-text-muted">Gera flashcard na frase atual</div>
+              </div>
+            </button>
+            <button onPointerDown={(e) => { 
+              e.preventDefault(); 
+              const boldAct = TOOLBAR_ACTIONS.find(a => a.title === 'Negrito')?.action;
+              if (boldAct) handleToolbarAction(boldAct);
+              setShowSlashMenu(false);
+            }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left">
+              <Bold className="size-4 text-text-medium" />
+              <div><div className="font-semibold text-text-strong">Negrito</div></div>
+            </button>
+          </div>
+        )}
+
         {viewMode === 'edit' ? (
           <textarea
             ref={textareaRef}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value)
+              const val = e.target.value
+              const start = e.target.selectionStart
+              if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
+                setShowSlashMenu(true)
+              } else if (showSlashMenu) {
+                setShowSlashMenu(false)
+              }
+            }}
             onPaste={handlePaste}
             onSelect={handleSelectionChange}
             onKeyUp={handleSelectionChange}
@@ -728,103 +842,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
             </div>
           )}
 
-          {/* Ações */}
-          <div className="flex items-center gap-0.5 overflow-x-auto px-2 py-1 scrollbar-none">
-            <button
-              type="button"
-              aria-label="Inserir Template de Aula"
-              onPointerDown={(e) => {
-                e.preventDefault()
-                insertTemplateAtCursor()
-              }}
-              className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-2 text-primary bg-primary/5 hover:bg-primary/10 active:bg-primary/20 transition-colors"
-            >
-              <LayoutTemplate className="size-4" />
-            </button>
-
-            <div className="mx-1 h-5 w-px shrink-0 bg-border" />
-
-            {TOOLBAR_ACTIONS.map(({ icon: Icon, title, action }) => (
-              <button
-                key={title}
-                type="button"
-                title={title}
-                aria-label={title}
-                onPointerDown={(e) => {
-                  e.preventDefault()
-                  handleToolbarAction(action)
-                }}
-                className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-2 text-text-medium transition-colors active:bg-primary/10 active:text-primary"
-              >
-                <Icon className="size-4" />
-              </button>
-            ))}
-
-            <div className="mx-1 h-5 w-px shrink-0 bg-border" />
-
-            <button
-              type="button"
-              aria-label="Tirar foto do quadro"
-              onPointerDown={(e) => {
-                e.preventDefault()
-                cameraInputRef.current?.click()
-              }}
-              className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-2 text-text-medium active:bg-primary/10 active:text-primary"
-            >
-              <Camera className="size-4" />
-            </button>
-
-            <button
-              type="button"
-              aria-label="Adicionar imagem"
-              onPointerDown={(e) => {
-                e.preventDefault()
-                fileInputRef.current?.click()
-              }}
-              className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-2 text-text-medium active:bg-primary/10 active:text-primary"
-            >
-              <ImagePlus className="size-4" />
-            </button>
-
-            <button
-              type="button"
-              aria-label="Formatar com IA"
-              disabled={isPendingGroq || !content.trim()}
-              onPointerDown={(e) => {
-                e.preventDefault()
-                handleAIAssist()
-              }}
-              className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-2 text-indigo-500 disabled:opacity-40 active:bg-indigo-500/10"
-            >
-              {isPendingGroq ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Wand2 className="size-4" />
-              )}
-            </button>
-
-            <div className="mx-1 h-5 w-px shrink-0 bg-border" />
-
-            <button
-              type="button"
-              aria-label="Referência rápida"
-              onPointerDown={(e) => {
-                e.preventDefault()
-                setShowQuickHelp((v) => !v)
-              }}
-              className={`flex h-10 min-w-[40px] items-center justify-center rounded-lg px-2 transition-colors ${
-                showQuickHelp
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-text-muted active:bg-surface-muted'
-              }`}
-            >
-              <ChevronDown
-                className={`size-4 transition-transform ${
-                  showQuickHelp ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-          </div>
         </div>
       )}
 
