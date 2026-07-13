@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X, Settings } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X, Settings, Pencil } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -217,6 +218,7 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceChange, isFloatingMode = false, onClose }: ChatPanelProps) {
   const { settings } = useSettings()
+  const pathname = usePathname()
   const isWorkspaceValid = true
   const storageKey = workspaceId ? `omnimind_chat_${workspaceId}` : 'omnimind_chat_global'
 
@@ -250,6 +252,9 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
   const [isRecording, setIsRecording] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [showPersonaModal, setShowPersonaModal] = useState(false)
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
+  const [editTitleValue, setEditTitleValue] = useState('')
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -413,12 +418,6 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
     const conversation = conversations.find((item) => item.id === conversationId)
     if (!conversation) return
 
-    const shouldDelete = typeof window === 'undefined'
-      ? true
-      : window.confirm(`Apagar a conversa "${conversation.title || DEFAULT_CONVERSATION_TITLE}"?`)
-
-    if (!shouldDelete) return
-
     const remainingConversations = conversations.filter((item) => item.id !== conversationId)
 
     if (remainingConversations.length === 0) {
@@ -441,6 +440,16 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
       setCopyError(null)
       setCopiedId(null)
     }
+    
+    setConversationToDelete(null)
+  }
+
+  const handleRenameConversation = (conversationId: string, newTitle: string) => {
+    const updatedConversations = conversations.map(conv => 
+      conv.id === conversationId ? { ...conv, title: newTitle.trim() || DEFAULT_CONVERSATION_TITLE } : conv
+    )
+    saveState(updatedConversations, activeConversationId)
+    setEditingConversationId(null)
   }
 
   const handleAsk = async (textOverride?: string) => {
@@ -488,10 +497,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
       textareaRef.current.style.height = 'auto'
     }
 
-    const history = activeMessages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }))
+    const activeWorkspaceName = workspaces.find(w => w.id === workspaceId)?.name || 'Todo o App'
 
     try {
       const response = await fetch('/api/chat', {
@@ -501,7 +507,12 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
           question: trimmed,
           workspaceId,
           persona: currentPersona,
-          history,
+          contextRoute: pathname,
+          contextWorkspace: activeWorkspaceName,
+          history: activeMessages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
           model: settings.ai_default_model,
           ecoMode: settings.eco_mode
         }),
@@ -697,36 +708,71 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                       : 'border-transparent bg-surface hover:border-border hover:bg-surface-muted'
                   }`}
                 >
-                  <button
-                    type="button"
+                  <div
                     onClick={() => handleSelectConversation(conversation.id)}
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left cursor-pointer"
+                    role="button"
+                    tabIndex={0}
                   >
                     <div className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-primary text-white' : 'bg-surface-muted text-text-medium'}`}>
                       <MessageSquare className="size-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium">
-                          {conversation.title || DEFAULT_CONVERSATION_TITLE}
-                        </span>
+                        {editingConversationId === conversation.id ? (
+                          <input
+                            type="text"
+                            value={editTitleValue}
+                            onChange={(e) => setEditTitleValue(e.target.value)}
+                            onBlur={() => handleRenameConversation(conversation.id, editTitleValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRenameConversation(conversation.id, editTitleValue)
+                              if (e.key === 'Escape') setEditingConversationId(null)
+                            }}
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full truncate text-sm font-medium bg-surface border-b border-primary outline-none px-1 py-0.5 rounded-sm"
+                          />
+                        ) : (
+                          <span className="truncate text-sm font-medium">
+                            {conversation.title || DEFAULT_CONVERSATION_TITLE}
+                          </span>
+                        )}
                         <ArrowLeftRight className="size-3 shrink-0 text-text-muted" />
                       </div>
                       <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-text-muted">
                         {conversation.messages[0]?.content || 'Conversa vazia'}
                       </p>
                     </div>
-                  </button>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteConversation(conversation.id)}
-                    aria-label={`Apagar conversa ${conversation.title || DEFAULT_CONVERSATION_TITLE}`}
-                    title="Apagar conversa"
-                    className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-error-soft hover:text-error"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingConversationId(conversation.id)
+                        setEditTitleValue(conversation.title || DEFAULT_CONVERSATION_TITLE)
+                      }}
+                      aria-label={`Renomear conversa ${conversation.title || DEFAULT_CONVERSATION_TITLE}`}
+                      title="Renomear conversa"
+                      className="rounded-md p-1 text-text-muted transition-colors hover:bg-surface-muted hover:text-text-strong"
+                    >
+                      <Pencil className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConversationToDelete(conversation.id)
+                      }}
+                      aria-label={`Apagar conversa ${conversation.title || DEFAULT_CONVERSATION_TITLE}`}
+                      title="Apagar conversa"
+                      className="rounded-md p-1 text-text-muted transition-colors hover:bg-error-soft hover:text-error"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </div>
                 </div>
               )
             })
@@ -820,9 +866,9 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
           {isFloatingMode ? (
             <button
               type="button"
-              onClick={handleStartNewConversation}
-              className="shrink-0 p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-surface-muted transition-colors"
-              title="Limpar conversa"
+              onClick={() => setConversationToDelete(activeConversationId)}
+              className="shrink-0 p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-error-soft hover:text-error transition-colors"
+              title="Apagar conversa atual"
             >
               <Trash2 className="size-4" />
             </button>
@@ -838,6 +884,42 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
             </button>
           )}
         </div>
+
+        {/* Modal de Exclusão de Conversa */}
+        {conversationToDelete && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="panel max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2 text-error">
+                  <AlertCircle className="size-5" />
+                  <h3 className="text-lg font-bold">Excluir Conversa</h3>
+                </div>
+                <button onClick={() => setConversationToDelete(null)} className="icon-button">
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              <p className="text-sm text-text-medium mb-6">
+                Tem certeza que deseja apagar esta conversa? Esta ação não pode ser desfeita e todo o histórico será perdido.
+              </p>
+
+              <div className="flex justify-end gap-3">
+                <button 
+                  onClick={() => setConversationToDelete(null)} 
+                  className="px-4 py-2 text-sm font-medium text-text-medium hover:text-text-strong hover:bg-surface-muted rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => handleDeleteConversation(conversationToDelete)} 
+                  className="px-4 py-2 text-sm font-bold text-white bg-error hover:bg-error/90 rounded-xl transition-colors"
+                >
+                  Sim, Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal de Personas */}
         {showPersonaModal && activeConversation && (
@@ -949,10 +1031,19 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                           </div>
                         ) : (
                           <div className="w-full">
-                            {msg.role === 'ai' && msg.model && (
-                              <div className="mb-2">
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase bg-primary-soft/30 border border-primary/10 px-2.5 py-0.5 rounded-full">
-                                  ⚡ {msg.model}
+                            {msg.role === 'ai' && (
+                              <div className="mb-2 flex items-center gap-2 flex-wrap">
+                                {msg.model && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase bg-primary-soft/30 border border-primary/10 px-2.5 py-0.5 rounded-full">
+                                    ⚡ {msg.model}
+                                  </span>
+                                )}
+                                <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase border px-2.5 py-0.5 rounded-full ${
+                                  activeConversation?.persona === 'grill' ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' :
+                                  activeConversation?.persona === 'eli5' ? 'bg-sky-500/10 text-sky-600 border-sky-500/20' :
+                                  'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                }`}>
+                                  {activeConversation?.persona === 'grill' ? '🔥 Grill' : activeConversation?.persona === 'eli5' ? '👶 Simplificado' : '📚 Tutor Socrático'}
                                 </span>
                               </div>
                             )}

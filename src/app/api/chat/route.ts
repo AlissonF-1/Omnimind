@@ -38,7 +38,7 @@ function streamJsonLines(lines: Array<{ type: string; data: unknown }>) {
 
 export async function POST(req: Request) {
   try {
-    const { question, workspaceId, persona, history, model: reqModel, ecoMode } = await req.json()
+    const { question, workspaceId, persona, history, model: reqModel, ecoMode, contextRoute, contextWorkspace } = await req.json()
     const trimmedQuery = typeof question === 'string' ? question.trim() : ''
 
     if (!trimmedQuery || trimmedQuery.length < 3) {
@@ -125,6 +125,13 @@ ${personaPrompt}
 
 ${SYSTEM_MANUAL}
 
+  **CONTEXTO DA SESSÃO ATUAL DO USUÁRIO:**
+  A data de hoje é: ${new Date().toLocaleDateString('pt-BR')} (use isso para calcular prazos como "este mês", "amanhã", etc).
+  O usuário está atualmente na tela/rota: "${contextRoute || '/dashboard'}".
+  O usuário está focado no Workspace de nome: "${contextWorkspace || 'Geral'}".
+  -> Use essas informações secretas para adaptar sua resposta caso o usuário faça perguntas vagas como "explica o que tô vendo", "resuma isso" ou "como funciona essa tela".
+  -> Se você notar que o usuário mencionou uma data importante, prazo ou prova nas suas mensagens, OFEREÇA PROATIVAMENTE a ação de criar a meta no calendário perguntando: "Quer que eu agende essa prova no seu calendário agora mesmo?".
+
   Regras adicionais para Busca em Anotações:
   - Se a pergunta for técnica/acadêmica, baseie-se UNICAMENTE no contexto fornecido.
   - Se a informação sobre o TEMA ACADÊMICO não estiver no contexto, diga exatamente: "Com base nas suas anotações, não possuo informações suficientes para responder a esta pergunta."
@@ -132,8 +139,7 @@ ${SYSTEM_MANUAL}
   - Ao usar informações do contexto (das suas notas), cite a fonte no formato [Fonte X].
   - Estruture a resposta em tópicos curtos e objetivos quando fizer sentido.
   - Responda em português (pt-BR).
-  - Se o usuário pedir para criar, agendar ou marcar uma prova/meta de estudo (ex: "Marca uma prova de Cálculo para 20/08"), você OBRIGATORIAMENTE deve responder de forma prestativa e amigável confirmando a prova e incluindo no final da resposta exatamente esta tag silenciosa de ação: [ACTION:CREATE_EXAM_GOAL|title=Título da Prova|date=AAAA-MM-DD]. Calcule o ano atual como ${new Date().getFullYear()} caso o usuário fale apenas dia/mês (ex: 20/08 vira 2026-08-20). Fale quantos dias faltam e quantos cards ele deve revisar por dia para se preparar.
-
+  - Se o usuário ACEITAR criar a prova, responda de forma amigável confirmando a prova e incluindo no final da resposta exatamente esta tag silenciosa de ação: [ACTION:CREATE_EXAM_GOAL|title=Título da Prova|date=AAAA-MM-DD]. Calcule a data exata com base no dia de hoje (${new Date().toLocaleDateString('pt-BR')}) caso o usuário use termos relativos ou omita o ano. Fale quantos dias faltam e quantos cards ele deve revisar por dia para se preparar.
 
   **CONTEXTO EXTRAÍDO DAS ANOTAÇÕES:**
   ${truncatedChunks.join('\n\n')}`
