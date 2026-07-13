@@ -17,7 +17,7 @@ export default function Heatmap({ logs }: { logs: Log[] }) {
     const daysArray = []
 
     let max = 0
-    const logMap = new Map(logs.map(log => [log.study_date, log.review_count]))
+    const logMap = new Map(logs.map(log => [log.study_date?.split('T')[0] || log.study_date, log.review_count]))
 
     for (let i = 139; i >= 0; i--) {
       const d = new Date(today)

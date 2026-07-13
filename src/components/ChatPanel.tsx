@@ -215,7 +215,7 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceChange }: ChatPanelProps) {
   const { settings } = useSettings()
-  const isWorkspaceValid = true // Sempre válido (vazio significa busca global em todo o app)
+  const isWorkspaceValid = true
   const storageKey = workspaceId ? `omnimind_chat_${workspaceId}` : 'omnimind_chat_global'
 
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -735,11 +735,6 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
 
       {/* Área Principal de Chat */}
       <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden bg-surface relative h-full">
-        {!isWorkspaceValid && (
-          <div className="flex items-center justify-center gap-2 border-b border-error/20 bg-error-soft px-4 py-2 text-center text-xs font-medium text-error">
-            <AlertCircle className="size-4" /> Workspace não identificado. O chat está desativado.
-          </div>
-        )}
 
         {/* Top Header do Chat com trigger para sidebar mobile */}
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 shrink-0 bg-surface">

@@ -76,19 +76,28 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
   const unlocked = new Set(stats.unlocked_achievements || [])
   const newlyUnlocked: AchievementDetails[] = []
 
-  // A. Busca total de notas criadas nas workspaces do usuário
-  const { count: notesCount } = await supabase
-    .from('notes')
-    .select('id, workspaces!inner(user_id)', { count: 'exact', head: true })
-    .eq('workspaces.user_id', user.id)
+  // Dispara queries em paralelo para melhorar performance
+  const [notesRes, logsRes, examGoalsRes, streak] = await Promise.all([
+    supabase
+      .from('notes')
+      .select('id, workspaces!inner(user_id)', { count: 'exact', head: true })
+      .eq('workspaces.user_id', user.id),
+    supabase
+      .from('daily_study_logs')
+      .select('review_count')
+      .eq('user_id', user.id),
+    supabase
+      .from('exam_goals')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+    getUserStreak(user.id)
+  ])
 
-  // B. Busca total de logs de revisão feitos
-  const { data: logs } = await supabase
-    .from('daily_study_logs')
-    .select('review_count')
-    .eq('user_id', user.id)
+  const notesCount = notesRes.count || 0
+  const logs = logsRes.data || []
+  const examGoalsCount = examGoalsRes.count || 0
 
-  const totalReviews = logs?.reduce((acc: number, cur: any) => acc + (cur.review_count || 0), 0) || 0
+  const totalReviews = logs.reduce((acc: number, cur: any) => acc + (cur.review_count || 0), 0)
 
   // 🏆 O Início
   if (!unlocked.has('o_inicio') && totalReviews >= 1) {
@@ -96,7 +105,7 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
   }
 
   // 📝 O Arquivista
-  if (!unlocked.has('o_arquivista') && (notesCount || 0) >= 50) {
+  if (!unlocked.has('o_arquivista') && notesCount >= 50) {
     newlyUnlocked.push(ACHIEVEMENTS.o_arquivista)
   }
 
@@ -106,12 +115,7 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
   }
 
   // 📅 O Planejador
-  const { count: examGoalsCount } = await supabase
-    .from('exam_goals')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-
-  if (!unlocked.has('o_planejador') && (examGoalsCount || 0) >= 1) {
+  if (!unlocked.has('o_planejador') && examGoalsCount >= 1) {
     newlyUnlocked.push(ACHIEVEMENTS.o_planejador)
   }
 
@@ -121,7 +125,6 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
   }
 
   // 🔥 A Chama (7 dias de streak)
-  const streak = await getUserStreak(user.id)
   if (!unlocked.has('a_chama') && streak >= 7) {
     newlyUnlocked.push(ACHIEVEMENTS.a_chama)
   }
@@ -245,8 +248,8 @@ export async function getStreakJeopardyStatus(): Promise<{
     .eq('user_id', user.id)
     .in('study_date', [yesterdayStr, twoDaysAgoStr])
 
-  const hasYesterday = logs?.some(l => l.study_date === yesterdayStr)
-  const hasTwoDaysAgo = logs?.some(l => l.study_date === twoDaysAgoStr)
+  const hasYesterday = logs?.some(l => (l.study_date?.split('T')[0] || l.study_date) === yesterdayStr)
+  const hasTwoDaysAgo = logs?.some(l => (l.study_date?.split('T')[0] || l.study_date) === twoDaysAgoStr)
 
   if (!hasYesterday && hasTwoDaysAgo) {
     // Ontem foi pulado, mas anteontem teve estudo. A streak pode ser resgatada!

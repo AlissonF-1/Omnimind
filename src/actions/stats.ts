@@ -310,7 +310,7 @@ export async function getProfileStats() {
     const d = new Date(today)
     d.setDate(today.getDate() - i)
     const dateStr = d.toISOString().split('T')[0]
-    const matchingLog = logs?.find((log: any) => log.study_date === dateStr)
+    const matchingLog = logs?.find((log: any) => (log.study_date?.split('T')[0] || log.study_date) === dateStr)
     last7Days.push({
       date: new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric' }).format(d),
       reviews: matchingLog?.review_count || 0

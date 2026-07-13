@@ -25,18 +25,12 @@ export function SettingsProvider({
   const [settings, setSettings] = useState<UserPreferences>(initialSettings)
   const [isUpdating, setIsUpdating] = useState(false)
 
-  // Atualiza a classe de tema no documento se o tema mudar
+  // Atualiza a classe de tema no documento se o tema mudar ou sistema mudar
   useEffect(() => {
     const root = document.documentElement
-    if (settings.theme === 'dark') {
-      root.classList.add('dark')
-      root.classList.remove('light')
-    } else if (settings.theme === 'light') {
-      root.classList.add('light')
-      root.classList.remove('dark')
-    } else {
-      // System
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    
+    const applyTheme = (isDark: boolean) => {
+      if (isDark) {
         root.classList.add('dark')
         root.classList.remove('light')
       } else {
@@ -44,12 +38,26 @@ export function SettingsProvider({
         root.classList.remove('dark')
       }
     }
+
+    if (settings.theme === 'dark') {
+      applyTheme(true)
+    } else if (settings.theme === 'light') {
+      applyTheme(false)
+    } else {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      applyTheme(mediaQuery.matches)
+      
+      const handleChange = (e: MediaQueryListEvent) => applyTheme(e.matches)
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
+    }
   }, [settings.theme])
 
   const updateSetting = async <K extends keyof Omit<UserPreferences, 'user_id' | 'updated_at'>>(
     key: K,
     value: UserPreferences[K]
   ) => {
+    const prevSettings = { ...settings }
     try {
       setIsUpdating(true)
       // Optimistic update
@@ -59,7 +67,8 @@ export function SettingsProvider({
       await updateUserPreferences({ [key]: value })
     } catch (error) {
       console.error('Failed to update setting:', error)
-      // Revert in case of error (simplificado, poderia buscar do server de novo)
+      // Revert in case of error
+      setSettings(prevSettings)
     } finally {
       setIsUpdating(false)
     }

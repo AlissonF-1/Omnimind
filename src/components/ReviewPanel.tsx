@@ -81,6 +81,12 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const [showVideoModal, setShowVideoModal] = useState(false)
   const [videoUrl, setVideoUrl] = useState('')
   const [isSearchingVideo, setIsSearchingVideo] = useState(false)
+  
+  const [uiError, setUiError] = useState<string | null>(null)
+  const showError = (msg: string) => {
+    setUiError(msg)
+    setTimeout(() => setUiError(null), 5000)
+  }
 
   const [isUsingAdvancedSpeech, setIsUsingAdvancedSpeech] = useState(false)
 
@@ -360,7 +366,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   // --- 🆕 FUNÇÃO: Text-to-Speech (Gratuito e Offline) ---
   const speakText = (text: string) => {
     if (!('speechSynthesis' in window)) {
-      alert('Seu navegador não suporta leitura de voz.');
+      showError('Seu navegador não suporta leitura de voz.');
       return;
     }
     // Para qualquer áudio que esteja tocando antes de tocar o novo
@@ -392,13 +398,13 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       
       // Verifica se houve um erro de comunicação/API
       if (!result.success) {
-        alert('Ops! A API do YouTube retornou um erro: ' + (result.error || 'Erro desconhecido.'));
+        showError('Ops! A API do YouTube retornou um erro: ' + (result.error || 'Erro desconhecido.'));
         return;
       }
 
       // Verifica se não encontrou nenhum vídeo
       if (!result.videos || result.videos.length === 0) {
-        alert('Não encontramos nenhum vídeo explicativo específico para este tópico no YouTube. Tente buscar por termos mais gerais.');
+        showError('Não encontramos nenhum vídeo explicativo específico para este tópico no YouTube. Tente buscar por termos mais gerais.');
         return;
       }
 
@@ -409,7 +415,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
 
     } catch (error) {
       console.error('Erro crítico ao buscar vídeo:', error);
-      alert('Houve um erro inesperado ao tentar buscar o vídeo.');
+      showError('Houve um erro inesperado ao tentar buscar o vídeo.');
     } finally {
       setIsSearchingVideo(false);
     }
@@ -452,15 +458,18 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
           })
           const resData = await apiRes.json()
           if (!apiRes.ok || resData.error) {
-            alert(`Erro ao transcrever com Groq Whisper: ${resData.error || 'Erro na requisição'}`)
-            setUserAnswerText('')
-            setResponseMethod(null)
+            if (apiRes.status === 429 || resData.error?.includes('sobrecarregado')) {
+               showError('Muitas requisições. Aguarde alguns segundos e tente novamente.');
+            } else {
+               showError(`Erro ao transcrever com Groq Whisper: ${resData.error || 'Erro na requisição'}`)
+            }
+            return
           } else {
             setUserAnswerText(resData.text)
           }
         } catch (err: any) {
           console.error(err)
-          alert('Erro ao se conectar ao Groq Whisper.')
+          showError('Erro ao se conectar ao Groq Whisper.')
           setUserAnswerText('')
           setResponseMethod(null)
         } finally {
@@ -475,7 +484,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       setUserAnswerText('Gravando áudio... Fale agora.')
     } catch (err) {
       console.error('Erro ao acessar microfone:', err)
-      alert('Não foi possível acessar seu microfone. Verifique as permissões de áudio no seu navegador.')
+      showError('Não foi possível acessar seu microfone. Verifique as permissões de áudio no seu navegador.')
       setIsRecording(false)
     }
   }
@@ -511,8 +520,8 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       return
     }
 
-    if (!recognitionRef.current) {
-      alert('Seu navegador não suporta reconhecimento de voz nativo.')
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      showError('Seu navegador não suporta reconhecimento de voz nativo.')
       return
     }
 
@@ -540,10 +549,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       setIsFlipped(true)
     } catch (error) {
       console.error('Erro ao avaliar com IA:', error)
-      setAiFeedback({
-        correct: false,
-        feedback: 'Não foi possível se comunicar com o tutor de IA. Compare com a resposta oficial.'
-      })
+      showError('Não foi possível se comunicar com o tutor de IA. Compare com a resposta oficial.')
       setIsFlipped(true)
     } finally {
       setIsEvaluating(false)
@@ -589,7 +595,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
                 }
               }))
             } else {
-              alert(`Erro ao resgatar streak: ${res.error}`)
+              showError(`Erro ao resgatar streak: ${res.error}`)
             }
           })
         }
@@ -1182,7 +1188,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
                 <PlayCircle className="size-5 text-red-500" />
                 Vídeo Explicativo
               </h4>
-              <button onClick={() => setShowVideoModal(false)} className="text-text-muted hover:text-white transition-colors">
+              <button onClick={() => { setShowVideoModal(false); setVideoUrl(''); }} className="text-text-muted hover:text-white transition-colors">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1201,6 +1207,15 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
           </div>
         </div>
       )}
+
+      {/* 🆕 TOAST DE ERRO */}
+      <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg shadow-lg backdrop-blur-md transition-all duration-300 z-[100] max-w-sm ${uiError ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0 pointer-events-none'}`}>
+        <AlertTriangle className="size-5 shrink-0" />
+        <span className="text-sm font-medium leading-tight">{uiError}</span>
+        <button onClick={() => setUiError(null)} className="ml-2 opacity-70 hover:opacity-100 transition-opacity">
+          <X className="size-4" />
+        </button>
+      </div>
     </div>
   )
 }

@@ -316,17 +316,17 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
       </div>
 
       {/* Streak Shield Status Extra */}
-      <div className="panel p-5 flex items-center justify-between border-border">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-primary-soft text-primary">
+      <div className="panel p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-border">
+        <div className="flex items-start gap-3 min-w-0">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary mt-0.5 sm:mt-0">
             <Shield className="size-5" />
           </span>
-          <div>
+          <div className="min-w-0">
             <h4 className="text-sm font-bold text-text-strong">Escudo de Streak do OmniMind</h4>
-            <p className="text-xs text-text-muted">O escudo mantém seu combo ativo se você esquecer de estudar por um dia inteiro.</p>
+            <p className="text-xs text-text-muted leading-relaxed">O escudo mantém seu combo ativo se você esquecer de estudar por um dia inteiro.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center sm:justify-end shrink-0">
           <span className={`text-xs font-extrabold px-3 py-1 rounded-full ${
             data.streakShields > 0 
               ? 'bg-primary-soft text-primary border border-primary/20' 

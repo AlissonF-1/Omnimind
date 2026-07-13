@@ -61,7 +61,8 @@ export async function getCalendarData(month: number, year: number): Promise<Cale
 
   const reviewedMap = new Map<string, number>()
   logs?.forEach(log => {
-    reviewedMap.set(log.study_date, (reviewedMap.get(log.study_date) || 0) + (log.review_count || 0))
+    const studyDateOnly = log.study_date?.split('T')[0] || log.study_date
+    reviewedMap.set(studyDateOnly, (reviewedMap.get(studyDateOnly) || 0) + (log.review_count || 0))
   })
 
   const { data: examGoals } = await supabase
@@ -107,27 +108,18 @@ export async function getDynamicDailyGoal(): Promise<{ goal: number; activeGoal:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { goal: 10, activeGoal: null }
 
-  const { data: activeGoal } = await supabase
+  const todayStr = new Date().toISOString().split('T')[0]
+  
+  // Unifica a busca: tenta achar a meta ativa OU a próxima meta mais próxima no futuro
+  const { data: targetGoal } = await supabase
     .from('exam_goals')
     .select('*')
     .eq('user_id', user.id)
-    .eq('is_active_goal', true)
+    .gte('exam_date', todayStr)
+    .order('is_active_goal', { ascending: false }) // ativas (true) primeiro
+    .order('exam_date', { ascending: true })
+    .limit(1)
     .maybeSingle()
-
-  let targetGoal: ExamGoal | null = activeGoal
-
-  if (!targetGoal) {
-    const todayStr = new Date().toISOString().split('T')[0]
-    const { data: nextGoal } = await supabase
-      .from('exam_goals')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('exam_date', todayStr)
-      .order('exam_date', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    targetGoal = nextGoal
-  }
 
   if (!targetGoal) {
     return { goal: 10, activeGoal: null }
@@ -207,6 +199,12 @@ export async function createExamGoal(
   })
 
   if (error) throw new Error(error.message)
+
+  // Dispara checagem de conquistas em background (ex: O Planejador)
+  const { checkAndUnlockAchievements } = await import('@/actions/achievements')
+  checkAndUnlockAchievements().catch(err => 
+    console.error('Erro ao verificar conquistas pós-criação de meta:', err)
+  )
 
   revalidatePath('/dashboard/calendario')
   revalidatePath('/dashboard')

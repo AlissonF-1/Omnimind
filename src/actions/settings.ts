@@ -99,18 +99,34 @@ export async function deleteAllUserData(confirmationText: string) {
   if (!user) throw new Error('Not authenticated')
 
   try {
-    // Apagamos das dependentes para as principais
-    // Como RLS protege, podemos chamar o delete sem medo para o próprio usuário
-    await supabase.from('review_logs').delete().eq('user_id', user.id)
-    await supabase.from('daily_study_logs').delete().eq('user_id', user.id)
-    await supabase.from('exam_goals').delete().eq('user_id', user.id)
-    await supabase.from('flashcards').delete().eq('user_id', user.id) // Se RLS basear em workspace, precisamos de uma query diferente, mas assumindo RLS robusto
-    await supabase.from('notes').delete().neq('id', '00000000-0000-0000-0000-000000000000') // Deleta todas do usuário
-    await supabase.from('workspaces').delete().eq('user_id', user.id)
-    await supabase.from('user_study_stats').delete().eq('user_id', user.id)
-    await supabase.from('user_preferences').delete().eq('user_id', user.id)
+    // 1. Gera backup ANTES de deletar
+    const backupJson = await exportUserData()
+
+    // 2. Busca os workspaces do usuário para deletar as notas em segurança
+    const { data: userWorkspaces } = await supabase
+      .from('workspaces').select('id').eq('user_id', user.id)
+    const wsIds = userWorkspaces?.map(w => w.id) || []
+
+    // 3. Deleta das tabelas independentes em paralelo
+    await Promise.all([
+      supabase.from('review_logs').delete().eq('user_id', user.id),
+      supabase.from('daily_study_logs').delete().eq('user_id', user.id),
+      supabase.from('exam_goals').delete().eq('user_id', user.id),
+      supabase.from('user_study_stats').delete().eq('user_id', user.id),
+      supabase.from('user_preferences').delete().eq('user_id', user.id)
+    ])
+
+    // 4. Deleta dependentes sequencialmente
+    await supabase.from('flashcards').delete().eq('user_id', user.id)
     
-    return { success: true }
+    if (wsIds.length > 0) {
+      await supabase.from('notes').delete().in('workspace_id', wsIds)
+    }
+    
+    await supabase.from('workspaces').delete().eq('user_id', user.id)
+    
+    // 5. Retorna o backup para o cliente
+    return { success: true, backupJson }
   } catch (error) {
     console.error('Error deleting data:', error)
     throw new Error('Falha ao apagar dados')

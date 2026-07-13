@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -258,10 +258,13 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0
-  const readingTime = Math.ceil(wordCount / 200) || 1
+  const { wordCount, readingTime } = useMemo(() => {
+    const wCount = content.trim() ? content.trim().split(/\s+/).length : 0
+    const rTime = Math.ceil(wCount / 200) || 1
+    return { wordCount: wCount, readingTime: rTime }
+  }, [content])
 
   useEffect(() => {
     if (viewMode === 'preview' && previewRef.current) {

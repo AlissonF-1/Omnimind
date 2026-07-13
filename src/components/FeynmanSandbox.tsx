@@ -90,6 +90,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
       // Para as faixas sem disparar o processamento do áudio
       const stream = mediaRecorderRef.current.stream
       stream.getTracks().forEach(track => track.stop())
+      mediaRecorderRef.current = null
       setIsRecording(false)
       setDuration(0)
     }
@@ -186,9 +187,9 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
       {/* Cabeçalho */}
       <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
             <h1 className="page-title text-2xl sm:text-3xl">Feynman Sandbox</h1>
-            <span className="inline-flex items-center gap-1 text-xs font-semibold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
               Técnica Feynman
             </span>
           </div>

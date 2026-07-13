@@ -36,6 +36,12 @@ export async function POST(req: NextRequest) {
     })
 
     if (!whisperResponse.ok) {
+      if (whisperResponse.status === 429) {
+        return NextResponse.json(
+          { error: 'Serviço de transcrição sobrecarregado. Aguarde e tente novamente.' },
+          { status: 429 }
+        )
+      }
       const errorText = await whisperResponse.text()
       throw new Error(`Groq Whisper falhou: ${errorText}`)
     }

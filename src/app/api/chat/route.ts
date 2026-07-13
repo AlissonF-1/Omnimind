@@ -153,7 +153,13 @@ ${personaPrompt}
   ${truncatedChunks.join('\n\n')}`
 
     let geminiModelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-    if (ecoMode) geminiModelName = 'gemini-1.5-flash-8b'
+    if (ecoMode) {
+      geminiModelName = 'gemini-1.5-flash-8b'
+    } else if (reqModel === 'groq') {
+      // Groq usa fallback via ai-fallback.ts — mantemos gemini como base mas marcamos no label
+      geminiModelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+    }
+    // openrouter também cai no fallback automático em ai-fallback.ts para outras rotas
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
@@ -188,34 +194,30 @@ ${personaPrompt}
         const encoder = new TextEncoder()
 
         try {
-          // Incrementa contagem de consultas e avança quest Curioso de forma assíncrona
-          incrementTutorQueriesCount().catch(err => console.error('Erro ao somar query:', err))
-          incrementQuestProgress('curioso', 1).catch(err => console.error('Erro ao somar quest:', err))
-          
-          // Adiciona o XP do chat usando configuração centralizada e verifica se subiu de nível
-          const xpRes = await addXp(XP_CONFIG.CHAT_MESSAGE).catch(err => {
-            console.error('Erro ao adicionar XP do chat:', err)
-            return null
-          })
-
-          if (xpRes && xpRes.leveledUp) {
-            controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'level-up', data: { oldLevel: xpRes.oldLevel, newLevel: xpRes.newLevel } })}\n`))
-          }
-
-          // Verifica conquistas desbloqueadas durante o chat
-          const newlyUnlocked = await checkAndUnlockAchievements().catch(err => {
-            console.error('Erro ao checar conquistas:', err)
-            return []
-          })
-
-          if (newlyUnlocked && newlyUnlocked.length > 0) {
-            newlyUnlocked.forEach((achievement) => {
-              controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'achievement-unlocked', data: achievement })}\n`))
+          // Lança todas as tarefas secundárias em background (fire-and-forget)
+          const backgroundUpdates = Promise.all([
+            incrementTutorQueriesCount().catch(err => console.error('Erro ao somar query:', err)),
+            incrementQuestProgress('curioso', 1).catch(err => console.error('Erro ao somar quest:', err)),
+            addXp(XP_CONFIG.CHAT_MESSAGE).catch(err => {
+              console.error('Erro ao adicionar XP do chat:', err)
+              return null
+            }).then(xpRes => {
+              if (xpRes && xpRes.leveledUp) {
+                controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'level-up', data: { oldLevel: xpRes.oldLevel, newLevel: xpRes.newLevel } })}\n`))
+              }
             })
-          }
+          ])
 
+          // Stream começa IMEDIATAMENTE:
           controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'sources', data: sources })}\n`))
-          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'model', data: ecoMode ? 'Gemini 1.5 Flash-8B (Eco)' : 'Gemini 2.5 Flash' })}\n`))
+          const modelLabel = ecoMode 
+            ? 'Gemini 1.5 Flash-8B (Eco)' 
+            : reqModel === 'groq' 
+              ? 'Llama 3 70B (Groq)'
+              : reqModel === 'openrouter' 
+                ? 'OpenRouter (Auto)'
+                : 'Gemini 2.5 Flash'
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'model', data: modelLabel })}\n`))
 
           let accumulatedText = ''
           for await (const chunk of resultStream.stream) {
@@ -240,6 +242,18 @@ ${personaPrompt}
             }
           }
 
+          // Aguarda updates em background e checa conquistas APÓS possíveis actions
+          await backgroundUpdates
+          const newlyUnlocked = await checkAndUnlockAchievements().catch(err => {
+            console.error('Erro ao checar conquistas pós-stream:', err)
+            return []
+          })
+          if (newlyUnlocked && newlyUnlocked.length > 0) {
+            newlyUnlocked.forEach((achievement) => {
+              controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'achievement-unlocked', data: achievement })}\n`))
+            })
+          }
+
           controller.close()
         } catch (error) {
           controller.error(error)
@@ -254,8 +268,14 @@ ${personaPrompt}
         Connection: 'keep-alive',
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro na API de Chat:', error)
+    if (error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota')) {
+      return Response.json({
+        error: 'Limite da IA atingido. Aguarde alguns segundos e tente novamente.',
+        retryAfter: 15
+      }, { status: 429 })
+    }
     return Response.json({ error: 'Erro interno de servidor' }, { status: 500 })
   }
 }

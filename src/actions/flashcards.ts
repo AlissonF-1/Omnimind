@@ -15,10 +15,21 @@ export async function generateFlashcardsFromNote(noteId: string, content: string
       throw new Error('A anotação é muito curta para gerar cards.')
     }
 
+    // Lê preferência do usuário sobre analogias
+    const { data: prefs } = await supabase
+      .from('user_preferences')
+      .select('generate_analogies')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    const generateAnalogies = prefs?.generate_analogies !== false // default true
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
     
     // Define a instrução baseada no modo selecionado
-    let systemInstruction = "Você é um especialista em neurociência, cognição profunda e criação de flashcards para retenção de memória. Sua missão é escanear o texto fornecido e mapear Entidades de Conhecimento. Extraia camadas inteligentes de estudo utilizando a Técnica de Feynman para analogias e Gatilhos de Memória para mnemônicos. OBRIGATORIAMENTE, para cada flashcard, extraia e devolva o bloco de texto exato da nota que serviu de base para aquele card no campo 'source_chunk'. Preencha o JSON estritamente conforme o schema solicitado."
+    const analogyInstruction = generateAnalogies
+      ? 'Extraia camadas inteligentes de estudo utilizando a Técnica de Feynman para analogias e Gatilhos de Memória para mnemônicos.'
+      : 'Foque apenas em perguntas e respostas diretas. Não gere analogias (retorne null no campo analogia). Pode gerar mnemônicos apenas quando for uma lista ou regra para memorizar.'
+    let systemInstruction = `Você é um especialista em neurociência, cognição profunda e criação de flashcards para retenção de memória. Sua missão é escanear o texto fornecido e mapear Entidades de Conhecimento. ${analogyInstruction} OBRIGATORIAMENTE, para cada flashcard, extraia e devolva o bloco de texto exato da nota que serviu de base para aquele card no campo 'source_chunk'. Preencha o JSON estritamente conforme o schema solicitado.`
 
     if (mode === 'concurso') {
       systemInstruction += " **MODO CONCURSO ATIVADO:** O foco principal deve ser na criação de perguntas sobre Lei Seca, exceções, pegadinhas e jurisprudência. Para cada conceito ou artigo, priorize perguntas do tipo: 'Qual a exceção a essa regra?', 'Quando este artigo NÃO se aplica?', 'O que a lei diz sobre X?'. Evite perguntas abertas demais; foque na literalidade e nas pegadinhas clássicas de prova."
@@ -285,9 +296,20 @@ export async function previewGeneratedFlashcards(content: string, mode: 'default
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
 
+    // Lê preferência do usuário sobre analogias
+    const { data: prefs } = await supabase
+      .from('user_preferences')
+      .select('generate_analogies')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    const generateAnalogies = prefs?.generate_analogies !== false // default true
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
     
-    let systemInstruction = "Você é um especialista em neurociência, cognição profunda e criação de flashcards para retenção de memória. Sua missão é escanear o texto fornecido e mapear Entidades de Conhecimento. Extraia camadas inteligentes de estudo utilizando a Técnica de Feynman para analogias e Gatilhos de Memória para mnemônicos. OBRIGATORIAMENTE, para cada flashcard, extraia e devolva o bloco de texto exato da nota que serviu de base para aquele card no campo 'source_chunk'. Preencha o JSON estritamente conforme o schema solicitado."
+    const analogyInstruction = generateAnalogies
+      ? 'Extraia camadas inteligentes de estudo utilizando a Técnica de Feynman para analogias e Gatilhos de Memória para mnemônicos.'
+      : 'Foque apenas em perguntas e respostas diretas. Não gere analogias (retorne null no campo analogia). Pode gerar mnemônicos apenas quando for uma lista ou regra para memorizar.'
+    let systemInstruction = `Você é um especialista em neurociência, cognição profunda e criação de flashcards para retenção de memória. Sua missão é escanear o texto fornecido e mapear Entidades de Conhecimento. ${analogyInstruction} OBRIGATORIAMENTE, para cada flashcard, extraia e devolva o bloco de texto exato da nota que serviu de base para aquele card no campo 'source_chunk'. Preencha o JSON estritamente conforme o schema solicitado.`
 
     if (mode === 'concurso') {
       systemInstruction += " **MODO CONCURSO ATIVADO:** O foco principal deve ser na criação de perguntas sobre Lei Seca, exceções, pegadinhas e jurisprudência. Para cada conceito ou artigo, priorize perguntas do tipo: 'Qual a exceção a essa regra?', 'Quando este artigo NÃO se aplica?', 'O que a lei diz sobre X?'. Evite perguntas abertas demais; foque na literalidade e nas pegadinhas clássicas de prova."

@@ -191,7 +191,7 @@ export default function SemanticSearch({
     })
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 sm:px-0">
+    <div className="mx-auto w-full max-w-3xl space-y-6">
       
       {/* O cabeçalho foi removido daqui, pois agora ele é renderizado pela página pai (BuscaPage) */}
 
@@ -233,7 +233,7 @@ export default function SemanticSearch({
         </label>
 
         {/* Linha 2: Filtro e Indexação em linha (alinhado por base) */}
-        <div className="flex gap-2.5 items-end w-full">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-2.5 items-stretch sm:items-end w-full">
           <div className="flex-1 min-w-0">
             <label htmlFor="workspace-filter" className="mb-1.5 block text-xs font-medium text-text-strong">
               Filtrar por workspace
@@ -242,7 +242,7 @@ export default function SemanticSearch({
               id="workspace-filter"
               value={workspaceId}
               onChange={(e) => setWorkspaceId(e.target.value)}
-              className="field w-full min-w-0 max-w-[70%] sm:max-w-none truncate"
+              className="field w-full min-w-0 truncate"
             >
               <option value="">Todos os workspaces</option>
               {workspaces.map((ws) => (

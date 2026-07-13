@@ -186,7 +186,7 @@ async function DashboardContent() {
 
     // Hoje e totais de revisões
     const todayStr = new Date().toISOString().split('T')[0]
-    const todayLog = studyLogs?.find((log: any) => log.study_date === todayStr)
+    const todayLog = studyLogs?.find((log: any) => (log.study_date?.split('T')[0] || log.study_date) === todayStr)
     const todayReviewCount = todayLog?.review_count || 0
     const totalReviews = studyLogs?.reduce((acc: number, cur: any) => acc + (cur.review_count || 0), 0) || 0
 

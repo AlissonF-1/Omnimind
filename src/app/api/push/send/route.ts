@@ -58,10 +58,20 @@ async function getUserDueCardsCount(supabase: any, userId: string): Promise<numb
   return dueCount
 }
 
-export async function POST(req: Request) {
+// Verifica se o usuário tem Modo Não Perturbe ativo
+async function getUserDoNotDisturb(supabase: any, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('user_preferences')
+    .select('do_not_disturb')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return data?.do_not_disturb === true
+}
+
+async function handleSend(req: Request) {
   try {
     // 1. Validação de segurança por token do Cron Secret
-    const apiKeyHeader = req.headers.get('x-api-key')
+    const apiKeyHeader = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '')
     const cronSecret = process.env.CRON_SECRET
 
     if (cronSecret && apiKeyHeader !== cronSecret) {
@@ -81,13 +91,21 @@ export async function POST(req: Request) {
 
     let notifiedCount = 0
     let errorCount = 0
+    let skippedDndCount = 0
 
     // Envia notificações agrupadas por usuário
     for (const subItem of subscriptions) {
       const userId = subItem.user_id
       const subscriptionData = subItem.subscription
 
-      // 3. Calcula o total de cards pendentes para este usuário específico
+      // 3. Verifica Modo Não Perturbe — pula usuário se ativo
+      const doNotDisturb = await getUserDoNotDisturb(supabase, userId)
+      if (doNotDisturb) {
+        skippedDndCount++
+        continue
+      }
+
+      // 4. Calcula o total de cards pendentes para este usuário específico
       const dueCount = await getUserDueCardsCount(supabase, userId)
 
       if (dueCount > 0) {
@@ -118,7 +136,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       notifiedCount,
-      errorCount
+      errorCount,
+      skippedDndCount
     })
 
   } catch (error: any) {
@@ -126,3 +145,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
+// POST: chamada manual ou por ferramentas externas
+export async function POST(req: Request) {
+  return handleSend(req)
+}
+
+// GET: chamada pelo Vercel Cron (vercel.json)
+export async function GET(req: Request) {
+  return handleSend(req)
+}
+

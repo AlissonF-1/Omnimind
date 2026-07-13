@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bell, BellOff, Loader2, Sparkles } from 'lucide-react'
+import { Bell, BellOff, Loader2, Sparkles, MoonStar } from 'lucide-react'
+import { useSettings } from '@/contexts/SettingsContext'
 
 // Helper para converter a chave pública VAPID
 function urlBase64ToUint8Array(base64String: string) {
@@ -17,6 +18,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export default function ReviewAlarm() {
+  const { settings } = useSettings()
   const [supported, setSupported] = useState(true)
   const [isEnabled, setIsEnabled] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -67,6 +69,11 @@ export default function ReviewAlarm() {
         for (const reg of registrations) {
           const sub = await reg.pushManager.getSubscription()
           if (sub) {
+            await fetch('/api/push/unsubscribe', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint: sub.endpoint })
+            }).catch(console.error)
             await sub.unsubscribe()
           }
         }
@@ -128,6 +135,18 @@ export default function ReviewAlarm() {
       <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface-muted/50 text-xs text-text-muted">
         <BellOff className="size-4 shrink-0 text-text-muted" />
         <span>Notificações Push não suportadas pelo seu navegador ou dispositivo.</span>
+      </div>
+    )
+  }
+
+  // Modo Não Perturbe ativo: exibe aviso e desabilita o alarme
+  if (settings.do_not_disturb) {
+    return (
+      <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-500">
+        <MoonStar className="size-4 shrink-0" />
+        <span>
+          <strong>Modo Não Perturbe ativado.</strong> Desative-o acima para poder ativar o alarme de revisão.
+        </span>
       </div>
     )
   }

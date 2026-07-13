@@ -17,47 +17,47 @@ interface WorkspaceHealthGridProps {
   healths: WorkspaceHealth[]
 }
 
+const getStatusStyles = (status: 'green' | 'yellow' | 'red') => {
+  switch (status) {
+    case 'red':
+      return {
+        border: 'border-rose-500/20 hover:border-rose-500/35',
+        bg: 'bg-rose-500/5',
+        glow: 'shadow-[0_0_15px_rgba(244,63,94,0.07)] hover:shadow-[0_0_25px_rgba(244,63,94,0.12)]',
+        badge: 'bg-rose-500/10 text-rose-500 border border-rose-500/20',
+        bar: 'bg-rose-500',
+        icon: <ShieldAlert className="size-4 text-rose-500" />,
+        label: 'Alerta Crítico'
+      }
+    case 'yellow':
+      return {
+        border: 'border-amber-500/20 hover:border-amber-500/35',
+        bg: 'bg-amber-500/5',
+        glow: 'shadow-[0_0_15px_rgba(245,158,11,0.07)] hover:shadow-[0_0_25px_rgba(245,158,11,0.12)]',
+        badge: 'bg-amber-500/10 text-amber-500 border border-amber-500/20',
+        bar: 'bg-amber-500',
+        icon: <WarningIcon className="size-4 text-amber-500" />,
+        label: 'Atenção'
+      }
+    case 'green':
+    default:
+      return {
+        border: 'border-emerald-500/20 hover:border-emerald-500/35',
+        bg: 'bg-emerald-500/5',
+        glow: 'shadow-[0_0_15px_rgba(16,185,129,0.07)] hover:shadow-[0_0_25px_rgba(16,185,129,0.12)]',
+        badge: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
+        bar: 'bg-emerald-500',
+        icon: <ShieldCheck className="size-4 text-emerald-500" />,
+        label: 'Saudável'
+      }
+  }
+}
+
 export default function WorkspaceHealthGrid({ healths }: WorkspaceHealthGridProps) {
   // Limita a exibição ao grid 2x3 (máximo 6 workspaces)
   const activeHealths = healths.slice(0, 6)
 
   if (activeHealths.length === 0) return null
-
-  const getStatusStyles = (status: 'green' | 'yellow' | 'red') => {
-    switch (status) {
-      case 'red':
-        return {
-          border: 'border-rose-500/20 hover:border-rose-500/35',
-          bg: 'bg-rose-500/5',
-          glow: 'shadow-[0_0_15px_rgba(244,63,94,0.07)] hover:shadow-[0_0_25px_rgba(244,63,94,0.12)]',
-          badge: 'bg-rose-500/10 text-rose-500 border border-rose-500/20',
-          bar: 'bg-rose-500',
-          icon: <ShieldAlert className="size-4 text-rose-500" />,
-          label: 'Alerta Crítico'
-        }
-      case 'yellow':
-        return {
-          border: 'border-amber-500/20 hover:border-amber-500/35',
-          bg: 'bg-amber-500/5',
-          glow: 'shadow-[0_0_15px_rgba(245,158,11,0.07)] hover:shadow-[0_0_25px_rgba(245,158,11,0.12)]',
-          badge: 'bg-amber-500/10 text-amber-500 border border-amber-500/20',
-          bar: 'bg-amber-500',
-          icon: <WarningIcon className="size-4 text-amber-500" />,
-          label: 'Atenção'
-        }
-      case 'green':
-      default:
-        return {
-          border: 'border-emerald-500/20 hover:border-emerald-500/35',
-          bg: 'bg-emerald-500/5',
-          glow: 'shadow-[0_0_15px_rgba(16,185,129,0.07)] hover:shadow-[0_0_25px_rgba(16,185,129,0.12)]',
-          badge: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
-          bar: 'bg-emerald-500',
-          icon: <ShieldCheck className="size-4 text-emerald-500" />,
-          label: 'Saudável'
-        }
-    }
-  }
 
   return (
     <section className="space-y-3.5">

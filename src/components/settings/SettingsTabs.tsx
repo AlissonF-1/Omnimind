@@ -50,7 +50,18 @@ export default function SettingsTabs() {
     if (deleteConfirmation !== 'CONCORDO EM APAGAR TUDO') return
     setIsDeleting(true)
     try {
-      await deleteAllUserData(deleteConfirmation)
+      const result = await deleteAllUserData(deleteConfirmation)
+      
+      if (result.backupJson) {
+        const blob = new Blob([result.backupJson], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `omnimind_backup_auto_${new Date().toISOString().split('T')[0]}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+
       window.location.href = '/' // Volta pro login/início após apagar
     } catch (e) {
       alert('Erro ao apagar conta. Tente novamente.')
