@@ -652,20 +652,20 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                       <span className="text-sm font-bold text-primary">{selectedNodeIds.length} selecionados</span>
                     </div>
                     <div className="h-8 w-px bg-border mx-2"></div>
-                    <Link 
-                      href={`/dashboard/chat?workspaceId=${selectedWorkspaceId}&focus=${selectedNodeIds.join(',')}&intent=simulado`}
+                    <button 
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
                       className="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
                     >
                       <BookOpen className="size-3.5" />
                       Gerar Simulado
-                    </Link>
-                    <Link 
-                      href={`/dashboard/chat?workspaceId=${selectedWorkspaceId}&focus=${selectedNodeIds.join(',')}&intent=resumo`}
+                    </button>
+                    <button 
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
                       className="btn-ghost py-1.5 px-3 text-xs flex items-center gap-1.5 border border-border hover:bg-surface-muted"
                     >
                       <MessageSquare className="size-3.5" />
                       Resumir Relação
-                    </Link>
+                    </button>
                     <button 
                       onClick={() => setSelectedNodeIds([])}
                       className="p-1.5 ml-1 rounded-full text-text-muted hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
@@ -765,13 +765,13 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                 Abrir no Editor
                 <ArrowRight className="size-3.5" />
               </Link>
-              <Link 
-                href={`/dashboard/chat?workspaceId=${selectedWorkspaceId}`}
+              <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
                 className="btn-ghost w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
               >
                 <MessageSquare className="size-3.5" />
                 Conversar no Assistente
-              </Link>
+              </button>
             </div>
           )}
         </aside>

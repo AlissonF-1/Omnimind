@@ -157,6 +157,17 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
 
       const data = await res.json()
       setResult(data)
+      
+      if (data.unlockedNobel) {
+        // Dispara o evento visual e sonoro da conquista secreta "Prêmio Nobel"
+        window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+          detail: {
+            id: 'premio_nobel',
+            title: '🏅 Prêmio Nobel',
+            description: 'Atingiu precisão superior a 90% em uma explicação no Feynman Sandbox.'
+          }
+        }))
+      }
     } catch (err: any) {
       console.error(err)
       setError(err.message || 'Erro de conexão ou processamento no servidor.')

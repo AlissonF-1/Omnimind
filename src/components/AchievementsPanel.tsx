@@ -68,50 +68,102 @@ export default function AchievementsPanel({
           } else if (item.id === 'a_chama') {
             currentVal = totalReviews >= 1 ? (unlockedSet.has('a_chama') ? 7 : 0) : 0
             targetVal = 7
-          } else if (item.id === 'o_arquivista') {
+          } else if (item.id.startsWith('o_arquivista')) {
             currentVal = notesCount
-            targetVal = 50
-          } else if (item.id === 'a_banca') {
+            if (item.id.includes('bronze')) targetVal = 10
+            else if (item.id.includes('prata')) targetVal = 50
+            else if (item.id.includes('ouro')) targetVal = 100
+            else if (item.id.includes('diamante')) targetVal = 500
+          } else if (item.id.startsWith('a_banca')) {
             currentVal = perfectExamsCount
-            targetVal = 10
-          } else if (item.id === 'o_tutor') {
+            if (item.id.includes('bronze')) targetVal = 1
+            else if (item.id.includes('prata')) targetVal = 10
+            else if (item.id.includes('ouro')) targetVal = 50
+          } else if (item.id.startsWith('o_tutor')) {
             currentVal = tutorCount
-            targetVal = 20
+            if (item.id.includes('bronze')) targetVal = 5
+            else if (item.id.includes('prata')) targetVal = 50
+            else if (item.id.includes('ouro')) targetVal = 200
           } else if (item.id === 'o_planejador') {
             currentVal = unlockedSet.has('o_planejador') ? 1 : 0
+            targetVal = 1
+          } else if (item.secret) {
+            currentVal = isUnlocked ? 1 : 0
             targetVal = 1
           }
 
           const progressPercent = Math.min(100, Math.round((currentVal / targetVal) * 100))
+
+          // Lógica de segredos
+          const isSecretAndLocked = item.secret && !isUnlocked
+
+          // Estilo baseado no tier
+          let tierStyles = {
+            border: 'border-amber-500/40',
+            shadow: 'shadow-amber-500/10',
+            ring: 'ring-amber-500/10',
+            gradient: 'from-amber-500/10 via-orange-500/5 to-transparent',
+            iconGradient: 'from-amber-500 to-orange-500',
+            iconShadow: 'shadow-orange-500/30'
+          }
+
+          if (item.tier === 'prata') {
+            tierStyles = {
+              border: 'border-slate-300/60',
+              shadow: 'shadow-slate-300/10',
+              ring: 'ring-slate-300/20',
+              gradient: 'from-slate-300/20 via-slate-400/5 to-transparent',
+              iconGradient: 'from-slate-300 to-slate-400 text-slate-800',
+              iconShadow: 'shadow-slate-400/30'
+            }
+          } else if (item.tier === 'ouro') {
+            tierStyles = {
+              border: 'border-yellow-400/60',
+              shadow: 'shadow-yellow-500/20',
+              ring: 'ring-yellow-400/30',
+              gradient: 'from-yellow-400/20 via-amber-500/5 to-transparent',
+              iconGradient: 'from-yellow-400 to-amber-500 text-amber-900',
+              iconShadow: 'shadow-amber-500/40'
+            }
+          } else if (item.tier === 'diamante') {
+            tierStyles = {
+              border: 'border-cyan-400/60',
+              shadow: 'shadow-cyan-400/30',
+              ring: 'ring-cyan-400/50',
+              gradient: 'from-cyan-400/20 via-blue-500/10 to-transparent',
+              iconGradient: 'from-cyan-300 to-blue-500 text-white',
+              iconShadow: 'shadow-cyan-400/50'
+            }
+          }
 
           return (
             <div 
               key={item.id}
               className={`relative overflow-hidden rounded-2xl border p-5 flex items-start gap-4 transition-all duration-300 ${
                 isUnlocked 
-                  ? 'bg-surface border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.03)]' 
+                  ? `bg-surface ${tierStyles.border} shadow-lg ${tierStyles.shadow} ring-1 ${tierStyles.ring}` 
                   : 'bg-surface-muted/50 border-border opacity-70'
               }`}
             >
               {/* Efeito glow no fundo se estiver liberado */}
               {isUnlocked && (
-                <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-amber-500/5 to-yellow-500/5 opacity-100 transition-opacity duration-300 pointer-events-none" />
+                <div className={`absolute -inset-px rounded-2xl bg-gradient-to-r ${tierStyles.gradient} opacity-100 transition-opacity duration-300 pointer-events-none`} />
               )}
 
               {/* Ícone do Troféu */}
-              <div className={`p-3 rounded-xl shrink-0 transition-colors ${
+              <div className={`p-3 rounded-xl shrink-0 transition-colors shadow-sm relative z-10 ${
                 isUnlocked 
-                  ? 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/25' 
+                  ? `bg-gradient-to-tr ${tierStyles.iconGradient} ${tierStyles.iconShadow}` 
                   : 'bg-slate-800 text-slate-500'
               }`}>
-                {isUnlocked ? <Trophy className="size-6 animate-pulse" /> : <Lock className="size-6" />}
+                {isSecretAndLocked ? <Lock className="size-6" /> : isUnlocked ? <Trophy className="size-6 animate-pulse" /> : <Lock className="size-6" />}
               </div>
 
               {/* Textos da conquista */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h4 className={`font-bold text-sm truncate ${isUnlocked ? 'text-text-strong' : 'text-text-muted'}`}>
-                    {item.title}
+                    {isSecretAndLocked ? 'Conquista Oculta' : item.title}
                   </h4>
                   {isUnlocked && (
                     <span className="flex items-center gap-0.5 text-[8px] bg-emerald-500/10 text-emerald-500 font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -120,11 +172,11 @@ export default function AchievementsPanel({
                   )}
                 </div>
                 <p className="text-xs text-text-muted mt-1 leading-snug break-words">
-                  {item.description}
+                  {isSecretAndLocked ? 'Continue explorando e estudando no OmniMind para descobrir este segredo.' : item.description}
                 </p>
 
-                {/* Barra de progresso para bloqueados */}
-                {!isUnlocked && (
+                {/* Barra de progresso para bloqueados (Secretos não mostram barra) */}
+                {!isUnlocked && !isSecretAndLocked && (
                   <div className="mt-3.5">
                     <div className="flex items-center justify-between text-[9px] text-text-muted font-bold mb-1">
                       <span>Progresso</span>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { embedQuery } from '@/lib/embeddings'
 import { callAIWithFallback } from '@/lib/ai-fallback'
+import { grantSpecificAchievement } from '@/actions/achievements'
 
 // Limpa marcações markdown de blocos de código JSON caso o LLM insira na resposta
 function cleanJsonResponseText(text: string): string {
@@ -145,12 +146,21 @@ ${notesContext || 'Nenhuma anotação relevante encontrada.'}
 
     const cleanedContent = cleanJsonResponseText(aiRes.content || '')
     const parsed = JSON.parse(cleanedContent) as { score: number; feedback: string }
+    const finalScore = typeof parsed.score === 'number' ? parsed.score : 0
+
+    // Verifica Conquista do Prêmio Nobel (Score >= 9)
+    let unlockedNobel = false
+    if (finalScore >= 9) {
+      const achievement = await grantSpecificAchievement('premio_nobel')
+      if (achievement) unlockedNobel = true
+    }
 
     return NextResponse.json({
       transcription: transcriptionText,
-      score: typeof parsed.score === 'number' ? parsed.score : 0,
+      score: finalScore,
       feedback: parsed.feedback || 'Explicado com sucesso.',
-      matchedNotes: matchedNotesTitles
+      matchedNotes: matchedNotesTitles,
+      unlockedNobel
     })
 
   } catch (error: any) {

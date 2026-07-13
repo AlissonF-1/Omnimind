@@ -235,7 +235,7 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
                 Conquistas
               </h3>
               <p className="text-xs text-text-muted mt-0.5">
-                {data.unlockedAchievements.length} de {Object.keys(ACHIEVEMENTS).length} desbloqueados
+                {data.unlockedAchievements.filter(id => ACHIEVEMENTS[id]).length} de {Object.keys(ACHIEVEMENTS).length} desbloqueados
               </p>
             </div>
             <Link href="/dashboard/conquistas" className="text-xs font-bold text-primary hover:underline">
@@ -247,21 +247,28 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
             {data.unlockedAchievements.length === 0 ? (
               <p className="text-sm text-text-muted py-6 text-center">Nenhum troféu conquistado ainda. Continue estudando!</p>
             ) : (
-              data.unlockedAchievements.slice(0, 4).map((id) => {
-                const details = ACHIEVEMENTS[id]
-                if (!details) return null
-                return (
-                  <div key={id} className="flex items-center gap-3 p-2.5 border border-border/40 rounded-xl hover:bg-surface-muted/50 transition-colors">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                      🏆
-                    </span>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-text-strong truncate">{details.title}</h4>
-                      <p className="text-[10px] text-text-muted truncate">{details.description}</p>
+              data.unlockedAchievements
+                .map((id) => ACHIEVEMENTS[id])
+                .filter(Boolean) // Remove legados apagados ou nulos
+                .slice(0, 4)
+                .map((details) => {
+                  let badgeColors = 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                  if (details.tier === 'prata') badgeColors = 'bg-slate-300/20 text-slate-400 border-slate-300/30'
+                  if (details.tier === 'ouro') badgeColors = 'bg-yellow-400/20 text-yellow-500 border-yellow-400/30'
+                  if (details.tier === 'diamante') badgeColors = 'bg-cyan-400/20 text-cyan-400 border-cyan-400/30'
+
+                  return (
+                    <div key={details.id} className="flex items-center gap-3 p-2.5 border border-border/40 rounded-xl hover:bg-surface-muted/50 transition-colors">
+                      <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg border ${badgeColors}`}>
+                        <Trophy className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-text-strong truncate">{details.title}</h4>
+                        <p className="text-[10px] text-text-muted truncate">{details.description}</p>
+                      </div>
                     </div>
-                  </div>
-                )
-              })
+                  )
+                })
             )}
           </div>
         </div>
@@ -291,7 +298,7 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
             {data.recentActivity.map((day, idx) => {
               const hPercent = (day.reviews / maxReviews) * 85 // Capped a 85% para não estourar em cima
               return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-2 group z-10 relative">
+                <div key={idx} className="flex-1 flex flex-col items-center justify-end gap-2 h-full group z-10 relative">
                   {/* Tooltip do valor no hover */}
                   <span className="absolute -top-6 text-[10px] font-extrabold text-white bg-slate-900 px-2 py-0.5 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none select-none">
                     {day.reviews} cards

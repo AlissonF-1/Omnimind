@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { fsrs, Rating, Card as FSRSCard } from 'ts-fsrs'
 import { revalidatePath } from 'next/cache'
-import { checkAndUnlockAchievements, addXp, incrementQuestProgress, getUserStreak, getUserStudyStats } from '@/actions/achievements'
+import { checkAndUnlockAchievements, addXp, incrementQuestProgress, getUserStreak, getUserStudyStats, grantSpecificAchievement } from '@/actions/achievements'
 import { AchievementDetails, XP_CONFIG } from '@/types/achievements'
 import { getDynamicDailyGoal } from '@/actions/calendar'
 
@@ -243,10 +243,21 @@ export async function submitReview(
         levelUpData = { oldLevel: xpRes.oldLevel, newLevel: xpRes.newLevel }
       }
 
-      // Incrementa progresso da quest "Guerreiro do Dia"
       const questRes = await incrementQuestProgress('guerreiro', 1)
       if (questRes?.leveledUp?.leveledUp) {
         levelUpData = { oldLevel: questRes.leveledUp.oldLevel, newLevel: questRes.leveledUp.newLevel }
+      }
+
+      // Verificação de Conquistas de Horário
+      const now = new Date()
+      // Pegar a hora local (São Paulo)
+      const saoPauloTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+      const hour = saoPauloTime.getHours()
+      
+      if (hour >= 4 && hour < 7) {
+        await grantSpecificAchievement('passaro_madrugador')
+      } else if (hour >= 0 && hour < 4) {
+        await grantSpecificAchievement('coruja_noturna')
       }
 
       const todayStr = getLocalISODate(new Date())

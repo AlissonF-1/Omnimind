@@ -114,14 +114,9 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
     newlyUnlocked.push(ACHIEVEMENTS.o_inicio)
   }
 
-  // 📝 O Arquivista
-  if (!unlocked.has('o_arquivista') && notesCount >= 50) {
-    newlyUnlocked.push(ACHIEVEMENTS.o_arquivista)
-  }
-
-  // 🧠 O Tutor
-  if (!unlocked.has('o_tutor') && stats.tutor_queries_count >= 20) {
-    newlyUnlocked.push(ACHIEVEMENTS.o_tutor)
+  // 🔥 A Chama (7 dias de streak)
+  if (!unlocked.has('a_chama') && streak >= 7) {
+    newlyUnlocked.push(ACHIEVEMENTS.a_chama)
   }
 
   // 📅 O Planejador
@@ -129,15 +124,21 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
     newlyUnlocked.push(ACHIEVEMENTS.o_planejador)
   }
 
-  // 🎓 A Banca
-  if (!unlocked.has('a_banca') && stats.perfect_exams_count >= 10) {
-    newlyUnlocked.push(ACHIEVEMENTS.a_banca)
-  }
+  // 📝 O Arquivista (Tiers)
+  if (!unlocked.has('o_arquivista_bronze') && notesCount >= 10) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_bronze)
+  if (!unlocked.has('o_arquivista_prata') && notesCount >= 50) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_prata)
+  if (!unlocked.has('o_arquivista_ouro') && notesCount >= 100) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_ouro)
+  if (!unlocked.has('o_arquivista_diamante') && notesCount >= 500) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_diamante)
 
-  // 🔥 A Chama (7 dias de streak)
-  if (!unlocked.has('a_chama') && streak >= 7) {
-    newlyUnlocked.push(ACHIEVEMENTS.a_chama)
-  }
+  // 🧠 O Tutor (Tiers)
+  if (!unlocked.has('o_tutor_bronze') && stats.tutor_queries_count >= 5) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_bronze)
+  if (!unlocked.has('o_tutor_prata') && stats.tutor_queries_count >= 50) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_prata)
+  if (!unlocked.has('o_tutor_ouro') && stats.tutor_queries_count >= 200) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_ouro)
+
+  // 🎓 A Banca (Tiers)
+  if (!unlocked.has('a_banca_bronze') && stats.perfect_exams_count >= 1) newlyUnlocked.push(ACHIEVEMENTS.a_banca_bronze)
+  if (!unlocked.has('a_banca_prata') && stats.perfect_exams_count >= 10) newlyUnlocked.push(ACHIEVEMENTS.a_banca_prata)
+  if (!unlocked.has('a_banca_ouro') && stats.perfect_exams_count >= 50) newlyUnlocked.push(ACHIEVEMENTS.a_banca_ouro)
 
   if (newlyUnlocked.length > 0) {
     const nextUnlocked = [...unlocked, ...newlyUnlocked.map(a => a.id)]
@@ -160,6 +161,36 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
   }
 
   return newlyUnlocked
+}
+
+export async function grantSpecificAchievement(achievementId: string): Promise<AchievementDetails | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const stats = await getUserStudyStats()
+  if (!stats) return null
+
+  const unlocked = new Set(stats.unlocked_achievements || [])
+  
+  if (unlocked.has(achievementId)) {
+    return null // Já possui
+  }
+
+  const achievement = ACHIEVEMENTS[achievementId]
+  if (!achievement) return null
+
+  const nextUnlocked = [...unlocked, achievementId]
+
+  await supabase
+    .from('user_study_stats')
+    .update({ unlocked_achievements: nextUnlocked })
+    .eq('user_id', user.id)
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/conquistas')
+  
+  return achievement
 }
 
 export async function incrementTutorQueriesCount() {

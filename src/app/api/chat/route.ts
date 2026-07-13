@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/utils/supabase/server'
 import { embedQuery } from '@/lib/embeddings'
-import { incrementTutorQueriesCount, addXp, incrementQuestProgress, checkAndUnlockAchievements } from '@/actions/achievements'
-import { XP_CONFIG } from '@/types/achievements'
+import { incrementTutorQueriesCount, addXp, incrementQuestProgress, checkAndUnlockAchievements, getUserStudyStats } from '@/actions/achievements'
+import { XP_CONFIG, ACHIEVEMENTS } from '@/types/achievements'
 import { createExamGoal } from '@/actions/calendar'
 import { SYSTEM_MANUAL } from '@/lib/system-prompt'
 
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Usuário não autenticado.' }, { status: 401 })
     }
 
-
+    const userStats = await getUserStudyStats()
 
     const queryEmbedding = await embedQuery(trimmedQuery)
 
@@ -129,7 +129,8 @@ ${SYSTEM_MANUAL}
   A data de hoje é: ${new Date().toLocaleDateString('pt-BR')} (use isso para calcular prazos como "este mês", "amanhã", etc).
   O usuário está atualmente na tela/rota: "${contextRoute || '/dashboard'}".
   O usuário está focado no Workspace de nome: "${contextWorkspace || 'Geral'}".
-  -> Use essas informações secretas para adaptar sua resposta caso o usuário faça perguntas vagas como "explica o que tô vendo", "resuma isso" ou "como funciona essa tela".
+  Dados de Gamificação do Usuário (se perguntado): Nível ${userStats?.current_level || 1}, ${userStats?.total_xp || 0} XP, e possui ${userStats?.unlocked_achievements?.filter(id => ACHIEVEMENTS[id]).length || 0} conquistas desbloqueadas de um total de ${Object.keys(ACHIEVEMENTS).length}.
+  -> Use essas informações secretas para adaptar sua resposta caso o usuário faça perguntas vagas como "explica o que tô vendo", "resuma isso", "como funciona essa tela", ou pergunte sobre seu próprio progresso/conquistas.
   -> Se você notar que o usuário mencionou uma data importante, prazo ou prova nas suas mensagens, OFEREÇA PROATIVAMENTE a ação de criar a meta no calendário perguntando: "Quer que eu agende essa prova no seu calendário agora mesmo?".
 
   Regras adicionais para Busca em Anotações:
