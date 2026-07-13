@@ -34,9 +34,9 @@ export default async function ReviewsPage({
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] dark:bg-[radial-gradient(#60a5fa_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.04]" />
 
         <div className="text-center max-w-2xl mx-auto px-4 z-10 flex flex-col items-center">
-          {/* Embalagem Central do Ícone Target (Vidro + Brilho) */}
-          <div className="mb-6 flex size-16 items-center justify-center rounded-3xl bg-primary/10 ring-1 ring-primary/20 backdrop-blur-sm shadow-[0_0_30px_rgba(99,102,241,0.15)]">
-            <Target className="size-8 text-primary" />
+          {/* Embalagem Central do Ícone Target (Imagem 3D Premium) */}
+          <div className="mb-6 flex size-24 items-center justify-center rounded-[2rem] bg-black/40 ring-1 ring-primary/20 backdrop-blur-sm shadow-[0_0_40px_rgba(99,102,241,0.2)] overflow-hidden">
+            <img src="/images/review_target_3d.jpg" alt="Foco de Revisão" className="w-full h-full object-cover" />
           </div>
           
           <h1 className="text-2xl sm:text-3xl font-bold text-text-strong mb-3 tracking-tight">

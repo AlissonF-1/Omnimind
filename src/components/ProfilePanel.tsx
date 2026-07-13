@@ -78,12 +78,13 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
     <div className="space-y-6 max-w-4xl mx-auto">
       
       {/* 1. Header (Identidade, Nível e XP) */}
-      <div className="panel p-5 sm:p-8 flex flex-row items-center gap-4 sm:gap-8 relative overflow-hidden">
-        {/* Glow de fundo */}
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,var(--primary-soft)_0%,transparent_50%)] opacity-30" />
+      <div className="panel p-5 sm:p-8 flex flex-row items-center gap-4 sm:gap-8 relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: 'url("/images/profile_banner.jpg")' }}>
+        {/* Glow de fundo / Overlay escuro para garantir leitura do texto */}
+        <div className="absolute inset-0 z-0 bg-slate-900/70" />
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-slate-950 via-slate-900/80 to-transparent" />
 
         {/* Avatar com moldura evolutiva */}
-        <div className="relative shrink-0 size-20 sm:size-28">
+        <div className="relative z-10 shrink-0 size-20 sm:size-28">
           {/* Anel externo animado — separado para não afetar a opacidade da imagem */}
           <div className={`absolute inset-0 rounded-full transition-all duration-300 ${
             currentLevel <= 5
@@ -110,7 +111,7 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
         </div>
 
         {/* Informações textuais */}
-        <div className="flex-1 min-w-0 space-y-2 sm:space-y-4">
+        <div className="flex-1 min-w-0 space-y-2 sm:space-y-4 z-10 relative">
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg sm:text-2xl font-black text-text-strong tracking-tight truncate max-w-[150px] sm:max-w-none">

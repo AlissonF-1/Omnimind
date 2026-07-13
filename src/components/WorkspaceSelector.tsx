@@ -70,8 +70,8 @@ export default async function WorkspaceSelector() {
               <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-primary/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
               <div className="flex items-center justify-between w-full z-10">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/25">
-                  <Brain className="size-5" />
+                <div className="flex size-12 items-center justify-center rounded-xl bg-black/40 ring-1 ring-primary/25 overflow-hidden shrink-0 shadow-sm group-hover:shadow-primary/20 transition-all">
+                  <img src="/images/brain_workspace_3d.jpg" alt="Workspace" className="w-full h-full object-cover" />
                 </div>
                 <span className="text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">→</span>
               </div>

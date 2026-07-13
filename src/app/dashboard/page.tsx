@@ -1,4 +1,4 @@
-import { BrainCircuit, FolderPlus, NotebookPen, Sparkles, CalendarDays, AlertCircle, Sun, Moon } from 'lucide-react'
+import { BrainCircuit, FolderPlus, NotebookPen, Sparkles, CalendarDays, AlertCircle } from 'lucide-react'
 import Heatmap from '@/components/Heatmap'
 import DashboardStatsCards from '@/components/DashboardStatsCards'
 import DashboardRelearningAlert from '@/components/DashboardRelearningAlert'
@@ -16,6 +16,7 @@ import WorkspaceHealthGrid from '@/components/WorkspaceHealthGrid'
 import { createClient } from '@/utils/supabase/server'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import LevelProgressCard from '@/components/LevelProgressCard'
 import DailyQuestsCard from '@/components/DailyQuestsCard'
 
@@ -80,20 +81,17 @@ export default async function DashboardPage() {
   })
   const hour = parseInt(formatterHour.format(new Date()), 10)
 
-  let greeting, IconComponent, iconColor
+  let greeting, iconImage
 
   if (hour >= 5 && hour < 12) {
     greeting = 'Bom dia'
-    IconComponent = Sun
-    iconColor = 'text-amber-400'
+    iconImage = '/images/greeting_sun_3d.jpg'
   } else if (hour >= 12 && hour < 18) {
     greeting = 'Boa tarde'
-    IconComponent = Sun
-    iconColor = 'text-orange-400'
+    iconImage = '/images/greeting_sun_3d.jpg'
   } else {
     greeting = 'Boa noite'
-    IconComponent = Moon
-    iconColor = 'text-indigo-300'
+    iconImage = '/images/greeting_moon_3d.jpg'
   }
 
   // 2. Formatação elegante da data atual com fuso horário blindado
@@ -119,8 +117,10 @@ export default async function DashboardPage() {
           </span>
         </div>
         
-        <h1 className="page-title text-2xl sm:text-3xl flex items-center gap-3">
-          <IconComponent className={`size-7 ${iconColor}`} />
+        <h1 className="page-title text-2xl sm:text-3xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="relative size-10 shrink-0 overflow-hidden rounded-full shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+            <Image src={iconImage} alt={greeting} fill className="object-cover" />
+          </div>
           <span>
             {greeting} — sua memória te espera.
           </span>

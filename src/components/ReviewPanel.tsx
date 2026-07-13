@@ -685,10 +685,12 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   if (!activeCard) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
-        <div className="w-24 h-24 bg-success-soft border border-success/20 rounded-full flex items-center justify-center mb-2 shadow-[0_0_30px_var(--success-soft)]">
-          <span className="text-4xl">🎉</span>
+        <div className="relative w-64 h-64 mb-2 drop-shadow-2xl opacity-90 hover:opacity-100 transition-opacity">
+          {/* Subtle glow behind image */}
+          <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
+          <img src="/images/empty_state_astronaut.jpg" alt="Tudo em dia" className="w-full h-full object-contain rounded-3xl" />
         </div>
-        <h2 className="text-3xl font-bold text-text-strong tracking-tight">Tudo em dia!</h2>
+        <h2 className="text-3xl font-bold text-text-strong tracking-tight mt-4">Tudo em dia!</h2>
         <p className="text-text-medium max-w-sm text-lg">
           Você não tem flashcards pendentes no momento. O algoritmo FSRS avisará quando sua memória precisar ser reativada.
         </p>

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { revalidatePath } from 'next/cache'
 import { UserStudyStats, AchievementDetails, ACHIEVEMENTS, XP_CONFIG } from '@/types/achievements'
 
@@ -608,7 +609,28 @@ Retorne APENAS o título gerado, sem explicações, sem aspas, sem introduções
 
     return title
   } catch (err) {
-    console.error('Erro ao gerar título:', err)
-    return `Explorador Nível ${level}`
+    console.warn('Groq falhou ao gerar título, tentando fallback com Gemini...', err)
+    try {
+      const geminiApiKey = process.env.GEMINI_API_KEY
+      if (!geminiApiKey) return `Explorador Nível ${level}`
+
+      const prompt = `Você é um gerador de títulos honoríficos de RPG para um aplicativo de estudos gamificado.
+O usuário estuda: "${workspaceNames}" e está no Nível ${level}.
+Gere um título honorífico curto de 2 a 4 palavras em português. APENAS o título gerado, sem introduções.`
+
+      const genAI = new GoogleGenerativeAI(geminiApiKey)
+      const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' })
+      const result = await model.generateContent(prompt)
+      const title = result.response.text().trim().replace(/['"]/g, '')
+      
+      await supabase.auth.updateUser({
+        data: { player_title: title, last_title_generated_at: new Date().toISOString() }
+      })
+      
+      return title
+    } catch (fallbackErr) {
+      console.error('Erro no fallback do Gemini ao gerar título:', fallbackErr)
+      return `Explorador Nível ${level}`
+    }
   }
 }

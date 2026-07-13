@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface DashboardStatsCardsProps {
   totalCards: number
@@ -49,7 +50,7 @@ export default function DashboardStatsCards({
           {/* barra lateral colorida */}
           <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl ${overdueSeverity.bar}`} />
 
-          <div className="pl-3">
+          <div className="pl-3 flex-1">
             <p className="text-xs font-medium text-text-muted mb-1">Cards pendentes</p>
             <div className="flex items-baseline gap-2">
               <span className={`text-3xl font-bold tracking-tight ${overdueSeverity.text}`}>
@@ -61,7 +62,10 @@ export default function DashboardStatsCards({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="relative size-12 overflow-hidden rounded-xl hidden sm:block">
+              <Image src="/images/stat_overdue_3d.jpg" alt="Pendentes" fill className="object-cover" />
+            </div>
             <span className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors group-hover:bg-primary/90">
               Revisar agora
             </span>
@@ -79,11 +83,14 @@ export default function DashboardStatsCards({
       )}
 
       {/* ── Linha de stats secundários ─────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
 
         {/* Sequência */}
-        <div className="rounded-xl bg-surface-muted/50 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted mb-2">
+        <div className="rounded-xl bg-surface-muted/50 p-4 relative overflow-hidden group">
+          <div className="absolute top-2 right-2 opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden mix-blend-screen">
+            <Image src="/images/stat_streak_3d.jpg" alt="Ofensiva" fill className="object-cover" />
+          </div>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted mb-2 relative z-10">
             Sequência
           </p>
           <div className="flex items-baseline gap-1">
@@ -102,8 +109,11 @@ export default function DashboardStatsCards({
         </div>
 
         {/* Retenção */}
-        <div className="rounded-xl bg-surface-muted/50 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted mb-2">
+        <div className="rounded-xl bg-surface-muted/50 p-4 relative overflow-hidden group">
+          <div className="absolute top-2 right-2 opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden mix-blend-screen">
+            <Image src="/images/stat_retention_3d.jpg" alt="Retenção" fill className="object-cover" />
+          </div>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted mb-2 relative z-10">
             Retenção
           </p>
           <div className="flex items-baseline gap-1">
@@ -133,8 +143,11 @@ export default function DashboardStatsCards({
         </div>
 
         {/* Total */}
-        <div className="rounded-xl bg-surface-muted/50 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted mb-2">
+        <div className="rounded-xl bg-surface-muted/50 p-4 relative overflow-hidden group col-span-2 sm:col-span-1">
+          <div className="absolute top-2 right-2 opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden mix-blend-screen">
+            <Image src="/images/stat_cards_3d.jpg" alt="Cards" fill className="object-cover" />
+          </div>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted mb-2 relative z-10">
             Total
           </p>
           <div className="flex items-baseline gap-1">

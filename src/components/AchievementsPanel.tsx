@@ -151,12 +151,24 @@ export default function AchievementsPanel({
               )}
 
               {/* Ícone do Troféu */}
-              <div className={`p-3 rounded-xl shrink-0 transition-colors shadow-sm relative z-10 ${
-                isUnlocked 
+              <div className={`p-3 rounded-xl shrink-0 transition-colors shadow-sm relative z-10 overflow-hidden ${
+                isUnlocked && !item.imageUrl
                   ? `bg-gradient-to-tr ${tierStyles.iconGradient} ${tierStyles.iconShadow}` 
+                  : isUnlocked && item.imageUrl 
+                  ? 'p-0 shadow-lg' 
                   : 'bg-slate-800 text-slate-500'
               }`}>
-                {isSecretAndLocked ? <Lock className="size-6" /> : isUnlocked ? <Trophy className="size-6 animate-pulse" /> : <Lock className="size-6" />}
+                {isSecretAndLocked ? (
+                  <Lock className="size-6" />
+                ) : isUnlocked ? (
+                  item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.title} className="size-12 object-cover" />
+                  ) : (
+                    <Trophy className="size-6 animate-pulse" />
+                  )
+                ) : (
+                  <Lock className="size-6" />
+                )}
               </div>
 
               {/* Textos da conquista */}

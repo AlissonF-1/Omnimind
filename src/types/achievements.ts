@@ -25,6 +25,7 @@ export interface AchievementDetails {
   icon: string
   tier?: 'bronze' | 'prata' | 'ouro' | 'diamante'
   secret?: boolean
+  imageUrl?: string
 }
 
 export const ACHIEVEMENTS: Record<string, AchievementDetails> = {
@@ -150,6 +151,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDetails> = {
     description: 'Atingiu precisão superior a 90% em uma explicação no Feynman Sandbox.',
     icon: 'Award',
     tier: 'diamante',
-    secret: true
+    secret: true,
+    imageUrl: '/images/nobel_3d.jpg'
   }
 }
