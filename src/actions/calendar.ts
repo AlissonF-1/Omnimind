@@ -36,7 +36,7 @@ export type CalendarData = {
   examGoals: ExamGoal[]
 }
 
-export async function getCalendarData(month: number, year: number): Promise<CalendarData> {
+export async function getCalendarData(month: number, year: number, workspaceId?: string): Promise<CalendarData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { days: [], examGoals: [] }
@@ -48,12 +48,30 @@ export async function getCalendarData(month: number, year: number): Promise<Cale
   const startOfMonthStr = `${year}-${mm}-01`
   const endOfMonthStr = `${year}-${mm}-${endDay}`
 
-  const { data: scheduledData } = await supabase
+  // 1. Busca nome do workspace se houver filtro
+  let workspaceName: string | null = null
+  if (workspaceId) {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', workspaceId)
+      .maybeSingle()
+    workspaceName = ws?.name || null
+  }
+
+  // 2. Busca flashcards agendados (FSRS)
+  let flashcardQuery = supabase
     .from('flashcards')
-    .select('due')
+    .select('due, notes!inner(workspace_id)')
     .eq('user_id', user.id)
     .gte('due', startOfMonth.toISOString())
     .lte('due', endOfMonth.toISOString())
+
+  if (workspaceId) {
+    flashcardQuery = flashcardQuery.eq('notes.workspace_id', workspaceId)
+  }
+
+  const { data: scheduledData } = await flashcardQuery
 
   const scheduledMap = new Map<string, number>()
   scheduledData?.forEach(card => {
@@ -62,24 +80,34 @@ export async function getCalendarData(month: number, year: number): Promise<Cale
     scheduledMap.set(dayStr, (scheduledMap.get(dayStr) || 0) + 1)
   })
 
+  // 3. Busca logs de estudo históricos
   const { data: logs } = await supabase
     .from('daily_study_logs')
-    .select('study_date, review_count')
+    .select('study_date, review_count, topics')
     .eq('user_id', user.id)
     .gte('study_date', startOfMonthStr)
     .lte('study_date', endOfMonthStr)
 
   const reviewedMap = new Map<string, number>()
   logs?.forEach(log => {
+    if (workspaceName && (!log.topics || !log.topics.includes(workspaceName))) {
+      return
+    }
     const studyDateOnly = log.study_date?.split('T')[0] || log.study_date
     reviewedMap.set(studyDateOnly, (reviewedMap.get(studyDateOnly) || 0) + (log.review_count || 0))
   })
 
-  const { data: examGoals } = await supabase
+  // 4. Busca metas de prova (exam goals)
+  let examGoalsQuery = supabase
     .from('exam_goals')
     .select('*')
     .eq('user_id', user.id)
-    .order('exam_date', { ascending: true })
+
+  if (workspaceId) {
+    examGoalsQuery = examGoalsQuery.or(`workspace_id.eq.${workspaceId},workspace_id.is.null`)
+  }
+
+  const { data: examGoals } = await examGoalsQuery.order('exam_date', { ascending: true })
 
   const todayStr = getLocalISODate(new Date())
   const days: DayData[] = []

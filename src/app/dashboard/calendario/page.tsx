@@ -1,5 +1,6 @@
-﻿import { CalendarDays } from 'lucide-react'
+import { CalendarDays } from 'lucide-react'
 import { getCalendarData, getExamGoals } from '@/actions/calendar'
+import { getWorkspaces } from '@/actions/workspaces'
 import StudyCalendar from '@/components/StudyCalendar'
 
 export const dynamic = 'force-dynamic'
@@ -9,9 +10,10 @@ export default async function CalendarioPage() {
   const month = today.getMonth()
   const year = today.getFullYear()
 
-  const [initialData, examGoals] = await Promise.all([
+  const [initialData, examGoals, workspaces] = await Promise.all([
     getCalendarData(month, year),
-    getExamGoals()
+    getExamGoals(),
+    getWorkspaces()
   ])
 
   return (
@@ -22,7 +24,7 @@ export default async function CalendarioPage() {
         </div>
         <div>
           <h1 className="text-xl font-black text-text-strong tracking-tight">
-            Calendario de Estudos
+            Calendário de Estudos
           </h1>
           <p className="text-xs text-text-muted mt-0.5">
             Visualize sua carga FSRS e configure metas por data de prova
@@ -35,6 +37,7 @@ export default async function CalendarioPage() {
         initialGoals={examGoals}
         currentMonth={month}
         currentYear={year}
+        workspaces={workspaces || []}
       />
     </div>
   )
