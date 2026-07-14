@@ -196,6 +196,8 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
     if (audioRef.current) {
       if (isBossMode && isMusicEnabled) {
         audioRef.current.volume = 0.3
+        // Força recarga da faixa de áudio se ela mudar
+        audioRef.current.load()
         audioRef.current.play().catch(() => {
           console.warn('Autoplay da música bloqueado pelo navegador.')
         })
@@ -952,7 +954,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
             >
               {isMusicEnabled ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
             </button>
-            <audio ref={audioRef} src="/sounds/battle.mp3" loop />
+            <audio ref={audioRef} src={currentBattleTrack} loop />
           </div>
 
           <div className="flex-1 relative">
