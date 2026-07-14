@@ -55,7 +55,7 @@ export default function AchievementsPanel({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((item) => {
           const isUnlocked = unlockedSet.has(item.id)
           
@@ -139,35 +139,35 @@ export default function AchievementsPanel({
           return (
             <div 
               key={item.id}
-              className={`relative overflow-hidden rounded-2xl border p-5 flex items-start gap-4 transition-all duration-300 ${
+              className={`relative overflow-hidden rounded-xl border p-4 flex items-start gap-3.5 transition-all duration-300 ${
                 isUnlocked 
-                  ? `bg-surface ${tierStyles.border} shadow-lg ${tierStyles.shadow} ring-1 ${tierStyles.ring}` 
+                  ? `bg-surface ${tierStyles.border} shadow-md ${tierStyles.shadow} ring-1 ${tierStyles.ring}` 
                   : 'bg-surface-muted/50 border-border opacity-70'
               }`}
             >
               {/* Efeito glow no fundo se estiver liberado */}
               {isUnlocked && (
-                <div className={`absolute -inset-px rounded-2xl bg-gradient-to-r ${tierStyles.gradient} opacity-100 transition-opacity duration-300 pointer-events-none`} />
+                <div className={`absolute -inset-px rounded-xl bg-gradient-to-r ${tierStyles.gradient} opacity-100 transition-opacity duration-300 pointer-events-none`} />
               )}
 
               {/* Ícone do Troféu */}
-              <div className={`p-3 rounded-xl shrink-0 transition-colors shadow-sm relative z-10 overflow-hidden ${
+              <div className={`p-2.5 rounded-lg shrink-0 transition-colors shadow-sm relative z-10 overflow-hidden ${
                 isUnlocked && !item.imageUrl
                   ? `bg-gradient-to-tr ${tierStyles.iconGradient} ${tierStyles.iconShadow}` 
                   : isUnlocked && item.imageUrl 
-                  ? 'p-0 shadow-lg' 
+                  ? 'p-0 shadow-md' 
                   : 'bg-slate-800 text-slate-500'
               }`}>
                 {isSecretAndLocked ? (
-                  <Lock className="size-6" />
+                  <Lock className="size-5" />
                 ) : isUnlocked ? (
                   item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.title} className="size-12 object-cover" />
+                    <img src={item.imageUrl} alt={item.title} className="size-10 object-cover rounded-lg" />
                   ) : (
-                    <Trophy className="size-6 animate-pulse" />
+                    <Trophy className="size-5 animate-pulse" />
                   )
                 ) : (
-                  <Lock className="size-6" />
+                  <Lock className="size-5" />
                 )}
               </div>
 
