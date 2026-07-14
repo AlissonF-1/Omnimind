@@ -53,6 +53,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
   // Refs de gravação
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const isCancelledRef = useRef(false)
   
   // Refs do Visualizador de Áudio Canvas
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -101,6 +102,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
   const startRecording = async () => {
     setError(null)
     setResult(null)
+    isCancelledRef.current = false
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       
@@ -123,6 +125,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
       }
 
       mediaRecorder.onstop = async () => {
+        if (isCancelledRef.current) return
         const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType })
         stream.getTracks().forEach(track => track.stop())
         await processExplanation(audioBlob, null)
@@ -202,6 +205,8 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
 
   const cancelRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      isCancelledRef.current = true
+      mediaRecorderRef.current.stop()
       const stream = mediaRecorderRef.current.stream
       stream.getTracks().forEach(track => track.stop())
       mediaRecorderRef.current = null
