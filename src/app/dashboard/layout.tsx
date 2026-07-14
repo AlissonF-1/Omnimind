@@ -44,6 +44,7 @@ export default async function DashboardLayout({
 
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const avatarUrl = user?.user_metadata?.avatar_url || null
+  const avatarIcon = user?.user_metadata?.avatar_icon || null
   const currentLevel = userStats?.current_level || 1
   const overdueCards = dashStats?.overdueCards || 0
 
@@ -53,6 +54,7 @@ export default async function DashboardLayout({
         workspaces={workspaces}
         userName={userName}
         avatarUrl={avatarUrl}
+        avatarIcon={avatarIcon}
         currentLevel={currentLevel}
         overdueCards={overdueCards}
       >

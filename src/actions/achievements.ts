@@ -708,7 +708,8 @@ Retorne APENAS o título gerado, sem aspas, sem explicações.`
   }
 
   // 3. Unlock achievement
-  await checkAndUnlockAchievements(['o_matador_de_chefes'])
+  const newlyUnlocked = await checkAndUnlockAchievements(['o_matador_de_chefes'])
+  return { success: true, newlyUnlocked }
 }
 
 export async function addPomodoroSuccess() {

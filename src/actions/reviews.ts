@@ -218,6 +218,7 @@ export async function submitReview(
     // 4.1. Verifica e atualiza estatísticas de gamificação (XP, Quests e Escudo)
     let levelUpData = null
     let earnedDisciplineBadge = false
+    const timeAchievements: any[] = []
     try {
       // Multiplicador FSRS-XP
       let xpAwarded = XP_CONFIG.REVIEW_CARD // Padrão: 10
@@ -256,9 +257,11 @@ export async function submitReview(
       const hour = saoPauloTime.getHours()
       
       if (hour >= 4 && hour < 7) {
-        await grantSpecificAchievement('passaro_madrugador')
+        const ach = await grantSpecificAchievement('passaro_madrugador')
+        if (ach) timeAchievements.push(ach)
       } else if (hour >= 0 && hour < 4) {
-        await grantSpecificAchievement('coruja_noturna')
+        const ach = await grantSpecificAchievement('coruja_noturna')
+        if (ach) timeAchievements.push(ach)
       }
 
       const todayStr = getLocalISODate(new Date())
@@ -307,8 +310,9 @@ export async function submitReview(
 
     // 6. Roda a checagem de conquistas após as atualizações de estudos
     const newlyUnlocked = await checkAndUnlockAchievements()
+    const allNewlyUnlocked = [...newlyUnlocked, ...timeAchievements]
 
-    return { success: true, newlyUnlocked, leveledUp: levelUpData, earnedDisciplineBadge }
+    return { success: true, newlyUnlocked: allNewlyUnlocked, leveledUp: levelUpData, earnedDisciplineBadge }
   } catch (error) {
     console.error('[submitReview] Erro inesperado:', error)
     return { error: error instanceof Error ? error.message : 'Erro interno no processamento' }

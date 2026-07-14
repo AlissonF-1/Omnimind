@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { BellDot, Bell, Menu, Sparkles } from 'lucide-react'
+import { AVATAR_ICONS } from '@/utils/avatars'
 
 interface MobileTopbarProps {
   userName: string
   avatarUrl: string | null
+  avatarIcon?: string | null
   currentLevel: number
   overdueCards: number
   onMenuOpen: () => void
@@ -30,6 +32,7 @@ function getAvatarRingClass(level: number) {
 export default function MobileTopbar({
   userName,
   avatarUrl,
+  avatarIcon,
   currentLevel,
   overdueCards,
   onMenuOpen,
@@ -102,6 +105,11 @@ export default function MobileTopbar({
               alt={userName}
               className="size-full object-cover rounded-full"
             />
+          ) : avatarIcon && AVATAR_ICONS[avatarIcon as keyof typeof AVATAR_ICONS] ? (
+            (() => {
+              const Icon = AVATAR_ICONS[avatarIcon as keyof typeof AVATAR_ICONS]
+              return <Icon className="size-6 text-text-strong" />
+            })()
           ) : (
             <span className="text-[12px] font-black text-text-strong leading-none select-none">
               {getInitials(userName)}

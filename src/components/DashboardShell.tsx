@@ -19,6 +19,7 @@ interface DashboardShellProps {
   workspaces: Workspace[]
   userName: string
   avatarUrl: string | null
+  avatarIcon?: string | null
   currentLevel: number
   overdueCards: number
 }
@@ -28,6 +29,7 @@ export default function DashboardShell({
   workspaces,
   userName,
   avatarUrl,
+  avatarIcon,
   currentLevel,
   overdueCards,
 }: DashboardShellProps) {
@@ -59,6 +61,7 @@ export default function DashboardShell({
       <MobileTopbar
         userName={userName}
         avatarUrl={avatarUrl}
+        avatarIcon={avatarIcon}
         currentLevel={currentLevel}
         overdueCards={overdueCards}
         onMenuOpen={() => setSidebarOpen(true)}

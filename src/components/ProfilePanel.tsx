@@ -1,13 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Trophy, Shield, Sparkles, RefreshCw, Edit3, BookOpen, BrainCircuit, Target, Zap, Rocket, Crown, Microscope, Palette, Flame, Gamepad, Compass, Check, X } from 'lucide-react'
+import { Shield, Sparkles, RefreshCw, Edit3, Check, X, Trophy } from 'lucide-react'
 import { generatePlayerTitle, updatePlayerAvatar } from '@/actions/achievements'
-
-const AVATAR_ICONS = {
-  BookOpen, BrainCircuit, Target, Zap, Rocket, Crown,
-  Microscope, Palette, Flame, Gamepad, Compass, Trophy
-}
+import { AVATAR_ICONS } from '@/utils/avatars'
 import { ACHIEVEMENTS } from '@/types/achievements'
 import Link from 'next/link'
 import Image from 'next/image'

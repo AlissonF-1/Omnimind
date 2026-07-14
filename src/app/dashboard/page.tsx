@@ -118,7 +118,7 @@ export default async function DashboardPage() {
         </div>
         
         <h1 className="page-title text-2xl sm:text-3xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <div className="relative size-10 shrink-0 overflow-hidden rounded-full shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+          <div className="relative size-14 sm:size-16 shrink-0 overflow-hidden rounded-full shadow-[0_0_25px_rgba(255,255,255,0.15)] border border-white/10">
             <Image src={iconImage} alt={greeting} fill className="object-cover" />
           </div>
           <span>

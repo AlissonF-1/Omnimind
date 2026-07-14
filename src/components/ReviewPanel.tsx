@@ -630,7 +630,17 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
           else playMKSFX('fatality')
 
           // Usa o front do card como contexto pro nome do boss
-          grantBossVictory(activeCard.front.substring(0, 50)).catch(console.error)
+          grantBossVictory(activeCard.front.substring(0, 50))
+            .then((res) => {
+              if (res && res.newlyUnlocked && Array.isArray(res.newlyUnlocked)) {
+                res.newlyUnlocked.forEach((achievement: any) => {
+                  window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+                    detail: achievement
+                  }))
+                })
+              }
+            })
+            .catch(console.error)
         } else if (newHp === 1) {
           playMKSFX('finish-him')
         }
