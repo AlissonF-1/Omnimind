@@ -90,21 +90,6 @@ export default async function ReviewsPage({
         <ReviewPanel initialCards={cards} />
       </Suspense>
 
-      {cardCount === 0 && (
-        <div className="mt-6 panel-muted p-6 rounded-2xl text-center">
-          <div className="flex flex-col items-center gap-2">
-            <div className="inline-flex items-center justify-center size-12 rounded-full bg-surface-muted text-text-muted">
-              <Calendar className="size-6" />
-            </div>
-            <p className="text-sm font-medium text-text-strong">
-              Tudo em dia!
-            </p>
-            <p className="text-xs text-text-muted max-w-sm">
-              Volte mais tarde ou crie novos flashcards para revisar.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

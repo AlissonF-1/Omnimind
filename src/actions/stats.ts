@@ -11,7 +11,7 @@ export async function getDailyStudyLogs() {
 
   const { data, error } = await supabase
     .from('daily_study_logs')
-    .select('study_date, review_count')
+    .select('study_date, review_count, topics')
     .gte('study_date', oneYearAgo.toISOString())
     .order('study_date', { ascending: true })
 
@@ -99,7 +99,7 @@ export async function getUserDashboardStats() {
       .eq('lapses', 0),
     supabase
       .from('daily_study_logs')
-      .select('study_date')
+      .select('study_date, review_count')
       .eq('user_id', user.id)
       .order('study_date', { ascending: false })
       .limit(365)
@@ -322,6 +322,7 @@ export async function getProfileStats() {
       name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Estudante',
       email: user.email,
       avatarUrl: user.user_metadata?.avatar_url || null,
+      avatarIcon: user.user_metadata?.avatar_icon || null,
       playerTitle: user.user_metadata?.player_title || 'Estudante Dedicado'
     },
     totalXp: userStats?.total_xp || 0,

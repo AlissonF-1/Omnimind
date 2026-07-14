@@ -158,7 +158,7 @@ export async function submitReview(
     // Verifica se o flashcard está em uma nota do usuário
     const { data: note, error: noteError } = await supabase
       .from('notes')
-      .select('user_id')
+      .select('user_id, workspaces(name)')
       .eq('id', card.note_id)
       .single()
 
@@ -208,7 +208,8 @@ export async function submitReview(
     }
 
     // 4. Incrementa log de estudo (assíncrono, não bloquear)
-    const { error: rpcError } = await supabase.rpc('increment_study_log', { p_user_id: user.id })
+    const workspaceName = (note as any).workspaces?.name || 'Estudos Gerais'
+    const { error: rpcError } = await supabase.rpc('increment_study_log', { p_user_id: user.id, p_topic: workspaceName })
     if (rpcError) {
       console.error('[submitReview] Erro ao atualizar log de estudo (não crítico):', rpcError)
       // Não falha a operação principal

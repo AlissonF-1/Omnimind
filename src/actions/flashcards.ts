@@ -219,12 +219,15 @@ export async function updateFlashcard(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
 
+  const updateData: any = { updated_at: new Date().toISOString() }
+  if (fields.front !== undefined) updateData.front = fields.front
+  if (fields.back !== undefined) updateData.back = fields.back
+  if (fields.analogia !== undefined) updateData.analogia = fields.analogia
+  if (fields.mnemonico !== undefined) updateData.mnemonico = fields.mnemonico
+
   const { data: updated, error } = await supabase
     .from('flashcards')
-    .update({
-      ...fields,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', cardId)
     .eq('user_id', user.id)
     .select(`id, front, back, analogia, mnemonico, note_id, user_id, source_anchor, notes!inner ( workspace_id )`)

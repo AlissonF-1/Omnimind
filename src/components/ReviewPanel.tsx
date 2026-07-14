@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Rating } from 'ts-fsrs'
 import { submitReview } from '@/actions/reviews'
 import { deleteFlashcard } from '@/actions/flashcards'
-import { addXp, getStreakJeopardyStatus, rescueStreak } from '@/actions/achievements'
+import { addXp, getStreakJeopardyStatus, rescueStreak, grantBossVictory } from '@/actions/achievements'
 import { XP_CONFIG } from '@/types/achievements'
 import { checkNoteRelearningAlert } from '@/actions/stats'
 import Link from 'next/link'
@@ -28,9 +28,14 @@ import {
   Sparkles,
   Loader2,
   BrainCircuit,
-  Volume2,     // NOVO
-  PlayCircle,  // Substitui 'Youtube'
+  Volume2,
+  VolumeX,
+  PlayCircle,
   Flame,
+  Maximize2,
+  Minimize2,
+  Skull,
+  Ghost,
 } from 'lucide-react'
 import RelearningAlert from './RelearningAlert'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -119,8 +124,26 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const [quizOptions, setQuizOptions] = useState<string[]>([])
   const [selectedQuizOption, setSelectedQuizOption] = useState<string | null>(null)
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false)
+  
+  // ESTADOS DO MODO BATALHA (BOSS FIGHT)
+  const [isBossMode, setIsBossMode] = useState(false)
+  const [bossHp, setBossHp] = useState(5)
+  const [playerHp, setPlayerHp] = useState(5)
+  const [maxBossHp, setMaxBossHp] = useState(5)
+  const [isBossDefeated, setIsBossDefeated] = useState(false)
+  const [isPlayerDefeated, setIsPlayerDefeated] = useState(false)
+  const [combatFeedback, setCombatFeedback] = useState<'hit' | 'miss' | null>(null)
+  
+  // Áudio de Batalha
+  const [isMusicEnabled, setIsMusicEnabled] = useState(true)
+  const [currentBattleTrack, setCurrentBattleTrack] = useState('/sounds/battle.mp3')
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const activeCard = cards[currentIndex]
+  
+  // Variáveis computadas para o Boss Mode
+  const isEnrageMode = isBossMode && bossHp === 1
+  const isCriticalDanger = isBossMode && playerHp === 1
 
   // --- Inicialização do reconhecimento de voz ---
   useEffect(() => {
@@ -145,16 +168,28 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
           setIsRecording(false)
         }
 
-        recognition.onend = () => {
-          setIsRecording(false)
-        }
-
+        recognition.onend = () => setIsRecording(false)
+        
         recognitionRef.current = recognition
       }
     }
   }, [])
 
-  // --- Auto-expansão do textarea ---
+  // Efeito da Música de Batalha
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isBossMode && isMusicEnabled) {
+        audioRef.current.volume = 0.3
+        audioRef.current.play().catch(() => {
+          console.warn('Autoplay da música bloqueado pelo navegador.')
+        })
+      } else {
+        audioRef.current.pause()
+      }
+    }
+  }, [isBossMode, isMusicEnabled, currentBattleTrack])
+
+  // Cleanup na desmontagem
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
@@ -566,15 +601,40 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         correct: true,
         feedback: 'Parabéns! Você escolheu a alternativa correta.'
       })
-      // Adiciona XP por acertar o simulado usando configuração centralizada
       addXp(XP_CONFIG.PERFECT_SIMULADO).catch(console.error)
+      
+      if (isBossMode) {
+        setCombatFeedback('hit')
+        setTimeout(() => setCombatFeedback(null), 800)
+        
+        const newHp = bossHp - 1
+        setBossHp(newHp)
+        if (newHp <= 0 && !isBossDefeated) {
+          setIsBossDefeated(true)
+          // Usa o front do card como contexto pro nome do boss
+          grantBossVictory(activeCard.front.substring(0, 50)).catch(console.error)
+        }
+      }
     } else {
       setAiFeedback({
         correct: false,
         feedback: `Você escolheu a alternativa incorreta. A resposta correta é: "${activeCard.back}".`
       })
+      
+      if (isBossMode) {
+        setCombatFeedback('miss')
+        setTimeout(() => setCombatFeedback(null), 800)
+        
+        // No Enrage Mode (1 HP do Boss), o erro custa 2 vidas!
+        const damage = isEnrageMode ? 2 : 1
+        const newHp = playerHp - damage
+        setPlayerHp(Math.max(0, newHp))
+        if (newHp <= 0) {
+          setIsPlayerDefeated(true)
+        }
+      }
     }
-    setIsFlipped(true) // Vira o card para revelar a resposta oficial e liberar os botões do FSRS
+    setIsFlipped(true)
   }
 
   const handleReview = async (grade: Rating) => {
@@ -698,8 +758,64 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
     )
   }
 
+  // === RENDERIZAÇÃO DA VITÓRIA / DERROTA NO BOSS ===
+  if (isBossMode && isBossDefeated) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] p-8 text-center animate-in zoom-in duration-500">
+        <div className="text-8xl mb-6 drop-shadow-xl animate-bounce">🏆</div>
+        <h2 className="text-3xl sm:text-4xl font-black text-text-strong tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-primary">
+          Boss Derrotado!
+        </h2>
+        <p className="text-text-muted mb-8 max-w-md mx-auto">
+          Você massacrou o simulado e ganhou 50 XP extras, além de desbloquear um novo título gerado pela IA! 
+          (Confira seu Perfil).
+        </p>
+        <button 
+          onClick={() => {
+            setIsBossMode(false)
+            setIsSimuladoMode(false)
+            setIsBossDefeated(false)
+            handleReview(3) // Passa pro prox
+          }}
+          className="bg-primary text-white font-bold px-8 py-3 rounded-xl hover:bg-primary-hover hover:scale-105 transition-all shadow-lg"
+        >
+          Continuar Jornada
+        </button>
+      </div>
+    )
+  }
+
+  if (isBossMode && isPlayerDefeated) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] p-8 text-center animate-in zoom-in duration-500">
+        <div className="text-8xl mb-6 drop-shadow-xl grayscale">💀</div>
+        <h2 className="text-3xl font-black text-red-500 tracking-tighter mb-4">
+          Você foi Destruído
+        </h2>
+        <p className="text-text-muted mb-8 max-w-md mx-auto">
+          A dificuldade deste assunto superou suas habilidades... por enquanto. Levante-se e tente novamente!
+        </p>
+        <button 
+          onClick={() => {
+            setIsBossMode(false)
+            setIsSimuladoMode(false)
+            setIsPlayerDefeated(false)
+            handleReview(1) // Marca como Errou (Hard)
+          }}
+          className="bg-surface-muted text-text-strong font-bold px-8 py-3 rounded-xl hover:bg-border transition-all shadow-sm"
+        >
+          Aceitar a Derrota
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center h-[calc(100vh-140px)] relative">
+      {/* Heartbeat Overlay */}
+      {isCriticalDanger && (
+        <div className="fixed inset-0 pointer-events-none z-50 animate-[pulse_1.5s_ease-in-out_infinite] shadow-[inset_0_0_150px_rgba(239,68,68,0.3)] border-[8px] border-red-500/10 mix-blend-multiply dark:mix-blend-screen" />
+      )}
 
       {/* Alerta de Reaprendizagem */}
       {activeCard && noteAlerts[activeCard.notes.id]?.shouldAlert && (
@@ -724,6 +840,55 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
           <span className="bg-orange-500/10 px-2 py-0.5 rounded-md font-mono">
             {consecutiveCorrect}/2 acertos
           </span>
+        </div>
+      )}
+
+      {/* Barras de HP do Boss Mode */}
+      {isBossMode && (
+        <div className="w-full mb-6 flex items-center justify-between gap-4 bg-surface-muted/50 p-4 rounded-xl border border-red-500/20 relative">
+          <div className="flex-1 relative">
+            <div className="flex justify-between text-xs font-bold mb-1 text-green-500">
+              <span>JOGADOR</span>
+              <span>{playerHp}/{maxBossHp}</span>
+            </div>
+            <div className="h-3 bg-surface rounded-full overflow-hidden border border-border">
+              <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${(playerHp / maxBossHp) * 100}%` }} />
+            </div>
+            {combatFeedback === 'miss' && (
+              <div className="absolute right-0 top-0 text-red-500 font-black text-xl animate-float-up pointer-events-none drop-shadow-md">
+                -{isEnrageMode ? '2' : '1'}
+              </div>
+            )}
+          </div>
+          
+          <div className={`px-2 flex flex-col items-center justify-center transition-all ${isEnrageMode ? 'text-red-500 animate-pulse' : 'text-text-muted'}`}>
+            <Ghost className={`size-8 ${isEnrageMode ? 'animate-bounce' : 'animate-[pulse_2s_ease-in-out_infinite]'}`} />
+            
+            {/* Music Toggle */}
+            <button
+              onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+              className="mt-1 p-1 rounded-full hover:bg-surface text-text-muted hover:text-text-strong transition-colors"
+              title={isMusicEnabled ? "Desativar música épica" : "Ativar música épica"}
+            >
+              {isMusicEnabled ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+            </button>
+            <audio ref={audioRef} src="/sounds/battle.mp3" loop />
+          </div>
+
+          <div className="flex-1 relative">
+            <div className="flex justify-between text-xs font-bold mb-1 text-red-500">
+              <span>{activeCard.notes.title ? activeCard.notes.title.substring(0, 15) : 'BOSS'}</span>
+              <span>{bossHp}/{maxBossHp}</span>
+            </div>
+            <div className="h-3 bg-surface rounded-full overflow-hidden border border-border flex justify-end">
+              <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(bossHp / maxBossHp) * 100}%` }} />
+            </div>
+            {combatFeedback === 'hit' && (
+              <div className="absolute left-0 top-0 text-white font-black text-xl animate-float-up pointer-events-none drop-shadow-md">
+                -1
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -784,7 +949,11 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
 
       {/* Painel principal do card */}
       <div
-        className="w-full panel p-6 md:p-10 flex-1 min-h-0 overflow-y-auto flex flex-col relative transition-all duration-300 custom-scrollbar cursor-pointer"
+        className={`w-full panel p-6 md:p-10 flex-1 min-h-0 overflow-y-auto flex flex-col relative transition-all duration-300 custom-scrollbar cursor-pointer
+          ${isEnrageMode ? 'shadow-[0_0_20px_rgba(239,68,68,0.6)] border-red-500/50' : ''}
+          ${combatFeedback === 'miss' ? 'animate-shake border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : ''}
+          ${combatFeedback === 'hit' ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}
+        `}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onClick={() => !isFlipped && !responseMethod && !isSimuladoMode && setIsFlipped(true)}
@@ -796,15 +965,15 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
             <p className="text-sm text-text-muted">Analisando conceitos com Llama 3.3 70B</p>
           </div>
         ) : !isFlipped ? (
-          <div className="text-center flex flex-col h-full justify-center animate-in fade-in zoom-in-95 duration-200">
-            <span className="uppercase text-xs font-bold tracking-widest text-text-muted mb-6 block shrink-0">Pergunta</span>
-            <h3 className="text-2xl md:text-3xl font-medium text-text-strong leading-relaxed mb-8 my-auto">
+          <div className="text-center flex flex-col flex-1 animate-in fade-in zoom-in-95 duration-200">
+            <span className="uppercase text-xs font-bold tracking-widest text-text-muted mb-4 mt-2 block shrink-0">Pergunta</span>
+            <h3 className="text-2xl md:text-3xl font-medium text-text-strong leading-relaxed mb-6 shrink-0">
               {activeCard.front}
             </h3>
 
             {isSimuladoMode ? (
               isGeneratingQuiz ? (
-                <div className="flex flex-col items-center justify-center py-6 my-auto">
+                <div className="flex flex-col items-center justify-center py-6 mt-4">
                   <Loader2 className="size-8 animate-spin text-primary mb-2" />
                   <p className="text-sm text-text-muted">Gerando simulado com IA...</p>
                 </div>
@@ -858,14 +1027,14 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
             )}
           </div>
         ) : (
-          <div className="text-center animate-in fade-in zoom-in-95 duration-200 flex flex-col min-h-full">
+          <div className="text-center animate-in fade-in zoom-in-95 duration-200 flex flex-col flex-1">
             {isSimuladoMode ? (
               <>
-                <span className="uppercase text-xs font-bold tracking-widest text-text-muted mb-6 block shrink-0">Pergunta</span>
-                <h3 className="text-xl md:text-2xl font-medium text-text-strong mb-6 leading-snug">
+                <span className="uppercase text-xs font-bold tracking-widest text-text-muted mb-4 mt-2 block shrink-0">Pergunta</span>
+                <h3 className="text-xl md:text-2xl font-medium text-text-strong mb-6 leading-snug shrink-0">
                   {activeCard.front}
                 </h3>
-                <div className="grid grid-cols-1 gap-3 w-full mb-6 animate-in fade-in duration-200" onClick={e => e.stopPropagation()}>
+                <div className="grid grid-cols-1 gap-3 w-full mb-6 mt-auto animate-in fade-in duration-200" onClick={e => e.stopPropagation()}>
                   {quizOptions.map((option, idx) => {
                     const letter = String.fromCharCode(65 + idx)
                     const isCorrect = option === activeCard.back
@@ -1041,24 +1210,68 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         {/* Simulado e Áudio posicionados na base antes das opções de resposta */}
         {!isFlipped && !responseMethod && (
           <div className="flex items-center justify-between gap-3 w-full border-t border-border/40 pt-3.5 pb-1" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => {
-                setIsSimuladoMode(!isSimuladoMode)
-                setSelectedQuizOption(null)
-                setQuizOptions([])
-                setAiFeedback(null)
-                setIsFlipped(false)
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
-                isSimuladoMode
-                  ? 'bg-primary/20 text-primary border-primary/30 hover:bg-primary/30'
-                  : 'bg-surface-muted text-text-medium border-border hover:border-border-strong hover:bg-surface-elevated hover:text-text-strong'
-              }`}
-              title="Alternar para Simulado de Múltipla Escolha"
-            >
-              <Sparkles className="size-3" />
-              <span>{isSimuladoMode ? '⚖️ Simulado ON' : 'Simulado OFF'}</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setIsSimuladoMode(!isSimuladoMode)
+                  if (isBossMode) setIsBossMode(false) // Desliga boss mode se desligar simulado
+                  setSelectedQuizOption(null)
+                  setQuizOptions([])
+                  setAiFeedback(null)
+                  setIsFlipped(false)
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                  isSimuladoMode && !isBossMode
+                    ? 'bg-primary/20 text-primary border-primary/30 hover:bg-primary/30'
+                    : 'bg-surface-muted text-text-medium border-border hover:border-border-strong hover:bg-surface-elevated hover:text-text-strong'
+                }`}
+                title="Alternar para Simulado de Múltipla Escolha"
+              >
+                <Sparkles className="size-3" />
+                <span>{isSimuladoMode && !isBossMode ? '⚖️ Simulado ON' : 'Simulado OFF'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const newState = !isBossMode
+                  setIsBossMode(newState)
+                  if (newState) {
+                    setIsSimuladoMode(true)
+                    const remainingCards = cards.length - currentIndex
+                    // Define o HP como no máximo 5, ou a quantidade de cards restantes (o que for menor)
+                    const calculatedHp = Math.max(1, Math.min(5, Math.floor(remainingCards * 0.8))) 
+                    setMaxBossHp(calculatedHp)
+                    setBossHp(calculatedHp)
+                    setPlayerHp(calculatedHp)
+                    setIsBossDefeated(false)
+                    setIsPlayerDefeated(false)
+
+                    // Escolhe uma música aleatória para a batalha
+                    const tracks = [
+                      '/sounds/battle.mp3',
+                      '/sounds/battle_2.mp3',
+                      '/sounds/battle_3.mp3',
+                      '/sounds/battle_4.mp3',
+                      '/sounds/battle_5.mp3'
+                    ]
+                    const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
+                    setCurrentBattleTrack(randomTrack)
+                  }
+                  setSelectedQuizOption(null)
+                  setQuizOptions([])
+                  setAiFeedback(null)
+                  setIsFlipped(false)
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                  isBossMode
+                    ? 'bg-red-500/20 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.3)]'
+                    : 'bg-surface-muted text-text-medium border-border hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500'
+                }`}
+                title="Modo Batalha (Boss Fight)"
+              >
+                <span className={isBossMode ? "animate-pulse" : ""}>⚔️ Batalha</span>
+              </button>
+            </div>
 
             <button
               onClick={() => speakText(`${activeCard.front}. A resposta é: ${activeCard.back}`)}

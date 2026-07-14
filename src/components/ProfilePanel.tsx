@@ -1,8 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Trophy, Shield, Sparkles, RefreshCw } from 'lucide-react'
-import { generatePlayerTitle } from '@/actions/achievements'
+import { Trophy, Shield, Sparkles, RefreshCw, Edit3, BookOpen, BrainCircuit, Target, Zap, Rocket, Crown, Microscope, Palette, Flame, Gamepad, Compass, Check, X } from 'lucide-react'
+import { generatePlayerTitle, updatePlayerAvatar } from '@/actions/achievements'
+
+const AVATAR_ICONS = {
+  BookOpen, BrainCircuit, Target, Zap, Rocket, Crown,
+  Microscope, Palette, Flame, Gamepad, Compass, Trophy
+}
 import { ACHIEVEMENTS } from '@/types/achievements'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -12,6 +17,7 @@ interface ProfileData {
     name: string
     email: string | undefined
     avatarUrl: string | null
+    avatarIcon: string | null
     playerTitle: string
   }
   totalXp: number
@@ -28,6 +34,8 @@ interface ProfileData {
 export default function ProfilePanel({ initialData }: { initialData: ProfileData }) {
   const [data, setData] = useState<ProfileData>(initialData)
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false)
 
   // Calcular progresso do nível atual
   const currentLevel = data.currentLevel
@@ -95,7 +103,7 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
               : 'ring-4 ring-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.6)] animate-pulse'
           }`} />
 
-          {/* Imagem ou iniciais — nunca afetado pelo animate-pulse */}
+          {/* Imagem ou Iniciais ou Ícone Escolhido */}
           <div className="size-full rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
             {data.user.avatarUrl ? (
               <img
@@ -103,12 +111,25 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
                 alt={data.user.name}
                 className="size-full rounded-full object-cover"
               />
+            ) : data.user.avatarIcon && AVATAR_ICONS[data.user.avatarIcon as keyof typeof AVATAR_ICONS] ? (
+              (() => {
+                const IconComponent = AVATAR_ICONS[data.user.avatarIcon as keyof typeof AVATAR_ICONS]
+                return <IconComponent className="size-8 sm:size-12 text-primary" />
+              })()
             ) : (
               <span className="text-2xl sm:text-4xl font-black text-text-strong tracking-tight">
                 {getInitials(data.user.name)}
               </span>
             )}
           </div>
+          
+          <button 
+            onClick={() => setIsAvatarModalOpen(true)}
+            className="absolute -bottom-1 -right-1 bg-surface border border-border rounded-full p-1.5 shadow-sm text-text-muted hover:text-primary transition-colors z-20"
+            title="Editar Avatar"
+          >
+            <Edit3 className="size-3.5 sm:size-4" />
+          </button>
         </div>
 
         {/* Informações textuais */}
@@ -353,6 +374,62 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
           O escudo protege seu combo caso você esqueça de estudar por um dia.
         </p>
       </div>
+
+      {/* Modal de Edição de Avatar */}
+      {isAvatarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-surface border border-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border p-4">
+              <h3 className="font-bold text-text-strong">Escolha seu Avatar</h3>
+              <button 
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="p-1 rounded hover:bg-surface-muted text-text-muted transition-colors"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 grid grid-cols-4 gap-3">
+              {Object.entries(AVATAR_ICONS).map(([key, Icon]) => {
+                const isActive = data.user.avatarIcon === key
+                return (
+                  <button
+                    key={key}
+                    onClick={async () => {
+                      setIsSavingAvatar(true)
+                      try {
+                        await updatePlayerAvatar(key)
+                        setData(prev => ({
+                          ...prev,
+                          user: { ...prev.user, avatarIcon: key }
+                        }))
+                        setIsAvatarModalOpen(false)
+                      } catch (err) {
+                        console.error('Erro ao salvar avatar:', err)
+                      } finally {
+                        setIsSavingAvatar(false)
+                      }
+                    }}
+                    disabled={isSavingAvatar}
+                    className={`relative flex items-center justify-center p-3 rounded-xl border transition-all duration-200 hover:scale-105 active:scale-95 ${
+                      isActive
+                        ? 'border-primary bg-primary-soft text-primary shadow-sm'
+                        : 'border-border/50 bg-surface text-text-muted hover:border-primary/50 hover:text-primary'
+                    }`}
+                  >
+                    <Icon className={`size-6 sm:size-8 ${isActive ? 'drop-shadow-sm' : ''}`} />
+                    {isActive && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-primary text-white rounded-full p-0.5">
+                        <Check className="size-3" />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

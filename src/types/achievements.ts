@@ -153,5 +153,21 @@ export const ACHIEVEMENTS: Record<string, AchievementDetails> = {
     tier: 'diamante',
     secret: true,
     imageUrl: '/images/nobel_3d.png'
+  },
+  o_matador_de_chefes: {
+    id: 'o_matador_de_chefes',
+    title: '⚔️ O Matador de Chefes',
+    description: 'Derrotou seu primeiro Boss no Modo Batalha de Simulados.',
+    icon: 'Swords',
+    tier: 'prata',
+    secret: false
+  },
+  o_jardineiro_do_foco: {
+    id: 'o_jardineiro_do_foco',
+    title: '🌱 Jardineiro do Foco',
+    description: 'Sobreviveu a 10 Pomodoros no Modo Hardcore sem perder a concentração.',
+    icon: 'Sprout',
+    tier: 'ouro',
+    secret: false
   }
 }

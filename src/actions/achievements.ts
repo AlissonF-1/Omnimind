@@ -110,33 +110,33 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
 
   const totalReviews = logs.reduce((acc: number, cur: any) => acc + (cur.review_count || 0), 0)
 
-  // 🏆 O Início
+  // ðŸ† O InÃ­cio
   if (!unlocked.has('o_inicio') && totalReviews >= 1) {
     newlyUnlocked.push(ACHIEVEMENTS.o_inicio)
   }
 
-  // 🔥 A Chama (7 dias de streak)
+  // ðŸ”¥ A Chama (7 dias de streak)
   if (!unlocked.has('a_chama') && streak >= 7) {
     newlyUnlocked.push(ACHIEVEMENTS.a_chama)
   }
 
-  // 📅 O Planejador
+  // ðŸ“… O Planejador
   if (!unlocked.has('o_planejador') && examGoalsCount >= 1) {
     newlyUnlocked.push(ACHIEVEMENTS.o_planejador)
   }
 
-  // 📝 O Arquivista (Tiers)
+  // ðŸ“ O Arquivista (Tiers)
   if (!unlocked.has('o_arquivista_bronze') && notesCount >= 10) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_bronze)
   if (!unlocked.has('o_arquivista_prata') && notesCount >= 50) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_prata)
   if (!unlocked.has('o_arquivista_ouro') && notesCount >= 100) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_ouro)
   if (!unlocked.has('o_arquivista_diamante') && notesCount >= 500) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_diamante)
 
-  // 🧠 O Tutor (Tiers)
+  // ðŸ§  O Tutor (Tiers)
   if (!unlocked.has('o_tutor_bronze') && stats.tutor_queries_count >= 5) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_bronze)
   if (!unlocked.has('o_tutor_prata') && stats.tutor_queries_count >= 50) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_prata)
   if (!unlocked.has('o_tutor_ouro') && stats.tutor_queries_count >= 200) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_ouro)
 
-  // 🎓 A Banca (Tiers)
+  // ðŸŽ“ A Banca (Tiers)
   if (!unlocked.has('a_banca_bronze') && stats.perfect_exams_count >= 1) newlyUnlocked.push(ACHIEVEMENTS.a_banca_bronze)
   if (!unlocked.has('a_banca_prata') && stats.perfect_exams_count >= 10) newlyUnlocked.push(ACHIEVEMENTS.a_banca_prata)
   if (!unlocked.has('a_banca_ouro') && stats.perfect_exams_count >= 50) newlyUnlocked.push(ACHIEVEMENTS.a_banca_ouro)
@@ -175,7 +175,7 @@ export async function grantSpecificAchievement(achievementId: string): Promise<A
   const unlocked = new Set(stats.unlocked_achievements || [])
   
   if (unlocked.has(achievementId)) {
-    return null // Já possui
+    return null // JÃ¡ possui
   }
 
   const achievement = ACHIEVEMENTS[achievementId]
@@ -245,7 +245,7 @@ export async function getUserStreak(userId: string): Promise<number> {
         streak++
         currentDate.setDate(currentDate.getDate() - 1)
       } else {
-        // Se hoje ainda não foi estudado, permitimos pular hoje para ontem
+        // Se hoje ainda nÃ£o foi estudado, permitimos pular hoje para ontem
         const yesterday = new Date(today)
         yesterday.setDate(yesterday.getDate() - 1)
 
@@ -262,7 +262,7 @@ export async function getUserStreak(userId: string): Promise<number> {
 }
 
 /**
- * Verifica se a streak do usuário está em perigo (ontem não estudado, mas anteontem sim)
+ * Verifica se a streak do usuÃ¡rio estÃ¡ em perigo (ontem nÃ£o estudado, mas anteontem sim)
  */
 export async function getStreakJeopardyStatus(): Promise<{
   isJeopardy: boolean
@@ -294,7 +294,7 @@ export async function getStreakJeopardyStatus(): Promise<{
 
   if (!hasYesterday && hasTwoDaysAgo) {
     // Ontem foi pulado, mas anteontem teve estudo. A streak pode ser resgatada!
-    // Para calcular a potentialStreak (a streak até anteontem), vamos buscar todos os logs anteriores
+    // Para calcular a potentialStreak (a streak atÃ© anteontem), vamos buscar todos os logs anteriores
     const { data: allLogs } = await supabase
       .from('daily_study_logs')
       .select('study_date')
@@ -311,7 +311,7 @@ export async function getStreakJeopardyStatus(): Promise<{
         const logDate = new Date(log.study_date)
         logDate.setHours(0, 0, 0, 0)
 
-        // Ignoramos hoje/amanhã se houver
+        // Ignoramos hoje/amanhÃ£ se houver
         if (logDate.getTime() > currentDate.getTime()) {
           continue
         }
@@ -337,13 +337,13 @@ export async function getStreakJeopardyStatus(): Promise<{
 export async function rescueStreak(): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Não autenticado' }
+  if (!user) return { success: false, error: 'NÃ£o autenticado' }
 
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayStr = getLocalISODate(yesterday)
 
-  // Insere um log de estudo fictício para ontem
+  // Insere um log de estudo fictÃ­cio para ontem
   const { error } = await supabase
     .from('daily_study_logs')
     .insert({
@@ -373,7 +373,7 @@ export async function addXp(amount: number) {
   const currentXp = stats.total_xp || 0
   const newXp = currentXp + amount
 
-  // Fórmula de nível: Nível = (Raiz quadrada do XP / 5) + 1
+  // FÃ³rmula de nÃ­vel: NÃ­vel = (Raiz quadrada do XP / 5) + 1
   const newLevel = Math.floor(Math.sqrt(newXp / 5)) + 1
   const oldLevel = stats.current_level || 1
   const leveledUp = newLevel > oldLevel
@@ -487,7 +487,7 @@ export async function getDailyQuests() {
     .eq('user_id', user.id)
     .eq('date', todayStr)
 
-  // Se não tem as 3 quests, inicializa
+  // Se nÃ£o tem as 3 quests, inicializa
   const questTypes = ['guerreiro', 'escritor', 'curioso']
   if (!quests || quests.length < 3) {
     const existingIds = quests?.map(q => q.quest_id) || []
@@ -536,25 +536,25 @@ export async function generatePlayerTitle(force = false): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return 'Estudante Dedicado'
 
-  // Se já tem título e não estamos forçando a geração, retorna o atual
+  // Se jÃ¡ tem tÃ­tulo e nÃ£o estamos forÃ§ando a geraÃ§Ã£o, retorna o atual
   const currentTitle = user.user_metadata?.player_title
   if (currentTitle && !force) {
     return currentTitle
   }
 
-  // Verificador de timestamp (Rate limit: 1 hora)
+  // Verificador de timestamp (Rate limit: 1 minuto para nÃ£o abusar da API)
   const lastGenerated = user.user_metadata?.last_title_generated_at
   if (lastGenerated && force) {
     const lastTime = new Date(lastGenerated).getTime()
     const nowTime = new Date().getTime()
-    const diffHours = (nowTime - lastTime) / (1000 * 60 * 60)
-    if (diffHours < 1) {
-      // Retorna o título atual silenciosamente se for clicado antes de 1 hora
+    const diffMinutes = (nowTime - lastTime) / (1000 * 60)
+    if (diffMinutes < 1) {
+      // Retorna o tÃ­tulo atual silenciosamente se for clicado antes de 1 minuto
       return currentTitle || 'Estudante Dedicado'
     }
   }
 
-  // 1. Busca os nomes das workspaces do usuário
+  // 1. Busca os nomes das workspaces do usuÃ¡rio
   const { data: workspaces } = await supabase
     .from('workspaces')
     .select('name')
@@ -565,21 +565,21 @@ export async function generatePlayerTitle(force = false): Promise<string> {
 
   const workspaceNames = workspaces?.map(w => w.name).join(', ') || 'Estudos Gerais'
 
-  // 2. Chama a API do Groq para gerar um título criativo de 3 palavras em português
+  // 2. Chama a API do Groq para gerar um tÃ­tulo criativo de 3 palavras em portuguÃªs
   const groqApiKey = process.env.GROQ_API_KEY
-  if (!groqApiKey) return `Especialista Nível ${level}`
+  if (!groqApiKey) return `Especialista NÃ­vel ${level}`
 
   try {
-    const prompt = `Você é um gerador de títulos honoríficos de RPG para um aplicativo de estudos gamificado chamado OmniMind.
-O usuário estuda os seguintes temas: "${workspaceNames}" e está no Nível ${level}.
-Gere um título honorífico curto de 2 a 4 palavras em português que descreva essa jornada de forma épica ou divertida.
+    const prompt = `VocÃª Ã© um gerador de tÃ­tulos honorÃ­ficos de RPG para um aplicativo de estudos gamificado chamado OmniMind.
+O usuÃ¡rio estuda os seguintes temas: "${workspaceNames}" e estÃ¡ no NÃ­vel ${level}.
+Gere um tÃ­tulo honorÃ­fico curto de 2 a 4 palavras em portuguÃªs que descreva essa jornada de forma Ã©pica ou divertida.
 Exemplos:
-- Se estuda Direito: "O Intérprete da Lei" ou "Defensor da Justiça"
-- Se estuda Computação: "Arquiteto de Algoritmos" ou "Mestre dos Bits"
-- Se estuda Medicina: "Guardião da Saúde" ou "Anatomista do Amanhã"
-- Se estuda vários temas: "Polímata Aprendiz" ou "Buscador do Conhecimento"
+- Se estuda Direito: "O IntÃ©rprete da Lei" ou "Defensor da JustiÃ§a"
+- Se estuda ComputaÃ§Ã£o: "Arquiteto de Algoritmos" ou "Mestre dos Bits"
+- Se estuda Medicina: "GuardiÃ£o da SaÃºde" ou "Anatomista do AmanhÃ£"
+- Se estuda vÃ¡rios temas: "PolÃ­mata Aprendiz" ou "Buscador do Conhecimento"
 
-Retorne APENAS o título gerado, sem explicações, sem aspas, sem introduções. Não use markdown.`
+Retorne APENAS o tÃ­tulo gerado, sem explicaÃ§Ãµes, sem aspas, sem introduÃ§Ãµes. NÃ£o use markdown.`
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -597,9 +597,9 @@ Retorne APENAS o título gerado, sem explicações, sem aspas, sem introduções
 
     if (!res.ok) throw new Error('Falha na chamada do Groq')
     const json = await res.json()
-    const title = json.choices?.[0]?.message?.content?.trim() || `Conquistador Nível ${level}`
+    const title = json.choices?.[0]?.message?.content?.trim() || `Conquistador NÃ­vel ${level}`
 
-    // 3. Salva o título gerado e o timestamp de geração no metadata do usuário
+    // 3. Salva o tÃ­tulo gerado e o timestamp de geraÃ§Ã£o no metadata do usuÃ¡rio
     await supabase.auth.updateUser({
       data: { 
         player_title: title,
@@ -609,14 +609,14 @@ Retorne APENAS o título gerado, sem explicações, sem aspas, sem introduções
 
     return title
   } catch (err) {
-    console.warn('Groq falhou ao gerar título, tentando fallback com Gemini...', err)
+    console.warn('Groq falhou ao gerar tÃ­tulo, tentando fallback com Gemini...', err)
     try {
       const geminiApiKey = process.env.GEMINI_API_KEY
-      if (!geminiApiKey) return `Explorador Nível ${level}`
+      if (!geminiApiKey) return `Explorador NÃ­vel ${level}`
 
-      const prompt = `Você é um gerador de títulos honoríficos de RPG para um aplicativo de estudos gamificado.
-O usuário estuda: "${workspaceNames}" e está no Nível ${level}.
-Gere um título honorífico curto de 2 a 4 palavras em português. APENAS o título gerado, sem introduções.`
+      const prompt = `VocÃª Ã© um gerador de tÃ­tulos honorÃ­ficos de RPG para um aplicativo de estudos gamificado.
+O usuÃ¡rio estuda: "${workspaceNames}" e estÃ¡ no NÃ­vel ${level}.
+Gere um tÃ­tulo honorÃ­fico curto de 2 a 4 palavras em portuguÃªs. APENAS o tÃ­tulo gerado, sem introduÃ§Ãµes.`
 
       const genAI = new GoogleGenerativeAI(geminiApiKey)
       const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' })
@@ -629,8 +629,98 @@ Gere um título honorífico curto de 2 a 4 palavras em português. APENAS o tít
       
       return title
     } catch (fallbackErr) {
-      console.error('Erro no fallback do Gemini ao gerar título:', fallbackErr)
-      return `Explorador Nível ${level}`
+      console.error('Erro no fallback do Gemini ao gerar tÃ­tulo:', fallbackErr)
+      return `Explorador NÃ­vel ${level}`
     }
   }
 }
+
+export async function updatePlayerAvatar(iconName: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.auth.updateUser({
+    data: { avatar_icon: iconName }
+  })
+  if (error) {
+    console.error('Erro ao atualizar avatar:', error)
+    return { error: 'Falha ao atualizar avatar' }
+  }
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function grantBossVictory(workspaceName: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  // 1. Give 50 XP
+  await addXp(50)
+
+  // 2. Generate Epic Boss Title using Groq
+  const groqApiKey = process.env.GROQ_API_KEY
+  if (groqApiKey) {
+    try {
+      const prompt = `Você é um gerador de títulos honoríficos de RPG para um aplicativo de estudos.
+O usuário acabou de derrotar um "Boss" (um simulado difícil) sobre o assunto: "${workspaceName}".
+Gere um título honorífico épico e sombrio de 2 a 4 palavras em português. 
+Exemplos: "O Carrasco de Pipelining", "Destruidor de Algoritmos", "Lâmina da Anatomia".
+Retorne APENAS o título gerado, sem aspas, sem explicações.`
+
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${groqApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama3-8b-8192',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.8,
+          max_tokens: 30
+        })
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        const title = json.choices?.[0]?.message?.content?.trim()
+        if (title) {
+          await supabase.auth.updateUser({
+            data: { player_title: title, last_title_generated_at: new Date().toISOString() }
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao gerar título de boss:', e)
+    }
+  }
+
+  // 3. Unlock achievement
+  await checkAndUnlockAchievements(user.id, ['o_matador_de_chefes'])
+}
+
+export async function addPomodoroSuccess() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  // 1. Give 15 XP
+  await addXp(15)
+
+  // 2. Track pomodoro count in user metadata
+  const currentCount = user.user_metadata?.pomodoros_completed || 0
+  const newCount = currentCount + 1
+  
+  await supabase.auth.updateUser({
+    data: { pomodoros_completed: newCount }
+  })
+
+  // 3. Unlock achievement if >= 10
+  if (newCount >= 10) {
+    await checkAndUnlockAchievements(user.id, ['o_jardineiro_do_foco'])
+  }
+}
+
+

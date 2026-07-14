@@ -6,6 +6,7 @@ import { TrendingUp } from 'lucide-react'
 interface Log {
   study_date: string
   review_count: number
+  topics?: string[]
 }
 
 export default function Heatmap({ logs }: { logs: Log[] }) {
@@ -17,17 +18,21 @@ export default function Heatmap({ logs }: { logs: Log[] }) {
     const daysArray = []
 
     let max = 0
-    const logMap = new Map(logs.map(log => [log.study_date?.split('T')[0] || log.study_date, log.review_count]))
+    const logMap = new Map(logs.map(log => [
+      log.study_date?.split('T')[0] || log.study_date, 
+      { count: log.review_count, topics: log.topics }
+    ]))
 
     for (let i = 139; i >= 0; i--) {
       const d = new Date(today)
       d.setDate(d.getDate() - i)
       const dateString = d.toISOString().split('T')[0]
-      const count = logMap.get(dateString) || 0
+      const count = logMap.get(dateString)?.count || 0
+      const topics = logMap.get(dateString)?.topics || []
 
       if (count > max) max = count
 
-      daysArray.push({ date: dateString, count })
+      daysArray.push({ date: dateString, count, topics })
     }
 
     return { days: daysArray, maxCount: max }
@@ -63,7 +68,7 @@ export default function Heatmap({ logs }: { logs: Log[] }) {
         className="w-full overflow-x-auto pb-2"
         style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}
       >
-        <div className="min-w-max flex flex-col flex-wrap gap-1.5 h-[116px] content-start py-1 px-1">
+        <div className="min-w-max grid grid-rows-7 grid-flow-col gap-1.5 py-1 px-1">
           {days.map((day) => {
             const isSelected = selectedDay?.date === day.date
             return (
@@ -71,7 +76,7 @@ export default function Heatmap({ logs }: { logs: Log[] }) {
                 key={day.date}
                 type="button"
                 onClick={() => setSelectedDay(day)}
-                title={`${formatDateBR(day.date)}: ${day.count} flashcard${day.count !== 1 ? 's' : ''} revisado${day.count !== 1 ? 's' : ''}`}
+                title={`${formatDateBR(day.date)}: ${day.count} flashcard${day.count !== 1 ? 's' : ''} revisado${day.count !== 1 ? 's' : ''}${day.topics?.length ? `\nAssuntos: ${day.topics.join(', ')}` : ''}`}
                 className={`w-3.5 h-3.5 rounded-[3px] outline-none transition-all cursor-pointer ${getIntensityClass(day.count, maxCount)} ${
                   isSelected 
                     ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface scale-110 z-10' 
@@ -94,6 +99,11 @@ export default function Heatmap({ logs }: { logs: Log[] }) {
               <span className="text-text-strong font-medium">
                 {selectedDay.count} flashcard{selectedDay.count !== 1 ? 's' : ''} revisado{selectedDay.count !== 1 ? 's' : ''}
               </span>
+              {(selectedDay as any).topics?.length > 0 && (
+                <span className="text-xs text-text-muted mt-0.5 max-w-[200px] sm:max-w-md truncate" title={(selectedDay as any).topics.join(', ')}>
+                  ({(selectedDay as any).topics.join(', ')})
+                </span>
+              )}
             </div>
           ) : (
             <span className="text-text-muted italic">Toque em qualquer quadrado para ver o rendimento</span>
