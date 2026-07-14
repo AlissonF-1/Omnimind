@@ -23,51 +23,62 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData()
-    const file = formData.get('file') as File
+    const file = formData.get('file') as File | null
+    const textInput = formData.get('text') as string | null
     const workspaceId = formData.get('workspaceId') as string | null
 
-    if (!file) {
-      return NextResponse.json({ error: 'Nenhum arquivo de áudio enviado.' }, { status: 400 })
+    if (!file && !textInput) {
+      return NextResponse.json({ error: 'Nenhum arquivo de áudio ou texto de explicação enviado.' }, { status: 400 })
     }
 
-    // 1. Transcreve o áudio usando Groq Whisper
-    const groqApiKey = process.env.GROQ_API_KEY
-    if (!groqApiKey) {
-      return NextResponse.json({ error: 'GROQ_API_KEY não configurada.' }, { status: 500 })
-    }
+    let transcriptionText = ''
 
-    const apiFormData = new FormData()
-    apiFormData.append('file', file)
-    apiFormData.append('model', 'whisper-large-v3-turbo')
-    apiFormData.append('language', 'pt')
-
-    const whisperResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-      },
-      body: apiFormData,
-    })
-
-    if (!whisperResponse.ok) {
-      if (whisperResponse.status === 429) {
-        return NextResponse.json(
-          { error: 'Serviço de transcrição sobrecarregado. Aguarde e tente novamente.' },
-          { status: 429 }
-        )
+    // 1. Transcreve o áudio se houver arquivo, ou pega o texto direto
+    if (textInput) {
+      transcriptionText = textInput.trim()
+    } else if (file) {
+      const groqApiKey = process.env.GROQ_API_KEY
+      if (!groqApiKey) {
+        return NextResponse.json({ error: 'GROQ_API_KEY não configurada.' }, { status: 500 })
       }
-      const errorText = await whisperResponse.text()
-      throw new Error(`Groq Whisper falhou: ${errorText}`)
-    }
 
-    const whisperData = await whisperResponse.json()
-    const transcriptionText = (whisperData.text || '').trim()
+      const apiFormData = new FormData()
+      apiFormData.append('file', file)
+      apiFormData.append('model', 'whisper-large-v3-turbo')
+      apiFormData.append('language', 'pt')
+
+      const whisperResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+        },
+        body: apiFormData,
+      })
+
+      if (!whisperResponse.ok) {
+        if (whisperResponse.status === 429) {
+          return NextResponse.json(
+            { error: 'Serviço de transcrição sobrecarregado. Aguarde e tente novamente.' },
+            { status: 429 }
+          )
+        }
+        const errorText = await whisperResponse.text()
+        throw new Error(`Groq Whisper falhou: ${errorText}`)
+      }
+
+      const whisperData = await whisperResponse.json()
+      transcriptionText = (whisperData.text || '').trim()
+    }
 
     if (!transcriptionText) {
       return NextResponse.json({ 
         transcription: '', 
         score: 0, 
-        feedback: 'Não foi possível detectar nenhuma fala no áudio enviado. Por favor, tente falar mais perto do microfone.',
+        strengths: 'Nenhuma fala ou texto detectado.',
+        gaps: 'Tente explicar novamente com mais detalhes.',
+        corrections: '',
+        mentioned: [],
+        forgotten: [],
         matchedNotes: []
       })
     }
@@ -90,7 +101,6 @@ export async function POST(req: NextRequest) {
       if (rpcError) {
         console.error('[Feynman API] Erro na busca de embeddings RAG:', rpcError)
       } else if (matches && matches.length > 0) {
-        // Obter os IDs das notas para buscar os títulos originais e complementar o contexto
         const noteIds = Array.from(new Set(matches.map((m: any) => m.note_id).filter(Boolean))) as string[]
         
         if (noteIds.length > 0) {
@@ -113,28 +123,25 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Avaliação de Feynman com Llama 3 via Groq (ou Fallback)
-    let dynamicInstruction = ""
-    if (notesContext.length > 1000) {
-      dynamicInstruction = "\nIMPORTANTE: Como o contexto recuperado é extenso, seja extremamente conciso e vá direto ao ponto no seu feedback (use no máximo 1 ou 2 frases curtas)."
-    }
+    const systemPrompt = `Você é um tutor especialista na Técnica Feynman. O usuário explicou um conceito (por voz ou texto).
+Sua missão é comparar a explicação dele com o contexto das anotações dele fornecido abaixo.
+Você deve avaliar a clareza, a precisão conceitual e a simplicidade (linguagem compreensível).
 
-    const systemPrompt = `Você é um tutor de Feynman. O usuário explicou um conceito por voz.
-Compare a explicação dele com o contexto das anotações dele fornecido abaixo (caso exista).
-Dê uma nota de 0 a 10 baseada na precisão e clareza da explicação (0 = errou tudo/vazio, 10 = explicou perfeitamente).
-Em seguida, em um feedback de no máximo 2 frases, aponte de forma construtiva o que ele esqueceu de mencionar ou explicou de forma confusa.
-${dynamicInstruction}
-
-Você deve responder OBRIGATORIAMENTE no formato JSON estruturado com a seguinte estrutura:
+Analise o texto e responda OBRIGATORIAMENTE no formato JSON estruturado com a seguinte estrutura:
 {
-  "score": number,
-  "feedback": "string"
+  "score": number (de 0 a 10),
+  "strengths": "string (resumo curto em markdown dos acertos da explicação)",
+  "gaps": "string (resumo curto em markdown dos pontos importantes esquecidos ou mal explicados)",
+  "corrections": "string (resumo curto em markdown apenas se houver algum erro crasso ou equívoco conceitual falado, caso contrário deixe string vazia)",
+  "mentioned": ["array de strings curtas dos conceitos-chave que o usuário citou com sucesso"],
+  "forgotten": ["array de strings curtas de conceitos-chave importantes no contexto das notas que o usuário deveria ter citado, mas esqueceu"]
 }`
 
     const userMessage = `
 [CONTEXTO DAS ANOTAÇÕES DO USUÁRIO]
 ${notesContext || 'Nenhuma anotação relevante encontrada.'}
 
-[EXPLICAÇÃO DO USUÁRIO POR VOZ]
+[EXPLICAÇÃO DO USUÁRIO]
 "${transcriptionText}"
 `
 
@@ -145,7 +152,15 @@ ${notesContext || 'Nenhuma anotação relevante encontrada.'}
     }
 
     const cleanedContent = cleanJsonResponseText(aiRes.content || '')
-    const parsed = JSON.parse(cleanedContent) as { score: number; feedback: string }
+    const parsed = JSON.parse(cleanedContent) as { 
+      score: number; 
+      strengths: string;
+      gaps: string;
+      corrections: string;
+      mentioned: string[];
+      forgotten: string[];
+    }
+    
     const finalScore = typeof parsed.score === 'number' ? parsed.score : 0
 
     // Verifica Conquista do Prêmio Nobel (Score >= 9)
@@ -158,7 +173,11 @@ ${notesContext || 'Nenhuma anotação relevante encontrada.'}
     return NextResponse.json({
       transcription: transcriptionText,
       score: finalScore,
-      feedback: parsed.feedback || 'Explicado com sucesso.',
+      strengths: parsed.strengths || '',
+      gaps: parsed.gaps || '',
+      corrections: parsed.corrections || '',
+      mentioned: parsed.mentioned || [],
+      forgotten: parsed.forgotten || [],
       matchedNotes: matchedNotesTitles,
       unlockedNobel
     })
