@@ -76,7 +76,7 @@ export async function getUserStudyStats(): Promise<UserStudyStats | null> {
   return data
 }
 
-export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]> {
+export async function checkAndUnlockAchievements(forceUnlockIds: string[] = []): Promise<AchievementDetails[]> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
@@ -131,15 +131,25 @@ export async function checkAndUnlockAchievements(): Promise<AchievementDetails[]
   if (!unlocked.has('o_arquivista_ouro') && notesCount >= 100) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_ouro)
   if (!unlocked.has('o_arquivista_diamante') && notesCount >= 500) newlyUnlocked.push(ACHIEVEMENTS.o_arquivista_diamante)
 
-  // ðŸ§  O Tutor (Tiers)
+  // 🧠 O Tutor (Tiers)
   if (!unlocked.has('o_tutor_bronze') && stats.tutor_queries_count >= 5) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_bronze)
   if (!unlocked.has('o_tutor_prata') && stats.tutor_queries_count >= 50) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_prata)
   if (!unlocked.has('o_tutor_ouro') && stats.tutor_queries_count >= 200) newlyUnlocked.push(ACHIEVEMENTS.o_tutor_ouro)
 
-  // ðŸŽ“ A Banca (Tiers)
+  // 🎓 A Banca (Tiers)
   if (!unlocked.has('a_banca_bronze') && stats.perfect_exams_count >= 1) newlyUnlocked.push(ACHIEVEMENTS.a_banca_bronze)
   if (!unlocked.has('a_banca_prata') && stats.perfect_exams_count >= 10) newlyUnlocked.push(ACHIEVEMENTS.a_banca_prata)
   if (!unlocked.has('a_banca_ouro') && stats.perfect_exams_count >= 50) newlyUnlocked.push(ACHIEVEMENTS.a_banca_ouro)
+
+  // Force unlock específicos (ex: Boss Fights, Pomodoros)
+  if (forceUnlockIds.length > 0) {
+    forceUnlockIds.forEach(id => {
+      const achievement = ACHIEVEMENTS[id as keyof typeof ACHIEVEMENTS]
+      if (achievement && !unlocked.has(id)) {
+        newlyUnlocked.push(achievement)
+      }
+    })
+  }
 
   if (newlyUnlocked.length > 0) {
     const nextUnlocked = [...unlocked, ...newlyUnlocked.map(a => a.id)]
@@ -698,7 +708,7 @@ Retorne APENAS o título gerado, sem aspas, sem explicações.`
   }
 
   // 3. Unlock achievement
-  await checkAndUnlockAchievements(user.id, ['o_matador_de_chefes'])
+  await checkAndUnlockAchievements(['o_matador_de_chefes'])
 }
 
 export async function addPomodoroSuccess() {
@@ -719,7 +729,7 @@ export async function addPomodoroSuccess() {
 
   // 3. Unlock achievement if >= 10
   if (newCount >= 10) {
-    await checkAndUnlockAchievements(user.id, ['o_jardineiro_do_foco'])
+    await checkAndUnlockAchievements(['o_jardineiro_do_foco'])
   }
 }
 
