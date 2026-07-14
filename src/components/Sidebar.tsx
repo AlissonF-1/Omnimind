@@ -245,7 +245,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
                 workspaces.filter(w => !w.is_archived).map((workspace) => (
                   <div 
                     key={workspace.id} 
-                    className="relative group"
+                    className={`relative group ${openDropdownId === workspace.id ? 'z-30' : 'z-10'}`}
                   >
                     <div className="flex items-center">
                       <Link
@@ -264,7 +264,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
                             e.preventDefault();
                             setOpenDropdownId(openDropdownId === workspace.id ? null : workspace.id)
                           }}
-                          className={`absolute right-1 p-1.5 rounded-md text-text-muted hover:text-text-strong hover:bg-surface-elevated transition-all ${openDropdownId === workspace.id ? 'opacity-100 bg-surface-elevated' : 'opacity-0 group-hover:opacity-100 peer-hover:opacity-100'}`}
+                          className={`absolute right-1 p-1.5 rounded-md text-text-muted hover:text-text-strong hover:bg-surface-elevated transition-all ${openDropdownId === workspace.id ? 'opacity-100 bg-surface-elevated' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}
                         >
                           <MoreHorizontal className="size-4" />
                         </button>
@@ -319,7 +319,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
                     {workspaces.filter(w => w.is_archived).map((workspace) => (
                       <div 
                         key={workspace.id} 
-                        className="group relative flex items-center justify-between rounded-md transition-colors hover:bg-surface-muted opacity-60 hover:opacity-100"
+                        className={`group relative flex items-center justify-between rounded-md transition-colors hover:bg-surface-muted opacity-60 hover:opacity-100 ${openDropdownId === workspace.id ? 'z-30' : 'z-10'}`}
                       >
                         <Link
                           href={`/dashboard/${workspace.id}`}
@@ -332,7 +332,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
 
                         <button
                           onClick={() => setOpenDropdownId(openDropdownId === workspace.id ? null : workspace.id)}
-                          className={`shrink-0 mr-1 p-1 rounded-md text-text-muted hover:text-text-strong hover:bg-border transition-all ${openDropdownId === workspace.id ? 'opacity-100 bg-border' : 'opacity-0 group-hover:opacity-100'}`}
+                          className={`shrink-0 mr-1 p-1 rounded-md text-text-muted hover:text-text-strong hover:bg-border transition-all ${openDropdownId === workspace.id ? 'opacity-100 bg-border' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}
                         >
                           <MoreHorizontal className="size-3.5" />
                         </button>
