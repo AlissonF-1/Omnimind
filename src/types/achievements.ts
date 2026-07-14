@@ -161,13 +161,5 @@ export const ACHIEVEMENTS: Record<string, AchievementDetails> = {
     icon: 'Swords',
     tier: 'prata',
     secret: false
-  },
-  o_jardineiro_do_foco: {
-    id: 'o_jardineiro_do_foco',
-    title: '🌱 Jardineiro do Foco',
-    description: 'Sobreviveu a 10 Pomodoros no Modo Hardcore sem perder a concentração.',
-    icon: 'Sprout',
-    tier: 'ouro',
-    secret: false
   }
 }

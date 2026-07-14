@@ -712,26 +712,6 @@ Retorne APENAS o título gerado, sem aspas, sem explicações.`
   return { success: true, newlyUnlocked }
 }
 
-export async function addPomodoroSuccess() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
 
-  // 1. Give 15 XP
-  await addXp(15)
-
-  // 2. Track pomodoro count in user metadata
-  const currentCount = user.user_metadata?.pomodoros_completed || 0
-  const newCount = currentCount + 1
-  
-  await supabase.auth.updateUser({
-    data: { pomodoros_completed: newCount }
-  })
-
-  // 3. Unlock achievement if >= 10
-  if (newCount >= 10) {
-    await checkAndUnlockAchievements(['o_jardineiro_do_foco'])
-  }
-}
 
 
