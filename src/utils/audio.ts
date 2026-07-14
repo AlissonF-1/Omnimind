@@ -108,8 +108,8 @@ export function getBestVoice(voicePref: 'default' | 'male' | 'female'): SpeechSy
     return sortedPtVoices[0]
   }
 
-  const maleKeywords = ['daniel', 'felipe', 'helder', 'rodrigo', 'ricardo', 'junior', 'male', 'homem', 'masculino', 'cosme']
-  const femaleKeywords = ['maria', 'francisca', 'heloisa', 'luciana', 'joana', 'vitoria', 'fernanda', 'raquel', 'female', 'mulher', 'feminino', 'google português']
+  const maleKeywords = ['antonio', 'felipe', 'daniel', 'helder', 'rodrigo', 'ricardo', 'junior', 'male', 'homem', 'masculino', 'cosme']
+  const femaleKeywords = ['francisca', 'maria', 'heloisa', 'luciana', 'joana', 'vitoria', 'fernanda', 'raquel', 'female', 'mulher', 'feminino', 'google português']
 
   if (voicePref === 'male') {
     const maleVoice = sortedPtVoices.find(v => 
