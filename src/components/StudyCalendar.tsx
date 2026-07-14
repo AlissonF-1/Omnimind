@@ -245,49 +245,48 @@ export default function StudyCalendar({ initialData, initialGoals, currentMonth,
       <div className="flex-1 panel p-5 sm:p-6 relative">
         
         {/* Header de navegação e filtros */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => navigate(-1)}
-                className="flex size-8 items-center justify-center rounded-xl border border-border text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all"
-                disabled={isPending}
-              >
-                <ChevronLeft className="size-4" />
-              </button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          {/* Month/Year Navigation */}
+          <div className="flex items-center justify-between md:justify-start gap-4 w-full md:w-auto">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex size-9 items-center justify-center rounded-xl border border-border text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all cursor-pointer"
+              disabled={isPending}
+            >
+              <ChevronLeft className="size-4" />
+            </button>
 
-              <div className="text-center min-w-[100px]">
-                <h2 className="text-base font-black text-text-strong leading-none">
+            <div className="flex items-center gap-2 justify-center">
+              <div className="text-center">
+                <h2 className="text-base font-black text-text-strong leading-tight">
                   {MONTHS[month]}
                 </h2>
-                <span className="text-[10px] text-text-muted font-bold">{year}</span>
+                <p className="text-[10px] text-text-muted font-extrabold leading-none mt-0.5">{year}</p>
               </div>
-
-              <button
-                onClick={() => navigate(1)}
-                className="flex size-8 items-center justify-center rounded-xl border border-border text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all"
-                disabled={isPending}
+              <button 
+                onClick={() => setShowHelpModal(true)}
+                className="text-text-muted hover:text-primary transition-colors cursor-pointer ml-1"
+                title="Como funciona o Calendário?"
               >
-                <ChevronRight className="size-4" />
+                <HelpCircle className="size-4" />
               </button>
             </div>
 
-            {/* Ícone de Ajuda Modal */}
-            <button 
-              onClick={() => setShowHelpModal(true)}
-              className="text-text-muted hover:text-primary transition-colors cursor-pointer"
-              title="Como funciona o Calendário?"
+            <button
+              onClick={() => navigate(1)}
+              className="flex size-9 items-center justify-center rounded-xl border border-border text-text-muted hover:text-text-strong hover:bg-surface-muted transition-all cursor-pointer"
+              disabled={isPending}
             >
-              <HelpCircle className="size-5" />
+              <ChevronRight className="size-4" />
             </button>
           </div>
 
           {/* Seletor de Workspace */}
-          <div className="w-full sm:w-56">
+          <div className="w-full md:w-56">
             <select
               value={selectedWorkspaceId}
               onChange={(e) => handleWorkspaceChange(e.target.value)}
-              className="w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-xs font-bold text-text-strong focus:outline-none focus:ring-2 focus:ring-primary/45 transition-all"
+              className="w-full rounded-xl border border-border bg-surface-muted px-3 py-2.5 text-xs font-bold text-text-strong focus:outline-none focus:ring-2 focus:ring-primary/45 transition-all cursor-pointer"
             >
               <option value="">📂 Todos os Workspaces</option>
               {workspaces.map(w => (
