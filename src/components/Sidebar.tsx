@@ -245,7 +245,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
                 workspaces.filter(w => !w.is_archived).map((workspace) => (
                   <div 
                     key={workspace.id} 
-                    className="relative"
+                    className="relative group"
                   >
                     <div className="flex items-center">
                       <Link
