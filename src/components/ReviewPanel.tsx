@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Rating } from 'ts-fsrs'
 import { submitReview } from '@/actions/reviews'
 import { deleteFlashcard } from '@/actions/flashcards'
@@ -198,6 +198,20 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   }, [userAnswerText, responseMethod])
 
   // --- Busca status de Jeopardy da Streak ---
+  const playMKSFX = useCallback((type: 'fight' | 'finish-him' | 'flawless' | 'fatality' | 'yousuck') => {
+    if (!settings.enable_sounds) return
+    const urls = {
+      'fight': '/sounds/mk/fight.mp3',
+      'finish-him': '/sounds/mk/finish-him.mp3',
+      'flawless': '/sounds/mk/flawless.mp3',
+      'fatality': '/sounds/mk/fatality.mp3',
+      'yousuck': '/sounds/mk/yousuck.mp3'
+    }
+    const audio = new Audio(urls[type])
+    audio.volume = 0.6
+    audio.play().catch(e => console.warn('SFX block', e))
+  }, [settings.enable_sounds])
+
   useEffect(() => {
     getStreakJeopardyStatus().then((res) => {
       if (res && res.isJeopardy) {
@@ -611,8 +625,14 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         setBossHp(newHp)
         if (newHp <= 0 && !isBossDefeated) {
           setIsBossDefeated(true)
+          
+          if (playerHp === maxBossHp) playMKSFX('flawless')
+          else playMKSFX('fatality')
+
           // Usa o front do card como contexto pro nome do boss
           grantBossVictory(activeCard.front.substring(0, 50)).catch(console.error)
+        } else if (newHp === 1) {
+          playMKSFX('finish-him')
         }
       }
     } else {
@@ -631,6 +651,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         setPlayerHp(Math.max(0, newHp))
         if (newHp <= 0) {
           setIsPlayerDefeated(true)
+          playMKSFX('yousuck')
         }
       }
     }
@@ -1256,6 +1277,8 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
                     ]
                     const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
                     setCurrentBattleTrack(randomTrack)
+                    
+                    playMKSFX('fight')
                   }
                   setSelectedQuizOption(null)
                   setQuizOptions([])
