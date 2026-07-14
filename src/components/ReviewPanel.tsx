@@ -134,6 +134,8 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const [isPlayerDefeated, setIsPlayerDefeated] = useState(false)
   const [combatFeedback, setCombatFeedback] = useState<'hit' | 'miss' | null>(null)
   
+  const [isTtsLoading, setIsTtsLoading] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   // Áudio de Batalha
   const [isMusicEnabled, setIsMusicEnabled] = useState(true)
   const [currentBattleTrack, setCurrentBattleTrack] = useState('/sounds/battle.mp3')
@@ -146,6 +148,20 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const isCriticalDanger = isBossMode && playerHp === 1
 
   // --- Inicialização do reconhecimento de voz ---
+  useEffect(() => {
+    // Cacheamento e Inicialização imediata do motor de síntese de voz (reduz delay de partida do TTS)
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.getVoices()
+      const handleVoicesChanged = () => {
+        window.speechSynthesis.getVoices()
+      }
+      window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged)
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -418,17 +434,44 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       showError('Seu navegador não suporta leitura de voz.');
       return;
     }
-    // Para qualquer áudio que esteja tocando antes de tocar o novo
+
+    if (isSpeaking || isTtsLoading) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setIsTtsLoading(false);
+      return;
+    }
+
+    // Cancela qualquer fala residual e ativa indicador de carregamento
     window.speechSynthesis.cancel();
+    setIsTtsLoading(true);
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'pt-BR';
     utterance.rate = 0.9;
     utterance.pitch = 1.2;
+
     const selectedVoice = getBestVoice(settings.tts_voice)
     if (selectedVoice) {
       utterance.voice = selectedVoice
     }
+
+    utterance.onstart = () => {
+      setIsTtsLoading(false);
+      setIsSpeaking(true);
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setIsTtsLoading(false);
+    };
+
+    utterance.onerror = (err) => {
+      console.error('TTS Error:', err);
+      setIsSpeaking(false);
+      setIsTtsLoading(false);
+    };
+
     window.speechSynthesis.speak(utterance);
   };
 
@@ -669,6 +712,12 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   }
 
   const handleReview = async (grade: Rating) => {
+    // Para qualquer leitura de voz em andamento ao avançar o card
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setIsTtsLoading(false);
+    }
     // Desafio de Resgate de Streak
     if (isJeopardy && !rescueSuccess) {
       if (grade === Rating.Good || grade === Rating.Easy) {
@@ -1308,11 +1357,29 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
 
             <button
               onClick={() => speakText(`${activeCard.front}. A resposta é: ${activeCard.back}`)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-border bg-surface-muted text-text-medium hover:text-text-strong hover:border-border-strong hover:bg-surface-elevated flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-              title="Ouvir o card em áudio (Podcast)"
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                isSpeaking 
+                  ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_10px_rgba(99,102,241,0.2)]'
+                  : 'border-border bg-surface-muted text-text-medium hover:text-text-strong hover:border-border-strong hover:bg-surface-elevated'
+              }`}
+              title={isSpeaking ? "Parar leitura por voz" : "Ouvir o card em áudio (Podcast)"}
             >
-              <Volume2 className="size-3.5" />
-              <span>Ouvir Card</span>
+              {isTtsLoading ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Carregando...</span>
+                </>
+              ) : isSpeaking ? (
+                <>
+                  <VolumeX className="size-3.5" />
+                  <span>Parar Leitura</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="size-3.5" />
+                  <span>Ouvir Card</span>
+                </>
+              )}
             </button>
           </div>
         )}
