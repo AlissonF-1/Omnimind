@@ -89,34 +89,49 @@ export function getBestVoice(voicePref: 'default' | 'male' | 'female'): SpeechSy
   const ptVoices = voices.filter(v => v.lang.toLowerCase().replace('_', '-').startsWith('pt'))
   if (ptVoices.length === 0) return null
 
+  // Pontuação e ordenação para priorizar vozes neurais / de alta qualidade
+  const getVoiceScore = (voice: SpeechSynthesisVoice) => {
+    const name = voice.name.toLowerCase()
+    let score = 0
+    if (name.includes('neural')) score += 100
+    if (name.includes('natural')) score += 90
+    if (name.includes('online')) score += 80
+    if (name.includes('google')) score += 70
+    if (name.includes('microsoft')) score += 60
+    if (voice.lang.toLowerCase().replace('_', '-').includes('pt-br')) score += 10
+    return score
+  }
+
+  const sortedPtVoices = [...ptVoices].sort((a, b) => getVoiceScore(b) - getVoiceScore(a))
+
   if (voicePref === 'default') {
-    return ptVoices.find(v => v.lang.toLowerCase().replace('_', '-').includes('pt-br')) || ptVoices[0]
+    return sortedPtVoices[0]
   }
 
   const maleKeywords = ['daniel', 'felipe', 'helder', 'rodrigo', 'ricardo', 'junior', 'male', 'homem', 'masculino', 'cosme']
   const femaleKeywords = ['maria', 'francisca', 'heloisa', 'luciana', 'joana', 'vitoria', 'fernanda', 'raquel', 'female', 'mulher', 'feminino', 'google português']
 
   if (voicePref === 'male') {
-    const maleVoice = ptVoices.find(v => 
+    const maleVoice = sortedPtVoices.find(v => 
       maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
     )
     if (maleVoice) return maleVoice
-    const fallbackMale = ptVoices.find(v => 
+    const fallbackMale = sortedPtVoices.find(v => 
       !femaleKeywords.some(kw => v.name.toLowerCase().includes(kw))
     )
-    return fallbackMale || ptVoices[0]
+    return fallbackMale || sortedPtVoices[0]
   }
 
   if (voicePref === 'female') {
-    const femaleVoice = ptVoices.find(v => 
+    const femaleVoice = sortedPtVoices.find(v => 
       femaleKeywords.some(kw => v.name.toLowerCase().includes(kw))
     )
     if (femaleVoice) return femaleVoice
-    const fallbackFemale = ptVoices.find(v => 
+    const fallbackFemale = sortedPtVoices.find(v => 
       !maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
     )
-    return fallbackFemale || ptVoices[0]
+    return fallbackFemale || sortedPtVoices[0]
   }
 
-  return ptVoices[0]
+  return sortedPtVoices[0]
 }
