@@ -327,9 +327,9 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
       <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            <Image src="/images/empty_state_astronaut.png" alt="Astronauta" width={40} height={40} className="object-contain drop-shadow-md hidden sm:block animate-bounce duration-[3s]" />
+            <Image src="/images/empty_state_astronaut.png" alt="Astronauta" width={52} height={52} className="object-contain drop-shadow-md hidden sm:block animate-bounce duration-[3s]" />
             <h1 className="page-title text-2xl sm:text-3xl flex items-center gap-2">
-              <span className="sm:hidden"><Image src="/images/empty_state_astronaut.png" alt="Astronauta" width={28} height={28} className="object-contain drop-shadow-md" /></span>
+              <span className="sm:hidden"><Image src="/images/empty_state_astronaut.png" alt="Astronauta" width={34} height={34} className="object-contain drop-shadow-md animate-bounce duration-[3s]" /></span>
               Feynman Sandbox
             </h1>
             <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
