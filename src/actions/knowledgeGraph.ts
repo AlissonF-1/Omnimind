@@ -408,7 +408,7 @@ export async function generateStudyRoadmap(noteId: string) {
 
     let sourcesText = ''
     let totalChars = 0
-    const CHAR_LIMIT = 8000
+    const CHAR_LIMIT = 12000
 
     for (let i = 0; i < sourcesList.length; i++) {
       const src = sourcesList[i]
@@ -418,7 +418,7 @@ export async function generateStudyRoadmap(noteId: string) {
 
       let contentBlock = ''
       if (!src.isGhost && src.content) {
-        const cleanContent = src.content.replace(/Fonte:.*?\n\n---\n\n/, '').slice(0, 1500)
+        const cleanContent = src.content.replace(/Fonte:.*?\n\n---\n\n/, '').slice(0, 3000)
         contentBlock = `Conteúdo:\n${cleanContent}\n\n`
       } else {
         contentBlock = `(Nota em falta no banco de dados. IA externa: por favor, explique as bases deste conceito.)\n\n`
@@ -434,7 +434,7 @@ export async function generateStudyRoadmap(noteId: string) {
     }
 
     const targetLabel = `[Conceito Final Alvo]: ${targetNote.title}\n`
-    const targetContentClean = (targetNote.content || '').replace(/Fonte:.*?\n\n---\n\n/, '').slice(0, 2000)
+    const targetContentClean = (targetNote.content || '').replace(/Fonte:.*?\n\n---\n\n/, '').slice(0, 4000)
     const targetContentBlock = `Conteúdo:\n${targetContentClean}\n`
     
     sourcesText += targetLabel + targetContentBlock
