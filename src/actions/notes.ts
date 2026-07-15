@@ -74,6 +74,53 @@ export async function getNoteById(noteId: string, workspaceId?: string) {
   return data
 }
 
+export async function createNoteWithTitle(workspaceId: string, title: string) {
+  const supabase = await createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    console.error('[createNoteWithTitle] Usuário não autenticado.')
+    throw new Error('Não autenticado')
+  }
+
+  const { data: workspace, error: workspaceError } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (workspaceError || !workspace) {
+    console.error('[createNoteWithTitle] Workspace não encontrado ou sem permissão:', workspaceError)
+    throw new Error('Workspace não encontrado ou acesso negado.')
+  }
+
+  const { data, error } = await supabase
+    .from('notes')
+    .insert({
+      user_id: user.id,
+      workspace_id: workspaceId,
+      title: title,
+      content: '',
+      topic: 'Geral'
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('[createNoteWithTitle] Erro ao criar nota:', error)
+    throw new Error(`Erro ao criar nota: ${error.message}`)
+  }
+
+  const { convertGhostToRealNote } = await import('./knowledgeGraph')
+  await convertGhostToRealNote(workspaceId, title, data.id)
+
+  revalidatePath(`/dashboard/${workspaceId}`)
+  revalidatePath(`/dashboard/${workspaceId}/note/${data.id}`)
+
+  return data.id
+}
+
 export async function createNote(workspaceId: string) {
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()

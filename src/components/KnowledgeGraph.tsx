@@ -1,14 +1,22 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
-import { getWorkspaceGraph, type GraphData, type GraphNode, type GraphLink } from '@/actions/knowledgeGraph'
-import { getNoteById } from '@/actions/notes'
+import { useState, useEffect, useRef, useCallback, useTransition, useMemo } from 'react'
+import { 
+  getWorkspaceGraph, 
+  generateAllWorkspacePrerequisites, 
+  generateStudyRoadmap,
+  type GraphData, 
+  type GraphNode, 
+  type GraphLink 
+} from '@/actions/knowledgeGraph'
+import { getNoteById, createNoteWithTitle } from '@/actions/notes'
 import { backfillEmbeddings } from '@/actions/embeddings'
 import { 
   Network, Loader2, ZoomIn, ZoomOut, Maximize2, 
   BookOpen, MessageSquare, RefreshCw, X, ArrowRight, ListChecks 
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Workspace {
   id: string
@@ -26,24 +34,53 @@ interface SimulatedNode extends GraphNode {
   vy: number
 }
 
-function getHealthTheme(health: number | null | undefined) {
-  if (health === null || health === undefined) {
-    return { fill: 'fill-slate-500', bg: 'bg-slate-500', border: 'border-slate-400', glow: 'rgba(100, 116, 139, 0.4)', text: 'text-slate-400', label: 'Não Revisado' }
+function getNodeTheme(node: GraphNode, dependentsCount: number) {
+  if (node.isGhost) {
+    return {
+      fill: 'fill-zinc-900',
+      bg: 'bg-zinc-900',
+      border: 'border-zinc-700',
+      glow: 'rgba(63, 63, 70, 0.4)',
+      text: 'text-zinc-500',
+      label: 'Pré-requisito Ausente'
+    }
   }
-  if (health >= 0.9) {
-    return { fill: 'fill-emerald-500', bg: 'bg-emerald-500', border: 'border-emerald-400', glow: 'rgba(16, 185, 129, 0.6)', text: 'text-emerald-400', label: 'Dominado' }
+
+  if (dependentsCount >= 3) {
+    return {
+      fill: 'fill-emerald-600',
+      bg: 'bg-emerald-600',
+      border: 'border-emerald-400',
+      glow: 'rgba(16, 185, 129, 0.5)',
+      text: 'text-emerald-400',
+      label: 'Conceito Base'
+    }
   }
-  if (health >= 0.75) {
-    return { fill: 'fill-sky-500', bg: 'bg-sky-500', border: 'border-sky-400', glow: 'rgba(14, 165, 233, 0.6)', text: 'text-sky-400', label: 'Forte' }
+  if (dependentsCount >= 1) {
+    return {
+      fill: 'fill-sky-500',
+      bg: 'bg-sky-500',
+      border: 'border-sky-400',
+      glow: 'rgba(14, 165, 233, 0.5)',
+      text: 'text-sky-400',
+      label: 'Intermediário'
+    }
   }
-  if (health >= 0.60) {
-    return { fill: 'fill-amber-500', bg: 'bg-amber-500', border: 'border-amber-400', glow: 'rgba(245, 158, 11, 0.6)', text: 'text-amber-400', label: 'Atenção' }
+  return {
+    fill: 'fill-violet-600',
+    bg: 'bg-violet-600',
+    border: 'border-violet-400',
+    glow: 'rgba(139, 92, 246, 0.5)',
+    text: 'text-violet-400',
+    label: 'Conceito Alvo'
   }
-  return { fill: 'fill-rose-500', bg: 'bg-rose-500', border: 'border-rose-400', glow: 'rgba(244, 63, 94, 0.6)', text: 'text-rose-400', label: 'Ponto Cego' }
 }
 
 export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
+  const router = useRouter()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('')
+  const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false)
+  const [isCreatingNote, setIsCreatingNote] = useState(false)
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] })
   const [nodes, setNodes] = useState<SimulatedNode[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -73,6 +110,73 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+
+  const dependentsCountMap = useMemo(() => {
+    const map = new Map<string, number>()
+    nodes.forEach(n => map.set(n.id, 0))
+    graphData.links.forEach(l => {
+      const count = map.get(l.source) || 0
+      map.set(l.source, count + 1)
+    })
+    return map
+  }, [nodes, graphData.links])
+
+  const handleGenerateMap = async () => {
+    if (!selectedWorkspaceId || isIndexing) return
+    setIsIndexing(true)
+    setIndexMessage('Analisando notas e gerando mapa de pré-requisitos...')
+    try {
+      const res = await generateAllWorkspacePrerequisites(selectedWorkspaceId)
+      if (res.error) {
+        alert(res.error)
+      } else {
+        setIndexMessage('✓ Mapa de pré-requisitos gerado com sucesso!')
+        await loadGraph(selectedWorkspaceId)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Erro ao gerar conexões.')
+    } finally {
+      setIsIndexing(false)
+      setTimeout(() => setIndexMessage(''), 3000)
+    }
+  }
+
+  const handleCreateFromGhost = async () => {
+    if (!selectedNote || !selectedNote.isGhost || isCreatingNote) return
+    setIsCreatingNote(true)
+    try {
+      const newNoteId = await createNoteWithTitle(selectedWorkspaceId, selectedNote.title)
+      router.push(`/dashboard/${selectedWorkspaceId}/note/${newNoteId}`)
+    } catch (err) {
+      console.error(err)
+      alert('Falha ao criar nota a partir do conceito.')
+    } finally {
+      setIsCreatingNote(false)
+    }
+  }
+
+  const handleExportRoadmap = async () => {
+    if (!selectedNote || isGeneratingRoadmap) return
+    setIsGeneratingRoadmap(true)
+    try {
+      const res = await generateStudyRoadmap(selectedNote.id)
+      if (res.error || !res.prompt) {
+        alert(res.error || 'Falha ao gerar roteiro.')
+        return
+      }
+      
+      await navigator.clipboard.writeText(res.prompt)
+      
+      setIndexMessage('📋 Roteiro Ultra-Condensado copiado para a Área de Transferência!')
+      setTimeout(() => setIndexMessage(''), 4000)
+    } catch (err) {
+      console.error(err)
+      alert('Erro ao copiar roteiro.')
+    } finally {
+      setIsGeneratingRoadmap(false)
+    }
+  }
 
   const width = 800
   const height = 550
@@ -365,6 +469,19 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
     
     setSelectedNodeIds([])
     setFocusedNodeId(nodeId)
+    
+    const clickedNode = nodes.find(n => n.id === nodeId)
+    if (clickedNode?.isGhost) {
+      setSelectedNote({
+        id: nodeId,
+        title: clickedNode.label,
+        content: `Este conceito é um pré-requisito necessário para outro conteúdo do seu workspace, mas você ainda não o tem anotado.\n\nClique no botão "Criar Nota" abaixo para criar um resumo sobre ele e começar a estudar!`,
+        topic: 'Ausente',
+        isGhost: true
+      })
+      return
+    }
+
     setIsLoadingNote(true)
     setSelectedNote(null)
     try {
@@ -383,7 +500,11 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
     setIndexMessage('Iniciando indexação vetorial...')
     try {
       const res = await backfillEmbeddings()
-      setIndexMessage(`Indexado com sucesso! ${res.notesIndexed} notas e ${res.cardsIndexed} cards indexados.`)
+      setIndexMessage(`Indexação concluída! Mapeando pré-requisitos via IA...`)
+      
+      await generateAllWorkspacePrerequisites(selectedWorkspaceId)
+      
+      setIndexMessage(`✓ Conexões indexadas e mapeadas!`)
       setTimeout(() => {
         setIndexMessage('')
         loadGraph(selectedWorkspaceId)
@@ -440,12 +561,25 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
             id="ws-select"
             value={selectedWorkspaceId}
             onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-            className="bg-surface-muted border border-border text-text-strong rounded-lg px-3 py-1.5 text-xs min-w-[180px] outline-none focus:border-primary/50"
+            className="bg-surface-muted border border-border text-text-strong rounded-lg px-3 py-1.5 text-xs min-w-[180px] outline-none focus:border-primary/50 mr-2"
           >
             {workspaces.map(w => (
               <option key={w.id} value={w.id}>{w.name}</option>
             ))}
           </select>
+          <button
+            onClick={handleGenerateMap}
+            disabled={isIndexing}
+            className="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
+            title="Mapear pré-requisitos via IA de todas as notas do workspace"
+          >
+            {isIndexing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="size-3.5" />
+            )}
+            <span>Gerar Mapa</span>
+          </button>
         </div>
       </header>
 
@@ -534,6 +668,19 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                 className="w-full h-full"
                 onWheel={handleWheel}
               >
+                <defs>
+                  <marker
+                    id="arrow"
+                    viewBox="0 0 10 10"
+                    refX="20"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+                  </marker>
+                </defs>
                 <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
                   
                   {/* Linhas (Links) */}
@@ -556,8 +703,9 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                           className="transition-all duration-200"
                           stroke={isHighlighted ? 'currentColor' : '#475569'}
                           strokeWidth={isHighlighted ? 2.5 : 1}
-                          strokeOpacity={isHighlighted ? Math.min(0.6, link.value + 0.1) : 0.1}
+                          strokeOpacity={isHighlighted ? 0.6 : 0.1}
                           style={{ color: isHighlighted ? 'var(--primary)' : undefined }}
+                          markerEnd="url(#arrow)"
                         />
                       </g>
                     )
@@ -565,7 +713,8 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
                   {/* Círculos e Rótulos (Nós) */}
                   {nodes.map((node) => {
-                    const theme = getHealthTheme(node.health)
+                    const dependentsCount = dependentsCountMap.get(node.id) || 0
+                    const theme = getNodeTheme(node, dependentsCount)
                     const isFocused = focusedNodeId === node.id || selectedNodeIds.includes(node.id)
                     const isDimmed = (focusedNodeId || hoveredNodeId || selectedNodeIds.length > 0) && !connectedNodeIds.has(node.id)
 
@@ -597,16 +746,33 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                         {/* Corpo do Nó */}
                         <circle
                           r={isFocused ? 12 : (node.flashcardsCount && node.flashcardsCount > 0 ? 10 : 8)}
-                          className={`transition-all duration-300 ${theme.fill} ${isDimmed ? 'opacity-20' : 'opacity-100 shadow-md'}`}
+                          className={`transition-all duration-300 ${
+                            node.isGhost 
+                              ? 'fill-zinc-900 stroke-zinc-500' 
+                              : theme.fill
+                          } ${isDimmed ? 'opacity-20' : 'opacity-100 shadow-md'}`}
                           style={{
-                            boxShadow: !isDimmed ? `0 0 16px ${theme.glow}` : undefined,
-                            stroke: isFocused ? 'currentColor' : 'rgba(255,255,255,0.15)',
-                            strokeWidth: isFocused ? 3 : 1.5,
-                            color: theme.fill.replace('fill-', 'var(--').replace('-500', ')') // quick hack to get currentColor for stroke if needed, but we use tailwind classes
+                            boxShadow: !isDimmed && !node.isGhost ? `0 0 16px ${theme.glow}` : undefined,
+                            stroke: node.isGhost ? 'var(--border)' : (isFocused ? 'currentColor' : 'rgba(255,255,255,0.15)'),
+                            strokeWidth: node.isGhost ? 1.5 : (isFocused ? 3 : 1.5),
+                            strokeDasharray: node.isGhost ? '3,3' : undefined,
+                            color: node.isGhost ? 'var(--text-muted)' : theme.fill.replace('fill-', 'var(--').replace('-500', ')')
                           }}
                           onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
                           onTouchStart={(e) => handleNodeTouchStart(node.id, e)}
                         />
+
+                        {/* Simbolo de '+' em nós fantasma */}
+                        {node.isGhost && (
+                          <text
+                            x={0}
+                            y={3}
+                            textAnchor="middle"
+                            className="text-[9px] font-extrabold fill-zinc-400 select-none pointer-events-none"
+                          >
+                            +
+                          </text>
+                        )}
 
                         {/* Rótulo de Texto */}
                         <text
@@ -628,18 +794,20 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
               {/* Legenda Explicativa do Grafo */}
               <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
                 <div className="bg-surface/90 border border-border rounded-xl p-3 shadow-lg backdrop-blur-sm">
-                  <h4 className="text-[10px] font-bold text-text-strong uppercase tracking-wider mb-2">Saúde (Retenção)</h4>
+                  <h4 className="text-[10px] font-bold text-text-strong uppercase tracking-wider mb-2">Estrutura do Mapa</h4>
                   <div className="flex flex-col gap-1.5 text-xs font-medium text-text-medium">
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div> Dominado (&gt;90%)</div>
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div> Forte (&gt;75%)</div>
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div> Atenção (&gt;60%)</div>
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></div> Ponto Cego (&lt;60%)</div>
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-slate-500"></div> Não Revisado</div>
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-violet-600 shadow-[0_0_8px_rgba(139,92,246,0.5)]"></div> Conceito Alvo (Final)</div>
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div> Intermediário</div>
+                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div> Conceito Base (Fundamento)</div>
+                    <div className="flex items-center gap-2">
+                      <div className="size-2.5 rounded-full bg-zinc-900 border border-dashed border-zinc-500"></div>
+                      <span>Pré-requisito Ausente</span>
+                    </div>
                   </div>
                 </div>
                 <div className="pointer-events-none opacity-45 text-[10px] text-text-muted select-none text-right font-medium leading-normal">
                   Ctrl/Shift+Click para multiseleção<br />
-                  Arraste para reorganizar
+                  Arraste para organizar
                 </div>
               </div>
 
@@ -691,7 +859,14 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
         >
           <div className="flex-1 overflow-y-auto pr-1">
             <header className="flex items-start justify-between gap-3 mb-5 shrink-0">
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${selectedNote ? getHealthTheme(nodes.find(n => n.id === selectedNote.id)?.health).bg : 'bg-slate-700'} text-white`}>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                selectedNote 
+                  ? getNodeTheme(
+                      nodes.find(n => n.id === selectedNote.id) || { id: selectedNote.id, label: selectedNote.title, topic: selectedNote.topic, isGhost: selectedNote.isGhost },
+                      dependentsCountMap.get(selectedNote.id) || 0
+                    ).bg 
+                  : 'bg-slate-700'
+              } text-white`}>
                 {selectedNote?.topic || 'Geral'}
               </span>
               <button 
@@ -757,21 +932,46 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
           {/* Botões de Ação na base */}
           {selectedNote && (
             <div className="border-t border-border pt-4 mt-4 shrink-0 space-y-2.5">
-              <Link 
-                href={`/dashboard/${selectedWorkspaceId}/note/${selectedNote.id}`}
-                className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
-              >
-                <BookOpen className="size-3.5" />
-                Abrir no Editor
-                <ArrowRight className="size-3.5" />
-              </Link>
-              <button 
-                onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
-                className="btn-ghost w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
-              >
-                <MessageSquare className="size-3.5" />
-                Conversar no Assistente
-              </button>
+              {selectedNote.isGhost ? (
+                <button 
+                  onClick={handleCreateFromGhost}
+                  disabled={isCreatingNote}
+                  className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className={`size-3.5 ${isCreatingNote ? 'animate-spin' : ''}`} />
+                  {isCreatingNote ? 'Criando nota...' : 'Criar Nota do Conceito'}
+                </button>
+              ) : (
+                <>
+                  <Link 
+                    href={`/dashboard/${selectedWorkspaceId}/note/${selectedNote.id}`}
+                    className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+                  >
+                    <BookOpen className="size-3.5" />
+                    Abrir no Editor
+                    <ArrowRight className="size-3.5" />
+                  </Link>
+                  <button 
+                    onClick={handleExportRoadmap}
+                    disabled={isGeneratingRoadmap}
+                    className="btn-ghost w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border border-border hover:bg-surface-muted"
+                  >
+                    {isGeneratingRoadmap ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <ListChecks className="size-3.5" />
+                    )}
+                    <span>📋 Gerar Roteiro de Estudo</span>
+                  </button>
+                  <button 
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
+                    className="btn-ghost w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+                  >
+                    <MessageSquare className="size-3.5" />
+                    Conversar no Assistente
+                  </button>
+                </>
+              )}
             </div>
           )}
         </aside>
