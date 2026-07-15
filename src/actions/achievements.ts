@@ -241,33 +241,43 @@ export async function getUserStreak(userId: string): Promise<number> {
     .order('study_date', { ascending: false })
     .limit(365)
 
+  if (!logs || logs.length === 0) return 0
+
+  // Extrai datas únicas normalizadas para YYYY-MM-DD
+  const dateStrings = Array.from(new Set(logs.map(l => {
+    const datePart = l.study_date?.split('T')[0] || l.study_date
+    return datePart
+  })))
+
+  const today = new Date()
+  const todayStr = getLocalISODate(today)
+  
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayStr = getLocalISODate(yesterday)
+
   let streak = 0
-  if (logs && logs.length > 0) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    let currentDate = new Date(today)
-    for (const log of logs) {
-      const logDate = new Date(log.study_date)
-      logDate.setHours(0, 0, 0, 0)
-      
-      if (logDate.getTime() === currentDate.getTime()) {
-        streak++
-        currentDate.setDate(currentDate.getDate() - 1)
-      } else {
-        // Se hoje ainda nÃ£o foi estudado, permitimos pular hoje para ontem
-        const yesterday = new Date(today)
-        yesterday.setDate(yesterday.getDate() - 1)
+  let checkDate: Date
 
-        if (currentDate.getTime() === today.getTime() && logDate.getTime() === yesterday.getTime()) {
-          currentDate.setDate(currentDate.getDate() - 1)
-          continue
-        }
+  if (dateStrings.includes(todayStr)) {
+    checkDate = today
+  } else if (dateStrings.includes(yesterdayStr)) {
+    checkDate = yesterday
+  } else {
+    return 0
+  }
 
-        break // A streak quebra de verdade
-      }
+  // Conta dias consecutivos retroagindo a partir da data de início encontrada
+  while (true) {
+    const checkStr = getLocalISODate(checkDate)
+    if (dateStrings.includes(checkStr)) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    } else {
+      break
     }
   }
+
   return streak
 }
 
