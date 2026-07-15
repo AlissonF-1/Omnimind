@@ -9,7 +9,11 @@ import 'katex/dist/katex.min.css'
 import { updateNoteContent } from '@/actions/notes'
 import { generateFlashcardsFromNote, createFlashcard, generateAIClozeCard, previewGeneratedFlashcards, saveGeneratedFlashcards } from '@/actions/flashcards'
 import { formatMarkdownWithGroq } from '@/actions/groq'
+import { useAudioRecorder } from '@/hooks/useAudioRecorder'
+import { useHistory } from '@/hooks/useHistory'
 import { createClient } from '@/utils/supabase/client'
+import Sketchpad from './Sketchpad'
+import LaTeXAssist from './LaTeXAssist'
 import {
   ImagePlus,
   Camera,
@@ -37,6 +41,11 @@ import {
   AlertCircle,
   Check,
   Columns,
+  Mic,
+  Undo2,
+  Redo2,
+  PenTool,
+  Sigma,
 } from 'lucide-react'
 
 interface Note {
@@ -203,6 +212,11 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans')
+  const [showSketchpad, setShowSketchpad] = useState(false)
+  const [showLatexAssist, setShowLatexAssist] = useState(false)
+
+  const { isRecording, isTranscribing, transcript, startRecording, stopRecording } = useAudioRecorder()
+  const { value, setValue, push, undo, redo, canUndo, canRedo } = useHistory(initialNote.content || '')
 
   const [activeScrollSource, setActiveScrollSource] = useState<'edit' | 'preview' | null>(null)
 
@@ -243,6 +257,10 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const [showPreviewPanel, setShowPreviewPanel] = useState(false)
   const [isSavingGenerated, setIsSavingGenerated] = useState(false)
 
+  useEffect(() => {
+    setContent(value)
+  }, [value])
+
   const handleSelectionChange = () => {
     const textarea = textareaRef.current
     if (!textarea) return
@@ -277,7 +295,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       if (res.error) throw new Error(res.error)
 
       const newContent = content.slice(0, start) + `**${selected}**` + content.slice(end)
-      setContent(newContent)
+        commitContent(newContent)
       
       showToast('Flashcard Cloze Manual criado!', 'success')
       setSelectedText('')
@@ -313,7 +331,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       if (resDb.error) throw new Error(resDb.error)
 
       const newContent = content.slice(0, start) + `**${selected}**` + content.slice(end)
-      setContent(newContent)
+        commitContent(newContent)
 
       showToast('Cloze gerado por IA com sucesso!', 'success')
       setSelectedText('')
@@ -336,6 +354,33 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const previewRef = useRef<HTMLDivElement>(null)
   const supabase = useMemo(() => createClient(), [])
 
+  const insertAtCursor = (
+    text: string,
+    selection?: { startOffset: number; endOffset: number }
+  ) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const newContent = content.slice(0, start) + text + content.slice(end)
+    commitContent(newContent)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      if (selection) {
+        textarea.setSelectionRange(start + selection.startOffset, start + selection.endOffset)
+      } else {
+        const newPos = start + text.length
+        textarea.setSelectionRange(newPos, newPos)
+      }
+    })
+  }
+
+  const commitContent = (newContent: string, shouldPush = true) => {
+    setContent(newContent)
+    setValue(newContent)
+    if (shouldPush) push(newContent)
+  }
+
   const { wordCount, readingTime } = useMemo(() => {
     const wCount = content.trim() ? content.trim().split(/\s+/).length : 0
     const rTime = Math.ceil(wCount / 200) || 1
@@ -348,6 +393,12 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     }
   }, [viewMode])
 
+  useEffect(() => {
+    if (transcript) {
+      insertAtCursor(transcript + ' ')
+    }
+  }, [transcript])
+
   // Auto‑save focado **exclusivamente** no conteúdo
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -355,6 +406,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         setIsSaving(true)
         try {
           await updateNoteContent(initialNote.id, content)
+          push(content)
         } catch (error) {
           console.error('Erro ao salvar conteúdo:', error)
         } finally {
@@ -364,7 +416,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     }, 1500)
 
     return () => clearTimeout(timer)
-  }, [content, initialNote.id, initialNote.content])
+  }, [content, initialNote.id, initialNote.content, push])
 
   const showToast = (
     text: string,
@@ -379,7 +431,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     const textarea = textareaRef.current
     if (!textarea) return
     const result = action(content, textarea)
-    setContent(result.newContent)
+    commitContent(result.newContent)
     requestAnimationFrame(() => {
       if (!textareaRef.current) return
       textareaRef.current.focus()
@@ -397,7 +449,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
     const newContent = content.slice(0, start) + template + content.slice(end)
-    setContent(newContent)
+    commitContent(newContent)
 
     requestAnimationFrame(() => {
       if (!textareaRef.current) return
@@ -464,7 +516,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         newEnd = start + prefix.length
       }
 
-      setContent(newContent)
+      commitContent(newContent)
       requestAnimationFrame(() => {
         textarea.setSelectionRange(newStart, newEnd)
       })
@@ -501,7 +553,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       if (pairedKeys[prevChar] === nextChar) {
         e.preventDefault()
         const newContent = content.slice(0, start - 1) + content.slice(start + 1)
-        setContent(newContent)
+        commitContent(newContent)
         const newCursor = start - 1
         requestAnimationFrame(() => {
           textarea.setSelectionRange(newCursor, newCursor)
@@ -554,7 +606,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         if (currentLine.trim() === plainPrefix) {
           e.preventDefault()
           const newContent = content.slice(0, lineStart) + content.slice(start)
-          setContent(newContent)
+          commitContent(newContent)
           requestAnimationFrame(() => {
             textarea.setSelectionRange(lineStart, lineStart)
           })
@@ -572,7 +624,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           const newContent = content.slice(0, start) + '\n' + newPrefix + content.slice(start)
           const newCursor = start + 1 + newPrefix.length
-          setContent(newContent)
+          commitContent(newContent)
           requestAnimationFrame(() => {
             textarea.setSelectionRange(newCursor, newCursor)
           })
@@ -588,7 +640,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       if (result.error) {
         showToast('Erro ao formatar com IA: ' + result.error, 'error')
       } else {
-        setContent(result.formattedText)
+        commitContent(result.formattedText)
         showToast('Formatado com IA!', 'success')
       }
     })
@@ -615,7 +667,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       data: { publicUrl },
     } = supabase.storage.from('note_images').getPublicUrl(filePath)
     const separator = content.endsWith('\n') || content === '' ? '' : '\n'
-    setContent((prev) => `${prev}${separator}\n![${file.name}](${publicUrl})\n`)
+    commitContent(`${content}${separator}\n![${file.name}](${publicUrl})\n`)
     setIsUploading(false)
   }
 
@@ -715,6 +767,59 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
             {/* Lado direito: botões */}
             <div className="flex items-center gap-1.5 shrink-0">
+              <div className="hidden md:flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={undo}
+                  disabled={!canUndo}
+                  className="p-1.5 text-text-muted disabled:opacity-30 hover:text-text-strong transition-colors"
+                  title="Desfazer"
+                >
+                  <Undo2 className="size-4" />
+                </button>
+
+                <button
+                  onClick={redo}
+                  disabled={!canRedo}
+                  className="p-1.5 text-text-muted disabled:opacity-30 hover:text-text-strong transition-colors"
+                  title="Refazer"
+                >
+                  <Redo2 className="size-4" />
+                </button>
+
+                <button
+                  onClick={() => setShowSketchpad(true)}
+                  className="p-1.5 text-text-muted hover:text-primary transition-colors"
+                  title="Quadro de Desenho"
+                >
+                  <PenTool className="size-4" />
+                </button>
+
+                <button
+                    onClick={() => {
+                      if (window.innerWidth < 768) {
+                        textareaRef.current?.blur()
+                        setShowLatexAssist(true)
+                        return
+                      }
+                      setShowLatexAssist(!showLatexAssist)
+                    }}
+                  className={`p-1.5 transition-colors ${showLatexAssist ? 'text-primary' : 'text-text-muted hover:text-primary'}`}
+                  title="Símbolos Matemáticos"
+                >
+                  <Sigma className="size-4" />
+                </button>
+
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isTranscribing}
+                  className={`p-1.5 rounded-full transition-all ${isRecording ? 'text-red-500 animate-pulse' : 'text-text-muted hover:text-primary'}`}
+                  title="Gravar áudio para transcrição"
+                >
+                  {isRecording ? <div className="size-2.5 bg-red-500 rounded-full animate-ping" /> : <Mic className="size-4" />}
+                </button>
+                {isTranscribing && <Loader2 className="size-3 animate-spin text-primary ml-1" />}
+              </div>
+
               <button
                 onClick={() => setShowSearch(!showSearch)}
                 className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
@@ -738,7 +843,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               </button>
 
               {/* Seletor de Tipografia */}
-              <div className="flex items-center">
+              <div className="hidden md:flex items-center">
                 <select
                   value={fontFamily}
                   onChange={(e) => setFontFamily(e.target.value as 'sans' | 'serif' | 'mono')}
@@ -791,7 +896,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               </div>
 
               {/* Seletor de Modo Concurso */}
-              <div className="flex items-center">
+              <div className="hidden md:flex items-center">
                 <select
                   value={generationMode}
                   onChange={(e) => setGenerationMode(e.target.value as 'default' | 'concurso')}
@@ -994,7 +1099,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 ref={textareaRef}
                 value={content}
                 onChange={(e) => {
-                  setContent(e.target.value)
+                  commitContent(e.target.value, false)
                   const val = e.target.value
                   const start = e.target.selectionStart
                   if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
@@ -1052,7 +1157,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               ref={textareaRef}
               value={content}
               onChange={(e) => {
-                setContent(e.target.value)
+                commitContent(e.target.value, false)
                 const val = e.target.value
                 const start = e.target.selectionStart
                 if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
@@ -1108,6 +1213,72 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         <div className="flex md:hidden shrink-0 items-center gap-1.5 overflow-x-auto px-3 py-2 border-t border-border/40 bg-surface scrollbar-none z-30">
           <button
             type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              undo()
+            }}
+            disabled={!canUndo}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium disabled:opacity-30 shrink-0"
+            title="Desfazer"
+          >
+            <Undo2 className="size-4" />
+          </button>
+
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              redo()
+            }}
+            disabled={!canRedo}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium disabled:opacity-30 shrink-0"
+            title="Refazer"
+          >
+            <Redo2 className="size-4" />
+          </button>
+
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              setShowSketchpad(true)
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium shrink-0"
+            title="Quadro de Desenho"
+          >
+            <PenTool className="size-4" />
+          </button>
+
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              textareaRef.current?.blur()
+              setShowLatexAssist(true)
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium shrink-0"
+            title="Símbolos Matemáticos"
+          >
+            <Sigma className="size-4" />
+          </button>
+
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              isRecording ? stopRecording() : startRecording()
+            }}
+            disabled={isTranscribing}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted shrink-0 ${isRecording ? 'text-red-500' : 'text-text-medium'} disabled:opacity-30`}
+            title="Gravar áudio para transcrição"
+          >
+            {isRecording ? <div className="size-2.5 rounded-full bg-red-500 animate-ping" /> : <Mic className="size-4" />}
+          </button>
+
+          {isTranscribing && <Loader2 className="size-3 animate-spin text-primary shrink-0" />}
+
+          <button
+            type="button"
             onPointerDown={(e) => { e.preventDefault(); insertTemplateAtCursor() }}
             className="flex h-8 items-center justify-center rounded-lg px-3 text-xs font-bold text-primary bg-primary/10 shrink-0"
           >
@@ -1125,7 +1296,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 const textarea = textareaRef.current
                 if (textarea) {
                   const result = key.action(content, textarea)
-                  setContent(result.newContent)
+                  commitContent(result.newContent)
                   requestAnimationFrame(() => {
                     textarea.focus()
                     textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
@@ -1390,6 +1561,64 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           </div>
         </div>
+      )}
+
+      {/* Modal do Sketchpad */}
+      {showSketchpad && (
+        <Sketchpad
+          noteId={initialNote.id}
+          onClose={() => setShowSketchpad(false)}
+          onSave={(imageUrl) => {
+            insertAtCursor(`\n![Desenho](${imageUrl})\n`)
+            setShowSketchpad(false)
+          }}
+        />
+      )}
+
+      {/* Popover do LaTeX Assist */}
+      {showLatexAssist && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+            onClick={() => setShowLatexAssist(false)}
+          />
+
+          <div className="fixed inset-x-0 bottom-0 z-50 md:hidden h-[40vh] safe-area-bottom">
+            <LaTeXAssist
+              variant="sheet"
+              onInsert={(code, selection) =>
+                insertAtCursor(
+                  ` $$ ${code} $$ `,
+                  selection
+                    ? {
+                        startOffset: selection.startOffset + 4,
+                        endOffset: selection.endOffset + 4,
+                      }
+                    : undefined
+                )
+              }
+              onClose={() => setShowLatexAssist(false)}
+            />
+          </div>
+
+          <div className="hidden md:block absolute bottom-20 left-1/2 -translate-x-1/2 z-50">
+            <LaTeXAssist
+              variant="popover"
+              onInsert={(code, selection) =>
+                insertAtCursor(
+                  ` $$ ${code} $$ `,
+                  selection
+                    ? {
+                        startOffset: selection.startOffset + 4,
+                        endOffset: selection.endOffset + 4,
+                      }
+                    : undefined
+                )
+              }
+              onClose={() => setShowLatexAssist(false)}
+            />
+          </div>
+        </>
       )}
     </div>
   )
