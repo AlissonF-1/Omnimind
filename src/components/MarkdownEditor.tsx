@@ -662,7 +662,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   }
 
   return (
-    <div className="relative flex h-[100dvh] flex-col bg-background">
+    <div className="relative flex h-full min-h-0 w-full flex-col bg-background">
       {/* Toast */}
       {toast && (
         <div
@@ -950,59 +950,61 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
           </div>
         )}
 
-        <div className="h-full w-full overflow-y-auto custom-scrollbar">
-          <div className="max-w-3xl mx-auto h-full px-4 py-6 md:px-8">
-            {viewMode === 'edit' ? (
-              <textarea
-                ref={textareaRef}
-                value={content}
-                onChange={(e) => {
-                  setContent(e.target.value)
-                  const val = e.target.value
-                  const start = e.target.selectionStart
-                  if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
-                    setShowSlashMenu(true)
-                  } else if (showSlashMenu) {
-                    setShowSlashMenu(false)
-                  }
-                }}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                onSelect={handleSelectionChange}
-                onKeyUp={handleSelectionChange}
-                onMouseUp={handleSelectionChange}
-                placeholder="Comece a anotar…"
-                autoCorrect="on"
-                spellCheck
-                className={`h-full w-full resize-none bg-transparent outline-none placeholder:text-text-muted pb-32 border-none ring-0 focus:ring-0 ${
-                  fontFamily === 'sans'
-                    ? 'font-sans text-base leading-relaxed tracking-wide'
-                    : fontFamily === 'serif'
-                    ? 'font-serif text-base md:text-lg leading-relaxed'
-                    : 'font-mono text-sm leading-7'
-                } text-text-strong`}
-              />
-            ) : (
-              <div
-                ref={previewRef}
-                className={`prose prose-sm max-w-none pb-24 ${
-                  fontFamily === 'sans'
-                    ? 'font-sans'
-                    : fontFamily === 'serif'
-                    ? 'font-serif'
-                    : 'font-mono'
-                }`}
-              >
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                >
-                  {content || '*A nota está vazia.*'}
-                </ReactMarkdown>
-              </div>
-            )}
+        {viewMode === 'edit' ? (
+          <div className="h-full w-full px-4 py-4 md:px-8">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => {
+                setContent(e.target.value)
+                const val = e.target.value
+                const start = e.target.selectionStart
+                if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
+                  setShowSlashMenu(true)
+                } else if (showSlashMenu) {
+                  setShowSlashMenu(false)
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onSelect={handleSelectionChange}
+              onKeyUp={handleSelectionChange}
+              onMouseUp={handleSelectionChange}
+              placeholder="Comece a anotar…"
+              autoCorrect="on"
+              spellCheck
+              className={`mx-auto max-w-3xl h-full w-full resize-none bg-transparent outline-none placeholder:text-text-muted pb-32 focus:outline-none focus:ring-0 focus:border-none border-none ring-0 ${
+                fontFamily === 'sans'
+                  ? 'font-sans text-base leading-relaxed tracking-wide'
+                  : fontFamily === 'serif'
+                  ? 'font-serif text-base md:text-lg leading-relaxed'
+                  : 'font-mono text-sm leading-7'
+              } text-text-strong block`}
+            />
           </div>
-        </div>
+        ) : (
+          <div
+            ref={previewRef}
+            className="h-full w-full overflow-y-auto custom-scrollbar px-4 py-6 md:px-8"
+          >
+            <div
+              className={`mx-auto max-w-3xl prose prose-sm max-w-none pb-24 ${
+                fontFamily === 'sans'
+                  ? 'font-sans'
+                  : fontFamily === 'serif'
+                  ? 'font-serif'
+                  : 'font-mono'
+              }`}
+            >
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+              >
+                {content || '*A nota está vazia.*'}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Mobile Accessory Bar (Scrollable syntax toolbar for mobile keyboards) ── */}
