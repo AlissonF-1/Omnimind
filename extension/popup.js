@@ -1,3 +1,30 @@
+const LOCAL_API_BASE = 'http://localhost:3000';
+const PROD_API_BASE = 'https://omnimind-tau.vercel.app';
+
+async function resolveApiBaseUrl() {
+  const storage = await chrome.storage.local.get(['clipperApiBaseUrl']);
+  if (storage.clipperApiBaseUrl) {
+    return storage.clipperApiBaseUrl;
+  }
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.url) {
+    try {
+      const tabUrl = new URL(tab.url);
+      if (tabUrl.hostname === 'omnimind-tau.vercel.app') {
+        return PROD_API_BASE;
+      }
+      if (tabUrl.hostname === 'localhost' || tabUrl.hostname === '127.0.0.1') {
+        return LOCAL_API_BASE;
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel identificar a URL da aba ativa.', error);
+    }
+  }
+
+  return PROD_API_BASE;
+}
+
 // Função para carregar os workspaces da sua API
 async function loadWorkspaces() {
   const select = document.getElementById('workspaceSelect');
@@ -8,7 +35,8 @@ async function loadWorkspaces() {
   status.className = '';
 
   try {
-    const response = await fetch('http://localhost:3000/api/clipper/workspaces', {
+    const apiBaseUrl = await resolveApiBaseUrl();
+    const response = await fetch(`${apiBaseUrl}/api/clipper/workspaces`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
@@ -183,13 +211,14 @@ document.getElementById('clipBtn').addEventListener('click', async () => {
     });
 
     const data = results[0].result;
+    const apiBaseUrl = await resolveApiBaseUrl();
     status.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; animation: spin 1s linear infinite;" class="animate-spin"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Convertendo para Markdown...</span>`;
 
     const markdown = htmlToMarkdown(data.html);
 
     status.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; animation: spin 1s linear infinite;" class="animate-spin"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Enviando para o OmniMind...</span>`;
     
-    const response = await fetch('http://localhost:3000/api/clipper', {
+    const response = await fetch(`${apiBaseUrl}/api/clipper`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -211,7 +240,7 @@ document.getElementById('clipBtn').addEventListener('click', async () => {
       status.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> <span>Nota salva com sucesso!</span>`;
       status.className = 'success';
 
-      const noteUrl = `http://localhost:3000/dashboard/${json.workspaceId}/note/${json.noteId}`;
+      const noteUrl = `${apiBaseUrl}/dashboard/${json.workspaceId}/note/${json.noteId}`;
       const notificationId = "clip_" + Date.now();
 
       // Salva a associação no storage para cliques no balão

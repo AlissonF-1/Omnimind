@@ -1,3 +1,24 @@
+const LOCAL_API_BASE = "http://localhost:3000";
+const PROD_API_BASE = "https://omnimind-tau.vercel.app";
+
+function resolveApiBaseUrlFromTabUrl(tabUrl) {
+  if (!tabUrl) return PROD_API_BASE;
+
+  try {
+    const parsedUrl = new URL(tabUrl);
+    if (parsedUrl.hostname === "omnimind-tau.vercel.app") {
+      return PROD_API_BASE;
+    }
+    if (parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1") {
+      return LOCAL_API_BASE;
+    }
+  } catch (error) {
+    console.warn("Nao foi possivel identificar a URL da aba ativa.", error);
+  }
+
+  return PROD_API_BASE;
+}
+
 // Cria a opção no menu de contexto ao instalar
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -60,9 +81,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       // 4. Busca o workspace preferencial do storage
       const storage = await chrome.storage.local.get(["clipperWorkspaceId"]);
       const workspaceId = storage.clipperWorkspaceId || null;
+      const apiBaseUrl = resolveApiBaseUrlFromTabUrl(url);
 
       // 5. Envia para o backend do OmniMind
-      const response = await fetch("http://localhost:3000/api/clipper", {
+      const response = await fetch(`${apiBaseUrl}/api/clipper`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -80,7 +102,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
       const json = await response.json();
       if (json.success && json.noteId && json.workspaceId) {
-        const noteUrl = `http://localhost:3000/dashboard/${json.workspaceId}/note/${json.noteId}`;
+        const noteUrl = `${apiBaseUrl}/dashboard/${json.workspaceId}/note/${json.noteId}`;
         const notificationId = "clip_" + Date.now();
 
         // Salva a associação no storage para cliques no balão
