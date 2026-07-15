@@ -79,6 +79,59 @@ function applyLinePrefix(
   }
 }
 
+function handleIndent(content: string, textarea: HTMLTextAreaElement) {
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const lineStart = content.lastIndexOf('\n', start - 1) + 1
+  const newContent = content.slice(0, lineStart) + '  ' + content.slice(lineStart)
+  return {
+    newContent,
+    cursorStart: start + 2,
+    cursorEnd: end + 2,
+  }
+}
+
+function handleOutdent(content: string, textarea: HTMLTextAreaElement) {
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const lineStart = content.lastIndexOf('\n', start - 1) + 1
+  const lineEnd = content.indexOf('\n', start)
+  const targetLine = content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd)
+  
+  let removeCount = 0
+  let newLine = targetLine
+  if (targetLine.startsWith('  ')) {
+    newLine = targetLine.substring(2)
+    removeCount = 2
+  } else if (targetLine.startsWith('\t')) {
+    newLine = targetLine.substring(1)
+    removeCount = 1
+  } else if (targetLine.startsWith(' ')) {
+    newLine = targetLine.substring(1)
+    removeCount = 1
+  }
+
+  const newContent = content.slice(0, lineStart) + newLine + content.slice(lineEnd === -1 ? content.length : lineEnd)
+  const newStart = Math.max(lineStart, start - removeCount)
+  const newEnd = Math.max(lineStart, end - removeCount)
+  return {
+    newContent,
+    cursorStart: newStart,
+    cursorEnd: newEnd,
+  }
+}
+
+const MOBILE_ACCESSORY_KEYS = [
+  { label: '#', title: 'Título', action: (c: string, t: HTMLTextAreaElement) => applyLinePrefix(c, t, '## ') },
+  { label: '**', title: 'Negrito', action: (c: string, t: HTMLTextAreaElement) => applyInlineWrap(c, t, '**') },
+  { label: '*', title: 'Itálico', action: (c: string, t: HTMLTextAreaElement) => applyInlineWrap(c, t, '*') },
+  { label: 'Lista', title: 'Lista', action: (c: string, t: HTMLTextAreaElement) => applyLinePrefix(c, t, '- ') },
+  { label: '[ ]', title: 'Checklist', action: (c: string, t: HTMLTextAreaElement) => applyLinePrefix(c, t, '- [ ] ') },
+  { label: '$', title: 'Matemática', action: (c: string, t: HTMLTextAreaElement) => applyInlineWrap(c, t, '$') },
+  { label: 'Tab', title: 'Identar', action: (c: string, t: HTMLTextAreaElement) => handleIndent(c, t) },
+  { label: 'Shift+Tab', title: 'Recuar', action: (c: string, t: HTMLTextAreaElement) => handleOutdent(c, t) },
+]
+
 const TOOLBAR_ACTIONS = [
   {
     label: 'H2',
@@ -148,6 +201,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const [isFocusMode, setIsFocusMode] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans')
 
   // 🔹 PASSO 1: Estado para o modo de geração
   const [generationMode, setGenerationMode] = useState<'default' | 'concurso'>('default')
@@ -350,6 +404,162 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const isSelection = start !== end
+    const selected = content.slice(start, end)
+
+    // 1. Envelopamento de seleção (surround selection) e auto-fechamento
+    const pairs: Record<string, [string, string]> = {
+      '(': ['(', ')'],
+      '[': ['[', ']'],
+      '{': ['{', '}'],
+      '"': ['"', '"'],
+      "'": ["'", "'"],
+      '*': ['*', '*'],
+      '_': ['_', '_'],
+      '$': ['$', '$'],
+      '`': ['`', '`'],
+    }
+
+    if (e.key in pairs) {
+      e.preventDefault()
+      const [prefix, suffix] = pairs[e.key]
+      let newContent = ''
+      let newStart = start
+      let newEnd = end
+
+      if (isSelection) {
+        newContent = content.slice(0, start) + prefix + selected + suffix + content.slice(end)
+        newStart = start + prefix.length
+        newEnd = end + prefix.length
+      } else {
+        newContent = content.slice(0, start) + prefix + suffix + content.slice(end)
+        newStart = start + prefix.length
+        newEnd = start + prefix.length
+      }
+
+      setContent(newContent)
+      requestAnimationFrame(() => {
+        textarea.setSelectionRange(newStart, newEnd)
+      })
+      return
+    }
+
+    // 1.1 Avança o cursor se digitar o caractere de fechamento que já está na frente
+    const nextChar = content[start]
+    const closers = [')', ']', '}', '"', "'", '`', '*', '_', '$']
+    if (closers.includes(e.key) && nextChar === e.key && !isSelection) {
+      e.preventDefault()
+      const newCursor = start + 1
+      requestAnimationFrame(() => {
+        textarea.setSelectionRange(newCursor, newCursor)
+      })
+      return
+    }
+
+    // 1.2 Backspace inteligente (deleta o par auto-fechado de uma vez)
+    if (e.key === 'Backspace' && !isSelection) {
+      const prevChar = content[start - 1]
+      const nextChar = content[start]
+      const pairedKeys: Record<string, string> = {
+        '(': ')',
+        '[': ']',
+        '{': '}',
+        '"': '"',
+        "'": "'",
+        '`': '`',
+        '*': '*',
+        '_': '_',
+        '$': '$',
+      }
+      if (pairedKeys[prevChar] === nextChar) {
+        e.preventDefault()
+        const newContent = content.slice(0, start - 1) + content.slice(start + 1)
+        setContent(newContent)
+        const newCursor = start - 1
+        requestAnimationFrame(() => {
+          textarea.setSelectionRange(newCursor, newCursor)
+        })
+        return
+      }
+    }
+
+    // 2. Atalhos de Teclado Universais
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault()
+      handleToolbarAction((c: string, t: HTMLTextAreaElement) => applyInlineWrap(c, t, '**'))
+      return
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+      e.preventDefault()
+      handleToolbarAction((c: string, t: HTMLTextAreaElement) => applyInlineWrap(c, t, '*'))
+      return
+    }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+      e.preventDefault()
+      handleToolbarAction((c: string, t: HTMLTextAreaElement) => applyLinePrefix(c, t, '- [ ] '))
+      return
+    }
+
+    // 3. Tab e Shift+Tab para recuo/avanço de listas
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      if (e.shiftKey) {
+        handleToolbarAction((c: string, t: HTMLTextAreaElement) => handleOutdent(c, t))
+      } else {
+        handleToolbarAction((c: string, t: HTMLTextAreaElement) => handleIndent(c, t))
+      }
+      return
+    }
+
+    // 4. Continuação Inteligente de Linhas (Smart Enter)
+    if (e.key === 'Enter') {
+      const lineStart = content.lastIndexOf('\n', start - 1) + 1
+      const currentLine = content.slice(lineStart, start)
+
+      // Listas ordenadas, desordenadas, checklists, citações
+      const listRegex = /^(\s*-\s*\[\s*[x ]\s*\]\s*|\s*-\s*|\s*\*\s*|\s*\d+\.\s*|\s*>\s*)/
+      const match = currentLine.match(listRegex)
+
+      if (match) {
+        const prefix = match[1]
+        const plainPrefix = prefix.replace('[ ]', '').replace('[x]', '').trim()
+        
+        if (currentLine.trim() === plainPrefix) {
+          e.preventDefault()
+          const newContent = content.slice(0, lineStart) + content.slice(start)
+          setContent(newContent)
+          requestAnimationFrame(() => {
+            textarea.setSelectionRange(lineStart, lineStart)
+          })
+        } else {
+          e.preventDefault()
+          let newPrefix = prefix
+          const numMatch = prefix.match(/^(\s*)(\d+)(\.\s*)$/)
+          if (numMatch) {
+            const nextNum = parseInt(numMatch[2], 10) + 1
+            newPrefix = `${numMatch[1]}${nextNum}${numMatch[3]}`
+          }
+          if (newPrefix.includes('[x]')) {
+            newPrefix = newPrefix.replace('[x]', '[ ]')
+          }
+
+          const newContent = content.slice(0, start) + '\n' + newPrefix + content.slice(start)
+          const newCursor = start + 1 + newPrefix.length
+          setContent(newContent)
+          requestAnimationFrame(() => {
+            textarea.setSelectionRange(newCursor, newCursor)
+          })
+        }
+      }
+    }
+  }
+
   const handleAIAssist = () => {
     if (!content.trim() || isPendingGroq) return
     startTransition(async () => {
@@ -505,6 +715,20 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               >
                 <Maximize className="size-4" />
               </button>
+
+              {/* Seletor de Tipografia */}
+              <div className="flex items-center">
+                <select
+                  value={fontFamily}
+                  onChange={(e) => setFontFamily(e.target.value as 'sans' | 'serif' | 'mono')}
+                  className="h-8 rounded-lg border border-border bg-surface-muted px-1.5 text-[10px] sm:text-xs font-semibold text-text-strong outline-none focus:border-primary/50 cursor-pointer"
+                  title="Tipografia"
+                >
+                  <option value="sans">Aa Sans</option>
+                  <option value="serif">Aa Serif</option>
+                  <option value="mono">Aa Mono</option>
+                </select>
+              </div>
 
               <div className="flex rounded-lg border border-border bg-surface-muted p-0.5 shrink-0">
                 <button
@@ -726,43 +950,133 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
           </div>
         )}
 
-        {viewMode === 'edit' ? (
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => {
-              setContent(e.target.value)
-              const val = e.target.value
-              const start = e.target.selectionStart
-              if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
-                setShowSlashMenu(true)
-              } else if (showSlashMenu) {
-                setShowSlashMenu(false)
+        <div className="h-full w-full overflow-y-auto custom-scrollbar">
+          <div className="max-w-3xl mx-auto h-full px-4 py-6 md:px-8">
+            {viewMode === 'edit' ? (
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value)
+                  const val = e.target.value
+                  const start = e.target.selectionStart
+                  if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
+                    setShowSlashMenu(true)
+                  } else if (showSlashMenu) {
+                    setShowSlashMenu(false)
+                  }
+                }}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                onSelect={handleSelectionChange}
+                onKeyUp={handleSelectionChange}
+                onMouseUp={handleSelectionChange}
+                placeholder="Comece a anotar…"
+                autoCorrect="on"
+                spellCheck
+                className={`h-full w-full resize-none bg-transparent outline-none placeholder:text-text-muted pb-32 border-none ring-0 focus:ring-0 ${
+                  fontFamily === 'sans'
+                    ? 'font-sans text-base leading-relaxed tracking-wide'
+                    : fontFamily === 'serif'
+                    ? 'font-serif text-base md:text-lg leading-relaxed'
+                    : 'font-mono text-sm leading-7'
+                } text-text-strong`}
+              />
+            ) : (
+              <div
+                ref={previewRef}
+                className={`prose prose-sm max-w-none pb-24 ${
+                  fontFamily === 'sans'
+                    ? 'font-sans'
+                    : fontFamily === 'serif'
+                    ? 'font-serif'
+                    : 'font-mono'
+                }`}
+              >
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                >
+                  {content || '*A nota está vazia.*'}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Mobile Accessory Bar (Scrollable syntax toolbar for mobile keyboards) ── */}
+      {viewMode === 'edit' && (
+        <div className="flex md:hidden shrink-0 items-center gap-1.5 overflow-x-auto px-3 py-2 border-t border-border/40 bg-surface scrollbar-none z-30">
+          <button
+            type="button"
+            onPointerDown={(e) => { e.preventDefault(); insertTemplateAtCursor() }}
+            className="flex h-8 items-center justify-center rounded-lg px-3 text-xs font-bold text-primary bg-primary/10 shrink-0"
+          >
+            Template
+          </button>
+          
+          <div className="h-4 w-px shrink-0 bg-border" />
+
+          {MOBILE_ACCESSORY_KEYS.map((key) => (
+            <button
+              key={key.label}
+              type="button"
+              onPointerDown={(e) => { 
+                e.preventDefault()
+                const textarea = textareaRef.current
+                if (textarea) {
+                  const result = key.action(content, textarea)
+                  setContent(result.newContent)
+                  requestAnimationFrame(() => {
+                    textarea.focus()
+                    textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
+                  })
+                }
+              }}
+              className="flex h-8 min-w-[36px] items-center justify-center rounded-lg border border-border/60 bg-surface-muted px-2.5 text-xs font-bold text-text-medium active:bg-primary/10 active:text-primary shrink-0"
+              title={key.title}
+            >
+              {key.label}
+            </button>
+          ))}
+
+          <div className="h-4 w-px shrink-0 bg-border" />
+          
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              const textarea = textareaRef.current
+              if (textarea) {
+                const pos = Math.max(0, textarea.selectionStart - 1)
+                textarea.focus()
+                textarea.setSelectionRange(pos, pos)
               }
             }}
-            onPaste={handlePaste}
-            onSelect={handleSelectionChange}
-            onKeyUp={handleSelectionChange}
-            onMouseUp={handleSelectionChange}
-            placeholder="Comece a anotar…"
-            autoCorrect="on"
-            spellCheck
-            className="h-full w-full resize-none bg-transparent px-4 py-4 font-mono text-sm leading-7 text-text-strong outline-none placeholder:text-text-muted pb-24"
-          />
-        ) : (
-          <div
-            ref={previewRef}
-            className="prose prose-sm h-full max-w-none overflow-y-auto px-4 py-4"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium shrink-0 font-bold"
+            title="Mover cursor esquerda"
           >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
-            >
-              {content || '*A nota está vazia.*'}
-            </ReactMarkdown>
-          </div>
-        )}
-      </div>
+            ←
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              const textarea = textareaRef.current
+              if (textarea) {
+                const pos = Math.min(content.length, textarea.selectionStart + 1)
+                textarea.focus()
+                textarea.setSelectionRange(pos, pos)
+              }
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium shrink-0 font-bold"
+            title="Mover cursor direita"
+          >
+            →
+          </button>
+        </div>
+      )}
 
       {/* ── Barra de ferramentas inferior (apenas modo edição) ──────── */}
       {viewMode === 'edit' && !isFocusMode && (
