@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Check,
+  Columns,
 } from 'lucide-react'
 
 interface Note {
@@ -187,7 +188,7 @@ const TOOLBAR_ACTIONS = [
 export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   // Título removido do estado local – gerenciado fora (na sidebar)
   const [content, setContent] = useState(initialNote.content || '')
-  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit')
+  const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'split'>('edit')
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -202,6 +203,26 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans')
+
+  const [activeScrollSource, setActiveScrollSource] = useState<'edit' | 'preview' | null>(null)
+
+  const handleEditScroll = () => {
+    const edit = textareaRef.current
+    const preview = previewRef.current
+    if (!edit || !preview || viewMode !== 'split' || activeScrollSource !== 'edit') return
+
+    const percentage = edit.scrollTop / (edit.scrollHeight - edit.clientHeight)
+    preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight)
+  }
+
+  const handlePreviewScroll = () => {
+    const edit = textareaRef.current
+    const preview = previewRef.current
+    if (!edit || !preview || viewMode !== 'split' || activeScrollSource !== 'preview') return
+
+    const percentage = preview.scrollTop / (preview.scrollHeight - preview.clientHeight)
+    edit.scrollTop = percentage * (edit.scrollHeight - edit.clientHeight)
+  }
 
   // 🔹 PASSO 1: Estado para o modo de geração
   const [generationMode, setGenerationMode] = useState<'default' | 'concurso'>('default')
@@ -755,6 +776,18 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 >
                   <Eye className="size-3.5" />
                 </button>
+                <button
+                  onClick={() => setViewMode('split')}
+                  aria-label="Lado a Lado"
+                  title="Modo Dividido (Lado a Lado)"
+                  className={`hidden md:flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                    viewMode === 'split'
+                      ? 'bg-surface text-text-strong shadow-sm'
+                      : 'text-text-muted'
+                  }`}
+                >
+                  <Columns className="size-3.5" />
+                </button>
               </div>
 
               {/* Seletor de Modo Concurso */}
@@ -950,7 +983,70 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
           </div>
         )}
 
-        {viewMode === 'edit' ? (
+        {viewMode === 'split' ? (
+          <div className="h-full w-full flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
+            {/* Esquerda: Editor */}
+            <div 
+              className="h-full w-full md:w-1/2 overflow-hidden px-4 py-4 md:px-6 flex flex-col"
+              onMouseEnter={() => setActiveScrollSource('edit')}
+            >
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value)
+                  const val = e.target.value
+                  const start = e.target.selectionStart
+                  if (val[start - 1] === '/' && (start === 1 || val[start - 2] === '\n' || val[start - 2] === ' ')) {
+                    setShowSlashMenu(true)
+                  } else if (showSlashMenu) {
+                    setShowSlashMenu(false)
+                  }
+                }}
+                onKeyDown={handleKeyDown}
+                onScroll={handleEditScroll}
+                onPaste={handlePaste}
+                onSelect={handleSelectionChange}
+                onKeyUp={handleSelectionChange}
+                onMouseUp={handleSelectionChange}
+                placeholder="Comece a anotar…"
+                autoCorrect="on"
+                spellCheck
+                className={`h-full w-full resize-none bg-transparent outline-none placeholder:text-text-muted pb-32 focus:outline-none focus:ring-0 focus:border-none border-none ring-0 ${
+                  fontFamily === 'sans'
+                    ? 'font-sans text-base leading-relaxed tracking-wide'
+                    : fontFamily === 'serif'
+                    ? 'font-serif text-base md:text-lg leading-relaxed'
+                    : 'font-mono text-sm leading-7'
+                } text-text-strong block`}
+              />
+            </div>
+            {/* Direita: Preview */}
+            <div 
+              ref={previewRef}
+              onMouseEnter={() => setActiveScrollSource('preview')}
+              onScroll={handlePreviewScroll}
+              className="hidden md:block h-full w-full md:w-1/2 overflow-y-auto custom-scrollbar px-4 py-4 md:px-6"
+            >
+              <div
+                className={`prose prose-sm max-w-none pb-24 ${
+                  fontFamily === 'sans'
+                    ? 'font-sans'
+                    : fontFamily === 'serif'
+                    ? 'font-serif'
+                    : 'font-mono'
+                }`}
+              >
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                >
+                  {content || '*A nota está vazia.*'}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        ) : viewMode === 'edit' ? (
           <div className="h-full w-full px-4 py-4 md:px-8">
             <textarea
               ref={textareaRef}
