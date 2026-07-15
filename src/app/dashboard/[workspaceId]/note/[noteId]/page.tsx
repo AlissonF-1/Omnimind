@@ -1,6 +1,6 @@
 import { getNoteById } from '@/actions/notes'
 import MarkdownEditor from '@/components/MarkdownEditor'
-import PdfImporter from '@/components/PdfImporter'
+import CollapsiblePdfImporter from '@/components/CollapsiblePdfImporter'
 import EditableNoteTitle from '@/components/EditableNoteTitle' // Importamos o novo componente
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -97,15 +97,7 @@ export default async function NotePage({
         </div>
       </header>
 
-      <section className="mb-4 rounded-xl border border-border bg-surface-muted/30 p-3 sm:p-4 transition-colors hover:border-primary/30">
-        <div className="flex items-center gap-2 mb-2">
-          <FileText className="size-4 text-primary" />
-          <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Importar PDF
-          </span>
-        </div>
-        <PdfImporter workspaceId={resolvedParams.workspaceId} />
-      </section>
+      <CollapsiblePdfImporter workspaceId={resolvedParams.workspaceId} />
 
       <section className="flex-1 min-h-0">
         <Suspense
