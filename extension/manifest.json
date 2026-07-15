@@ -12,6 +12,7 @@
   ],
   "host_permissions": [
     "http://localhost:3000/*",
+    "https://omnimind-tau.vercel.app/*",
     "https://localhost:3000/*"
   ],
   "background": {
