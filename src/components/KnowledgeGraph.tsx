@@ -76,8 +76,25 @@ function getNodeTheme(node: GraphNode, dependentsCount: number) {
   }
 }
 
+// Hook para detectar se é mobile
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  return isMobile
+}
+
 export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('')
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false)
   const [isCreatingNote, setIsCreatingNote] = useState(false)
@@ -110,6 +127,12 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+
+  // Dimensões responsivas
+  const width = isMobile ? 600 : 800
+  const height = isMobile ? 400 : 550
+  const centerX = width / 2
+  const centerY = height / 2
 
   const dependentsCountMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -178,11 +201,6 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
     }
   }
 
-  const width = 800
-  const height = 550
-  const centerX = width / 2
-  const centerY = height / 2
-
   // 1. Carrega dados do grafo ao alterar o workspace
   useEffect(() => {
     if (workspaces.length > 0 && !selectedWorkspaceId) {
@@ -200,7 +218,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
       // Inicializa posições circulares ordenadas em torno do centro
       const simulated: SimulatedNode[] = data.nodes.map((node, index) => {
         const angle = (index / data.nodes.length) * 2 * Math.PI
-        const radius = 120 + Math.random() * 60
+        const radius = isMobile ? 80 + Math.random() * 40 : 120 + Math.random() * 60
         return {
           ...node,
           x: centerX + radius * Math.cos(angle),
@@ -219,7 +237,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [centerX, centerY])
+  }, [centerX, centerY, isMobile])
 
   useEffect(() => {
     if (selectedWorkspaceId) {
@@ -245,10 +263,10 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
             const dx = v.x - u.x
             const dy = v.y - u.y
             const dist = Math.sqrt(dx * dx + dy * dy) || 0.1
-            if (dist < 280) {
-              const force = 180 / (dist * dist)
-              const fx = force * (dx / dist)
-              const fy = force * (dy / dist)
+            if (dist < (isMobile ? 180 : 280)) {
+              const force = isMobile ? 120 : 180
+              const fx = force / (dist * dist) * (dx / dist)
+              const fy = force / (dist * dist) * (dy / dist)
               if (u.id !== draggedNodeId) {
                 u.vx -= fx
                 u.vy -= fy
@@ -270,7 +288,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
           const dx = v.x - u.x
           const dy = v.y - u.y
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.1
-          const desiredLen = 150
+          const desiredLen = isMobile ? 100 : 150
           const force = (dist - desiredLen) * 0.02 * link.value
           const fx = force * (dx / dist)
           const fy = force * (dy / dist)
@@ -310,7 +328,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
     animId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(animId)
-  }, [graphData.links, draggedNodeId, centerX, centerY, nodes.length])
+  }, [graphData.links, draggedNodeId, centerX, centerY, nodes.length, isMobile])
 
   // 3. Zoom e Navegação do Canvas
   const zoom = (factor: number) => {
@@ -541,44 +559,47 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
   const hasConnections = graphData.links.length > 0
 
   return (
-    <div className="relative flex flex-col h-[calc(100dvh-110px)] md:h-[calc(100vh-120px)] min-h-[500px] bg-background text-text-strong rounded-2xl border border-border overflow-hidden">
+    <div className="relative flex flex-col h-[calc(100dvh-110px)] md:h-[calc(100vh-120px)] min-h-[400px] bg-background text-text-strong rounded-2xl border border-border overflow-hidden">
       
-      {/* 🟢 Header de controle */}
-      <header className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-border bg-surface shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-soft text-primary rounded-lg">
-            <Network className="size-5" />
+      {/* 🟢 Header de controle - Mobile otimizado */}
+      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-3 md:p-4 border-b border-border bg-surface shrink-0">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="p-1.5 md:p-2 bg-primary-soft text-primary rounded-lg">
+            <Network className="size-4 md:size-5" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-text-strong">Rede de Conexões</h1>
-            <p className="text-xs text-text-muted">Mapeamento conceitual por similaridade vetorial (RAG)</p>
+            <h1 className="text-sm md:text-base font-bold text-text-strong">Rede de Conexões</h1>
+            <p className="text-[10px] md:text-xs text-text-muted hidden sm:block">Mapeamento conceitual por similaridade vetorial (RAG)</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label htmlFor="ws-select" className="text-xs font-semibold text-text-muted uppercase">Workspace:</label>
-          <select
-            id="ws-select"
-            value={selectedWorkspaceId}
-            onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-            className="bg-surface-muted border border-border text-text-strong rounded-lg px-3 py-1.5 text-xs min-w-[180px] outline-none focus:border-primary/50 mr-2"
-          >
-            {workspaces.map(w => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
+            <label htmlFor="ws-select" className="text-[10px] md:text-xs font-semibold text-text-muted uppercase whitespace-nowrap">Workspace:</label>
+            <select
+              id="ws-select"
+              value={selectedWorkspaceId}
+              onChange={(e) => setSelectedWorkspaceId(e.target.value)}
+              className="flex-1 bg-surface-muted border border-border text-text-strong rounded-lg px-2.5 md:px-3 py-1.5 text-[10px] md:text-xs min-w-[140px] md:min-w-[180px] outline-none focus:border-primary/50"
+            >
+              {workspaces.map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={handleGenerateMap}
             disabled={isIndexing}
-            className="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
+            className="btn-primary py-1.5 px-2.5 md:px-3 text-[10px] md:text-xs flex items-center justify-center gap-1"
             title="Mapear pré-requisitos via IA de todas as notas do workspace"
           >
             {isIndexing ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader2 className="size-3 md:size-3.5 animate-spin" />
             ) : (
-              <RefreshCw className="size-3.5" />
+              <RefreshCw className="size-3 md:size-3.5" />
             )}
-            <span>Gerar Mapa</span>
+            <span className="hidden sm:inline">Gerar Mapa</span>
+            <span className="sm:hidden">Mapa</span>
           </button>
         </div>
       </header>
@@ -598,7 +619,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
 
         {/* Notificação de Indexação */}
         {indexMessage && (
-          <div className="absolute top-4 left-4 z-20 max-w-sm p-3 bg-surface border-l-4 border-l-primary border border-border rounded-r-xl rounded-l-md text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2">
+          <div className="absolute top-2 md:top-4 left-2 md:left-4 z-20 max-w-[calc(100%-16px)] md:max-w-sm p-2.5 md:p-3 bg-surface border-l-4 border-l-primary border border-border rounded-r-xl rounded-l-md text-[10px] md:text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-2">
               {!isIndexing && <span className="text-emerald-500">✓</span>}
               {isIndexing && <Loader2 className="size-3 animate-spin text-primary" />}
@@ -621,16 +642,16 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
           onTouchCancel={handleTouchEnd}
         >
           {nodes.length === 0 && !isLoading ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-              <div className="p-4 bg-surface-muted border border-border rounded-full mb-3 text-text-muted">
-                <Network className="size-8" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 md:p-6 text-center">
+              <div className="p-3 md:p-4 bg-surface-muted border border-border rounded-full mb-2 md:mb-3 text-text-muted">
+                <Network className="size-6 md:size-8" />
               </div>
-              <h3 className="font-semibold text-text-strong mb-1">Nenhuma conexão mapeada</h3>
-              <p className="text-text-muted text-xs max-w-sm mb-4">Seu workspace está vazio ou precisa de processamento de IA para rastrear similaridades conceituais.</p>
+              <h3 className="font-semibold text-text-strong mb-1 text-sm md:text-base">Nenhuma conexão mapeada</h3>
+              <p className="text-text-muted text-[10px] md:text-xs max-w-sm mb-3 md:mb-4 px-4">Seu workspace está vazio ou precisa de processamento de IA para rastrear similaridades conceituais.</p>
               <button 
                 onClick={handleStartIndex}
                 disabled={isIndexing}
-                className="btn-primary py-1.5 px-4 text-xs flex items-center gap-1.5"
+                className="btn-primary py-1.5 px-3 md:px-4 text-[10px] md:text-xs flex items-center gap-1.5"
               >
                 <RefreshCw className={`size-3.5 ${isIndexing ? 'animate-spin' : ''}`} />
                 Gerar Vetores & Indexar
@@ -638,26 +659,27 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
             </div>
           ) : (
             <>
-              {/* Barra de controle flutuante do Canvas */}
-              <div className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 p-1 bg-surface/90 border border-border rounded-full shadow-md backdrop-blur-xs">
+              {/* Barra de controle flutuante do Canvas - Mobile otimizado */}
+              <div className="absolute bottom-2 md:bottom-4 left-2 md:left-4 z-10 flex items-center gap-1 p-1 md:p-1.5 bg-surface/90 border border-border rounded-full shadow-md backdrop-blur-xs">
                 <button 
                   onClick={() => setIsMultiSelectMode(!isMultiSelectMode)} 
-                  className={`p-2 rounded-full transition-colors ${isMultiSelectMode ? 'bg-primary text-white shadow-lg' : 'hover:bg-surface-muted text-text-medium'}`} 
+                  className={`p-1.5 md:p-2 rounded-full transition-colors ${isMultiSelectMode ? 'bg-primary text-white shadow-lg' : 'hover:bg-surface-muted text-text-medium'}`} 
                   title="Modo Multiseleção (Mobile/Touch)"
                 >
-                  <ListChecks className="size-4" />
+                  <ListChecks className="size-3.5 md:size-4" />
                 </button>
-                <div className="w-px h-4 bg-border"></div>
-                <button onClick={() => zoom(1.15)} className="p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom In"><ZoomIn className="size-4" /></button>
-                <button onClick={() => zoom(0.85)} className="p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom Out"><ZoomOut className="size-4" /></button>
-                <button onClick={resetZoom} className="p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Focar Grafo"><Maximize2 className="size-4" /></button>
+                <div className="w-px h-3.5 md:h-4 bg-border"></div>
+                <button onClick={() => zoom(1.15)} className="p-1.5 md:p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom In"><ZoomIn className="size-3.5 md:size-4" /></button>
+                <button onClick={() => zoom(0.85)} className="p-1.5 md:p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom Out"><ZoomOut className="size-3.5 md:size-4" /></button>
+                <button onClick={resetZoom} className="p-1.5 md:p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Focar Grafo"><Maximize2 className="size-3.5 md:size-4" /></button>
                 {!hasConnections && (
                   <button 
                     onClick={handleStartIndex}
                     disabled={isIndexing}
-                    className="flex items-center gap-1 px-3 py-1.5 ml-2 text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary border border-primary/20 rounded-full hover:bg-primary/20 transition-all"
+                    className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-1.5 ml-1 md:ml-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary border border-primary/20 rounded-full hover:bg-primary/20 transition-all"
                   >
-                    <RefreshCw className={`size-3 ${isIndexing ? 'animate-spin' : ''}`} /> Indexar Conexões
+                    <RefreshCw className={`size-2.5 md:size-3 ${isIndexing ? 'animate-spin' : ''}`} /> 
+                    <span className="hidden md:inline">Indexar Conexões</span>
                   </button>
                 )}
               </div>
@@ -667,6 +689,8 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                 ref={svgRef}
                 className="w-full h-full"
                 onWheel={handleWheel}
+                viewBox={`0 0 ${width} ${height}`}
+                preserveAspectRatio="xMidYMid meet"
               >
                 <defs>
                   <marker
@@ -702,7 +726,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                           y2={targetNode.y}
                           className="transition-all duration-200"
                           stroke={isHighlighted ? 'currentColor' : '#475569'}
-                          strokeWidth={isHighlighted ? 2.5 : 1}
+                          strokeWidth={isHighlighted ? (isMobile ? 1.5 : 2.5) : 1}
                           strokeOpacity={isHighlighted ? 0.6 : 0.1}
                           style={{ color: isHighlighted ? 'var(--primary)' : undefined }}
                           markerEnd="url(#arrow)"
@@ -717,6 +741,11 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                     const theme = getNodeTheme(node, dependentsCount)
                     const isFocused = focusedNodeId === node.id || selectedNodeIds.includes(node.id)
                     const isDimmed = (focusedNodeId || hoveredNodeId || selectedNodeIds.length > 0) && !connectedNodeIds.has(node.id)
+
+                    // Tamanhos responsivos para nós
+                    const nodeRadius = isMobile 
+                      ? (isFocused ? 10 : (node.flashcardsCount && node.flashcardsCount > 0 ? 8 : 6))
+                      : (isFocused ? 12 : (node.flashcardsCount && node.flashcardsCount > 0 ? 10 : 8))
 
                     return (
                       <g
@@ -735,26 +764,26 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                         {/* Glow effect on focused node */}
                         {isFocused && (
                           <circle
-                            r={18}
+                            r={isMobile ? 14 : 18}
                             fill="none"
                             stroke="currentColor"
-                            strokeWidth={2.5}
+                            strokeWidth={isMobile ? 2 : 2.5}
                             className={`animate-ping opacity-25 ${theme.text}`}
                           />
                         )}
 
                         {/* Corpo do Nó */}
                         <circle
-                          r={isFocused ? 12 : (node.flashcardsCount && node.flashcardsCount > 0 ? 10 : 8)}
+                          r={nodeRadius}
                           className={`transition-all duration-300 ${
                             node.isGhost 
                               ? 'fill-zinc-900 stroke-zinc-500' 
                               : theme.fill
                           } ${isDimmed ? 'opacity-20' : 'opacity-100 shadow-md'}`}
                           style={{
-                            boxShadow: !isDimmed && !node.isGhost ? `0 0 16px ${theme.glow}` : undefined,
+                            boxShadow: !isDimmed && !node.isGhost ? `0 0 12px ${theme.glow}` : undefined,
                             stroke: node.isGhost ? 'var(--border)' : (isFocused ? 'currentColor' : 'rgba(255,255,255,0.15)'),
-                            strokeWidth: node.isGhost ? 1.5 : (isFocused ? 3 : 1.5),
+                            strokeWidth: node.isGhost ? 1.5 : (isFocused ? 2 : 1.5),
                             strokeDasharray: node.isGhost ? '3,3' : undefined,
                             color: node.isGhost ? 'var(--text-muted)' : theme.fill.replace('fill-', 'var(--').replace('-500', ')')
                           }}
@@ -766,81 +795,99 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                         {node.isGhost && (
                           <text
                             x={0}
-                            y={3}
+                            y={isMobile ? 2 : 3}
                             textAnchor="middle"
-                            className="text-[9px] font-extrabold fill-zinc-400 select-none pointer-events-none"
+                            className="text-[7px] md:text-[9px] font-extrabold fill-zinc-400 select-none pointer-events-none"
                           >
                             +
                           </text>
                         )}
 
-                        {/* Rótulo de Texto */}
+                        {/* Rótulo de Texto - responsivo */}
                         <text
                           x={0}
-                          y={isFocused ? 26 : 22}
+                          y={isMobile ? (isFocused ? 20 : 16) : (isFocused ? 26 : 22)}
                           textAnchor="middle"
-                          className={`text-[10px] font-bold fill-text-strong select-none transition-all duration-200 ${isDimmed ? 'opacity-10' : 'opacity-100'}`}
+                          className={`font-bold fill-text-strong select-none transition-all duration-200 ${isDimmed ? 'opacity-10' : 'opacity-100'} ${isMobile ? 'text-[8px] md:text-[10px]' : 'text-[10px]'}`}
                           stroke="var(--background)"
-                          strokeWidth={2.5}
+                          strokeWidth={isMobile ? 2 : 2.5}
                           paintOrder="stroke"
                         >
-                          {node.label.length > 20 ? `${node.label.slice(0, 18)}...` : node.label}
+                          {node.label.length > (isMobile ? 15 : 20) ? `${node.label.slice(0, isMobile ? 13 : 18)}...` : node.label}
                         </text>
                       </g>
                     )
                   })}
                 </g>
               </svg>
-              {/* Legenda Explicativa do Grafo */}
-              <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-                <div className="bg-surface/90 border border-border rounded-xl p-3 shadow-lg backdrop-blur-sm">
-                  <h4 className="text-[10px] font-bold text-text-strong uppercase tracking-wider mb-2">Estrutura do Mapa</h4>
-                  <div className="flex flex-col gap-1.5 text-xs font-medium text-text-medium">
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-violet-600 shadow-[0_0_8px_rgba(139,92,246,0.5)]"></div> Conceito Alvo (Final)</div>
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div> Intermediário</div>
-                    <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div> Conceito Base (Fundamento)</div>
-                    <div className="flex items-center gap-2">
-                      <div className="size-2.5 rounded-full bg-zinc-900 border border-dashed border-zinc-500"></div>
-                      <span>Pré-requisito Ausente</span>
+              
+              {/* Legenda Explicativa do Grafo - Mobile otimizada */}
+              <div className="absolute bottom-2 md:bottom-4 right-2 md:right-4 z-10 flex flex-col gap-1.5 md:gap-2">
+                <div className="bg-surface/90 border border-border rounded-lg md:rounded-xl p-2 md:p-3 shadow-lg backdrop-blur-sm max-w-[180px] md:max-w-none">
+                  <h4 className="text-[9px] md:text-[10px] font-bold text-text-strong uppercase tracking-wider mb-1.5 md:mb-2">Estrutura do Mapa</h4>
+                  <div className="flex flex-col gap-1 md:gap-1.5 text-[9px] md:text-xs font-medium text-text-medium">
+                    <div className="flex items-center gap-1.5 md:gap-2">
+                      <div className={`size-2 md:size-2.5 rounded-full bg-violet-600 shadow-[0_0_6px_rgba(139,92,246,0.5)]`}></div> 
+                      <span className="hidden md:inline">Conceito Alvo (Final)</span>
+                      <span className="md:hidden">Alvo</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2">
+                      <div className={`size-2 md:size-2.5 rounded-full bg-sky-500 shadow-[0_0_6px_rgba(14,165,233,0.5)]`}></div> 
+                      <span className="hidden md:inline">Intermediário</span>
+                      <span className="md:hidden">Inter.</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2">
+                      <div className={`size-2 md:size-2.5 rounded-full bg-emerald-600 shadow-[0_0_6px_rgba(16,185,129,0.5)]`}></div> 
+                      <span className="hidden md:inline">Conceito Base (Fundamento)</span>
+                      <span className="md:hidden">Base</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 md:gap-2">
+                      <div className="size-2 md:size-2.5 rounded-full bg-zinc-900 border border-dashed border-zinc-500"></div>
+                      <span className="hidden md:inline">Pré-requisito Ausente</span>
+                      <span className="md:hidden">Ausente</span>
                     </div>
                   </div>
                 </div>
-                <div className="pointer-events-none opacity-45 text-[10px] text-text-muted select-none text-right font-medium leading-normal">
+                <div className="pointer-events-none opacity-45 text-[8px] md:text-[10px] text-text-muted select-none text-right font-medium leading-normal hidden sm:block">
                   Ctrl/Shift+Click para multiseleção<br />
                   Arraste para organizar
                 </div>
               </div>
 
-              {/* Mesa de Operações (Action Hub) */}
+              {/* Mesa de Operações (Action Hub) - Mobile otimizada */}
               {selectedNodeIds.length > 1 && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-top-4 fade-in duration-200">
-                  <div className="flex items-center gap-3 bg-surface/95 border border-border shadow-xl backdrop-blur-md rounded-2xl p-2 px-4">
+                <div className="absolute top-2 md:top-4 left-2 md:left-1/2 md:-translate-x-1/2 z-30 animate-in slide-in-from-top-4 fade-in duration-200 w-[calc(100%-16px)] md:w-auto">
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3 bg-surface/95 border border-border shadow-xl backdrop-blur-md rounded-xl md:rounded-2xl p-2.5 md:p-2 px-3 md:px-4">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Ação em Lote</span>
-                      <span className="text-sm font-bold text-primary">{selectedNodeIds.length} selecionados</span>
+                      <span className="text-[9px] md:text-[10px] font-bold text-text-muted uppercase tracking-wider">Ação em Lote</span>
+                      <span className="text-xs md:text-sm font-bold text-primary">{selectedNodeIds.length} selecionados</span>
                     </div>
-                    <div className="h-8 w-px bg-border mx-2"></div>
-                    <button 
-                      onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
-                      className="btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
-                    >
-                      <BookOpen className="size-3.5" />
-                      Gerar Simulado
-                    </button>
-                    <button 
-                      onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
-                      className="btn-ghost py-1.5 px-3 text-xs flex items-center gap-1.5 border border-border hover:bg-surface-muted"
-                    >
-                      <MessageSquare className="size-3.5" />
-                      Resumir Relação
-                    </button>
-                    <button 
-                      onClick={() => setSelectedNodeIds([])}
-                      className="p-1.5 ml-1 rounded-full text-text-muted hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
-                      title="Cancelar Seleção"
-                    >
-                      <X className="size-4" />
-                    </button>
+                    <div className="h-6 md:h-8 w-px bg-border mx-1 md:mx-2 hidden md:block"></div>
+                    <div className="flex flex-col md:flex-row gap-1.5 w-full md:w-auto">
+                      <button 
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
+                        className="btn-primary py-1.5 px-2.5 md:px-3 text-[10px] md:text-xs flex items-center justify-center gap-1"
+                      >
+                        <BookOpen className="size-3 md:size-3.5" />
+                        <span className="md:hidden">Simulado</span>
+                        <span className="hidden md:inline">Gerar Simulado</span>
+                      </button>
+                      <button 
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
+                        className="btn-ghost py-1.5 px-2.5 md:px-3 text-[10px] md:text-xs flex items-center justify-center gap-1 border border-border hover:bg-surface-muted"
+                      >
+                        <MessageSquare className="size-3 md:size-3.5" />
+                        <span className="md:hidden">Relação</span>
+                        <span className="hidden md:inline">Resumir Relação</span>
+                      </button>
+                      <button 
+                        onClick={() => setSelectedNodeIds([])}
+                        className="p-1.5 rounded-full text-text-muted hover:bg-rose-500/10 hover:text-rose-500 transition-colors self-start md:self-center"
+                        title="Cancelar Seleção"
+                      >
+                        <X className="size-3.5 md:size-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -848,9 +895,17 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
           )}
         </div>
 
-        {/* 🟢 Painel Lateral de Detalhes */}
+        {/* 🟢 Painel Lateral de Detalhes - Mobile otimizado */}
         <aside 
-          className={`absolute top-0 bottom-0 right-0 z-20 w-full sm:w-80 bg-surface border-l border-border shadow-2xl p-5 flex flex-col justify-between transition-transform duration-300 pointer-events-auto ${focusedNodeId ? 'translate-x-0' : 'translate-x-full'}`}
+          className={`
+            absolute top-0 bottom-0 right-0 z-20 
+            w-full sm:w-80 md:w-96 
+            bg-surface border-l border-border shadow-2xl 
+            p-3 md:p-5 
+            flex flex-col justify-between 
+            transition-transform duration-300 pointer-events-auto 
+            ${focusedNodeId ? 'translate-x-0' : 'translate-x-full'}
+          `}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseMove={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
@@ -858,8 +913,8 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
           onTouchMove={(e) => e.stopPropagation()}
         >
           <div className="flex-1 overflow-y-auto pr-1">
-            <header className="flex items-start justify-between gap-3 mb-5 shrink-0">
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+            <header className="flex items-start justify-between gap-2 md:gap-3 mb-3 md:mb-5 shrink-0">
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 md:px-2.5 md:py-0.5 text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${
                 selectedNote 
                   ? getNodeTheme(
                       nodes.find(n => n.id === selectedNote.id) || { id: selectedNote.id, label: selectedNote.title, topic: selectedNote.topic, isGhost: selectedNote.isGhost },
@@ -877,25 +932,25 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                 className="p-1 rounded-md text-text-muted hover:bg-surface-muted hover:text-text-strong transition-colors pointer-events-auto"
                 title="Fechar painel"
               >
-                <X className="size-4" />
+                <X className="size-3.5 md:size-4" />
               </button>
             </header>
 
             {isLoadingNote ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-3">
-                <Loader2 className="size-6 animate-spin text-primary" />
-                <span className="text-xs text-text-muted font-medium">Buscando conteúdo...</span>
+              <div className="flex flex-col items-center justify-center py-12 md:py-16 gap-2">
+                <Loader2 className="size-5 md:size-6 animate-spin text-primary" />
+                <span className="text-[10px] md:text-xs text-text-muted font-medium">Buscando conteúdo...</span>
               </div>
             ) : selectedNote ? (
               <div className="animate-in fade-in slide-in-from-right-4 duration-200">
-                <h2 className="text-base font-extrabold text-text-strong mb-2 leading-tight">
+                <h2 className="text-sm md:text-base font-extrabold text-text-strong mb-1.5 md:mb-2 leading-tight">
                   {selectedNote.title}
                 </h2>
                 
                 {/* Visualização de conexões locais */}
-                <div className="mb-6">
-                  <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Conceitos Conectados</h4>
-                  <div className="space-y-1.5">
+                <div className="mb-4 md:mb-6">
+                  <h4 className="text-[9px] md:text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5 md:mb-2">Conceitos Conectados</h4>
+                  <div className="space-y-1">
                     {graphData.links
                       .filter(l => l.source === selectedNote.id || l.target === selectedNote.id)
                       .map((link, idx) => {
@@ -908,10 +963,10 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                           <button
                             key={idx}
                             onClick={() => handleNodeClick(targetNode.id, false)}
-                            className="flex items-center justify-between w-full p-2 text-left rounded-lg text-xs bg-surface-muted hover:bg-border transition-colors group"
+                            className="flex items-center justify-between w-full p-1.5 md:p-2 text-left rounded-lg text-[9px] md:text-xs bg-surface-muted hover:bg-border transition-colors group"
                           >
                             <span className="font-semibold text-text-medium truncate pr-2 group-hover:text-text-strong transition-colors">{targetNode.label}</span>
-                            <span className="shrink-0 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">{pct}% similar</span>
+                            <span className="shrink-0 text-[8px] md:text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1 py-0.5 md:px-1.5 md:py-0.5 rounded-full">{pct}%</span>
                           </button>
                         )
                       })}
@@ -919,9 +974,9 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                 </div>
 
                 {/* Pré-visualização do conteúdo */}
-                <div className="border-t border-border pt-4">
-                  <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Prévia do Conteúdo</h4>
-                  <p className="text-xs text-text-muted leading-relaxed line-clamp-[12] whitespace-pre-wrap bg-surface-muted/50 p-3 rounded-xl border border-border/30">
+                <div className="border-t border-border pt-3 md:pt-4">
+                  <h4 className="text-[9px] md:text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5 md:mb-2">Prévia do Conteúdo</h4>
+                  <p className="text-[9px] md:text-xs text-text-muted leading-relaxed line-clamp-[10] md:line-clamp-[12] whitespace-pre-wrap bg-surface-muted/50 p-2.5 md:p-3 rounded-lg md:rounded-xl border border-border/30">
                     {selectedNote.content ? selectedNote.content.replace(/Fonte:.*?\n\n---\n\n/, '') : 'Sem conteúdo.'}
                   </p>
                 </div>
@@ -929,46 +984,49 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
             ) : null}
           </div>
 
-          {/* Botões de Ação na base */}
+          {/* Botões de Ação na base - Mobile otimizado */}
           {selectedNote && (
-            <div className="border-t border-border pt-4 mt-4 shrink-0 space-y-2.5">
+            <div className="border-t border-border pt-3 md:pt-4 mt-3 md:mt-4 shrink-0 space-y-2">
               {selectedNote.isGhost ? (
                 <button 
                   onClick={handleCreateFromGhost}
                   disabled={isCreatingNote}
-                  className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+                  className="btn-primary w-full py-2 text-[10px] md:text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
                   <RefreshCw className={`size-3.5 ${isCreatingNote ? 'animate-spin' : ''}`} />
-                  {isCreatingNote ? 'Criando nota...' : 'Criar Nota do Conceito'}
+                  {isCreatingNote ? 'Criando...' : 'Criar Nota do Conceito'}
                 </button>
               ) : (
                 <>
                   <Link 
                     href={`/dashboard/${selectedWorkspaceId}/note/${selectedNote.id}`}
-                    className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+                    className="btn-primary w-full py-2 text-[10px] md:text-xs font-semibold flex items-center justify-center gap-1.5"
                   >
                     <BookOpen className="size-3.5" />
-                    Abrir no Editor
+                    <span className="md:hidden">Abrir</span>
+                    <span className="hidden md:inline">Abrir no Editor</span>
                     <ArrowRight className="size-3.5" />
                   </Link>
                   <button 
                     onClick={handleExportRoadmap}
                     disabled={isGeneratingRoadmap}
-                    className="btn-ghost w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border border-border hover:bg-surface-muted"
+                    className="btn-ghost w-full py-2 text-[10px] md:text-xs font-semibold flex items-center justify-center gap-1.5 border border-border hover:bg-surface-muted"
                   >
                     {isGeneratingRoadmap ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : (
                       <ListChecks className="size-3.5" />
                     )}
-                    <span>📋 Gerar Roteiro de Estudo</span>
+                    <span className="md:hidden">Roteiro</span>
+                    <span className="hidden md:inline">📋 Gerar Roteiro de Estudo</span>
                   </button>
                   <button 
                     onClick={() => window.dispatchEvent(new CustomEvent('open-chat'))}
-                    className="btn-ghost w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+                    className="btn-ghost w-full py-2 text-[10px] md:text-xs font-semibold flex items-center justify-center gap-1.5"
                   >
                     <MessageSquare className="size-3.5" />
-                    Conversar no Assistente
+                    <span className="md:hidden">Chat</span>
+                    <span className="hidden md:inline">Conversar no Assistente</span>
                   </button>
                 </>
               )}
