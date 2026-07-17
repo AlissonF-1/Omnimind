@@ -2,9 +2,8 @@ import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
 
-export const dynamic = 'force-dynamic'; // Impede que a rota seja tratada como estática
-export const runtime = 'nodejs';        // Garante que rode no Node, não no Edge (caso você use web-push)
-
+export const dynamic = 'force-dynamic'; 
+export const runtime = 'nodejs';
 
 // Configura o web-push com as chaves VAPID
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
@@ -18,9 +17,11 @@ if (publicKey && privateKey) {
   )
 }
 
-// Helper para calcular a contagem de cards pendentes para um usuário específico (bypassing auth session checks)
+// ⚠️ FLAG DE TESTE: Ignora a contagem de cards e envia uma notificação de teste para TODOS os usuários registrados
+const SKIP_DUE_CHECK = true; // Mude para false quando quiser voltar ao normal
+
 async function getUserDueCardsCount(supabase: any, userId: string): Promise<number> {
-  // 1. Busca workspaces ativos (não arquivados) do usuário
+  // ... (seu código original de contagem permanece idêntico) ...
   const { data: workspaces } = await supabase
     .from('workspaces')
     .select('id, is_sprint_mode, sprint_date')
@@ -30,14 +31,11 @@ async function getUserDueCardsCount(supabase: any, userId: string): Promise<numb
   if (!workspaces || workspaces.length === 0) return 0
 
   const activeWorkspaceIds = workspaces.map((ws: any) => ws.id)
-  
-  // Determina quais workspaces estão em Sprint ativa
   const now = new Date()
   const sprintWsIds = workspaces
     .filter((ws: any) => ws.is_sprint_mode && ws.sprint_date && new Date(ws.sprint_date) >= now)
     .map((ws: any) => ws.id)
 
-  // 2. Busca flashcards das notas pertencentes a essas workspaces
   const { data: cards, error } = await supabase
     .from('flashcards')
     .select('id, due, state, notes!inner(workspace_id)')
@@ -46,23 +44,19 @@ async function getUserDueCardsCount(supabase: any, userId: string): Promise<numb
 
   if (error || !cards) return 0
 
-  // 3. Filtra os vencidos ou em Sprint ativa
   const nowTime = now.getTime()
   const dueCount = cards.filter((card: any) => {
     const cardWorkspaceId = card.notes?.workspace_id
     if (!cardWorkspaceId) return false
-    
     const isNew = !card.due || card.state === 0 || card.state === null
     const isDue = card.due ? new Date(card.due).getTime() <= nowTime : false
     const isSprint = sprintWsIds.includes(cardWorkspaceId)
-
     return isNew || isDue || isSprint
   }).length
 
   return dueCount
 }
 
-// Verifica se o usuário tem Modo Não Perturbe ativo
 async function getUserDoNotDisturb(supabase: any, userId: string): Promise<boolean> {
   const { data } = await supabase
     .from('user_preferences')
@@ -74,7 +68,7 @@ async function getUserDoNotDisturb(supabase: any, userId: string): Promise<boole
 
 async function handleSend(req: Request) {
   try {
-    // 1. Validação de segurança por token do Cron Secret
+    // 1. Validação de segurança por token
     const apiKeyHeader = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '')
     const cronSecret = process.env.CRON_SECRET
 
@@ -93,6 +87,8 @@ async function handleSend(req: Request) {
       return NextResponse.json({ success: true, message: 'Nenhuma assinatura registrada para notificar.' })
     }
 
+    console.log(`[DEBUG] Encontradas ${subscriptions.length} assinaturas no banco.`);
+
     let notifiedCount = 0
     let errorCount = 0
     let skippedDndCount = 0
@@ -100,33 +96,60 @@ async function handleSend(req: Request) {
     // Envia notificações agrupadas por usuário
     for (const subItem of subscriptions) {
       const userId = subItem.user_id
-      const subscriptionData = subItem.subscription
+      // 🛡️ AQUI ESTÁ A CORREÇÃO: Garante que o objeto subscription seja um objeto JS válido
+      let subscriptionData = subItem.subscription;
+      if (typeof subscriptionData === 'string') {
+        try {
+          subscriptionData = JSON.parse(subscriptionData);
+        } catch (e) {
+          console.error(`[ERRO] Falha ao parsear JSON da assinatura do usuário ${userId}. Ignorando.`);
+          errorCount++;
+          continue;
+        }
+      }
 
-      // 3. Verifica Modo Não Perturbe — pula usuário se ativo
+      // 3. Verifica Modo Não Perturbe
       const doNotDisturb = await getUserDoNotDisturb(supabase, userId)
       if (doNotDisturb) {
         skippedDndCount++
         continue
       }
 
-      // 4. Calcula o total de cards pendentes para este usuário específico
-      const dueCount = await getUserDueCardsCount(supabase, userId)
+      // 4. Calcula o total de cards pendentes (ou ignora se estiver no modo de teste)
+      let dueCount = 0;
+      if (SKIP_DUE_CHECK) {
+        dueCount = 1; // Força a entrada no bloco de envio
+        console.log(`[DEBUG] Modo de teste ativado. Enviando notificação de teste para ${userId}`);
+      } else {
+        dueCount = await getUserDueCardsCount(supabase, userId);
+      }
 
       if (dueCount > 0) {
         const estimatedMinutes = Math.max(2, Math.round(dueCount * 0.5))
         const payload = JSON.stringify({
-          title: '🔥 Hora de Estudo OmniMind!',
-          body: `Você tem ${dueCount} cards pendentes. Isso vai demorar apenas ${estimatedMinutes} minutos. Vamos revisar?`,
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`
+          title: SKIP_DUE_CHECK ? '🧠 TESTE DE NOTIFICAÇÃO' : '🔥 Hora de Estudo OmniMind!',
+          body: SKIP_DUE_CHECK 
+            ? 'Esta é uma notificação de teste. Sua assinatura está funcionando!' 
+            : `Você tem ${dueCount} cards pendentes. Isso vai demorar apenas ${estimatedMinutes} minutos. Vamos revisar?`,
+          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`,
+          icon: '/logo.png',
+          badge: '/logo.png'
         })
 
         try {
+          console.log(`[DEBUG] Tentando enviar para: ${subscriptionData.endpoint}`);
           await webpush.sendNotification(subscriptionData, payload)
           notifiedCount++
+          console.log(`[DEBUG] Notificação enviada com sucesso para ${userId}`);
         } catch (pushErr: any) {
-          console.error(`Erro ao enviar push para usuário ${userId}:`, pushErr)
-          // Se a assinatura expirou ou é inválida, remove do banco de dados
+          console.error(`[ERRO] Falha crítica ao enviar push para usuário ${userId}:`, {
+            statusCode: pushErr.statusCode,
+            message: pushErr.message,
+            endpoint: subscriptionData.endpoint || 'N/A'
+          });
+          // Se a assinatura expirou, remove do banco
           if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+            console.log(`[DEBUG] Removendo assinatura expirada: ${subItem.id}`);
             await supabase
               .from('push_subscriptions')
               .delete()
@@ -134,8 +157,12 @@ async function handleSend(req: Request) {
           }
           errorCount++
         }
+      } else {
+        console.log(`[DEBUG] Usuário ${userId} não tem cards pendentes. Nenhuma notificação enviada.`);
       }
     }
+
+    console.log(`[RESUMO] Enviadas: ${notifiedCount}, Erros: ${errorCount}, DND ignorados: ${skippedDndCount}`);
 
     return NextResponse.json({
       success: true,
@@ -150,13 +177,5 @@ async function handleSend(req: Request) {
   }
 }
 
-// POST: chamada manual ou por ferramentas externas
-export async function POST(req: Request) {
-  return handleSend(req)
-}
-
-// GET: chamada pelo Vercel Cron (vercel.json)
-export async function GET(req: Request) {
-  return handleSend(req)
-}
-
+export async function POST(req: Request) { return handleSend(req) }
+export async function GET(req: Request) { return handleSend(req) }
