@@ -26,6 +26,19 @@ interface SketchpadProps {
   onSave: (imageUrl: string) => void
 }
 
+interface TextLabel {
+  id: string
+  x: number
+  y: number
+  value: string
+  fontSize: number
+  fontFamily: string
+  fontWeight: string
+  fontStyle: string
+  textAlign: string
+  color: string
+}
+
 type Tool = 'pen' | 'line' | 'arrow' | 'rect' | 'circle' | 'eraser' | 'text'
 
 export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
@@ -63,10 +76,15 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const [fillMode, setFillMode] = useState(false)
   const pointsRef = useRef<{ x: number; y: number }[]>([])
   
-  // Estados da Ferramenta de Texto
-  const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null)
+  // Estados da Ferramenta de Texto (Camada de Vetores Interativa)
+  const [textLabels, setTextLabels] = useState<TextLabel[]>([])
+  const [editingTextId, setEditingTextId] = useState<string | null>(null)
   const [textInputValue, setTextInputValue] = useState('')
   const textInputRef = useRef<HTMLInputElement | null>(null)
+  
+  // Arrastar caixas de texto
+  const [draggedLabelId, setDraggedLabelId] = useState<string | null>(null)
+  const dragStartOffsetRef = useRef({ x: 0, y: 0 })
   
   // Estado de ajuda de atalhos
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
@@ -189,45 +207,9 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     )
   }
 
-  // Estampa o texto final no Canvas com suporte a múltiplas linhas e viewport
-  const stampText = (coords: { x: number; y: number }, value: string) => {
-    if (!value.trim()) return
-
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    ctx.save()
-    // Aplica o zoom/pan antes de estampar
-    applyViewport(ctx)
-
-    ctx.fillStyle = color
-    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`
-    ctx.textBaseline = 'middle'
-    ctx.textAlign = textAlign as CanvasTextAlign
-
-    const lines = value.split('\n')
-    const lineHeight = fontSize * 1.2
-    lines.forEach((line, index) => {
-      ctx.fillText(line, coords.x, coords.y + index * lineHeight)
-    })
-
-    ctx.restore()
-    saveState(ctx)
-  }
-
-  const handleStampText = () => {
-    if (textInput) {
-      stampText(textInput, textInputValue)
-      setTextInput(null)
-      setTextInputValue('')
-    }
-  }
-
   // Foca o input de texto automaticamente com um pequeno timeout para aguardar a montagem no DOM
   useEffect(() => {
-    if (textInput) {
+    if (editingTextId) {
       const timer = setTimeout(() => {
         if (textInputRef.current) {
           textInputRef.current.focus()
@@ -235,14 +217,92 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
       }, 50)
       return () => clearTimeout(timer)
     }
-  }, [textInput])
+  }, [editingTextId])
 
   // Estampa texto automaticamente caso mude de ferramenta
   useEffect(() => {
-    if (tool !== 'text' && textInput) {
+    if (tool !== 'text' && editingTextId) {
       handleStampText()
     }
-  }, [tool])
+  }, [tool, editingTextId])
+
+  // Estampa os textos finais no Canvas com suporte a múltiplas linhas e viewport ao salvar
+  const stampAllLabels = (ctx: CanvasRenderingContext2D) => {
+    textLabels.forEach((l) => {
+      if (!l.value.trim()) return
+      ctx.save()
+      ctx.setTransform(
+        viewport.scale, 0,
+        0, viewport.scale,
+        viewport.offsetX, viewport.offsetY
+      )
+      ctx.fillStyle = l.color
+      ctx.font = `${l.fontStyle} ${l.fontWeight} ${l.fontSize}px ${l.fontFamily}, sans-serif`
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = l.textAlign as CanvasTextAlign
+
+      const lines = l.value.split('\n')
+      const lineHeight = l.fontSize * 1.2
+      lines.forEach((line, index) => {
+        ctx.fillText(line, l.x, l.y + index * lineHeight)
+      })
+      ctx.restore()
+    })
+  }
+
+  const handleStampText = () => {
+    if (editingTextId) {
+      if (!textInputValue.trim()) {
+        setTextLabels(prev => prev.filter(l => l.id !== editingTextId))
+      } else {
+        setTextLabels(prev => prev.map(l => {
+          if (l.id === editingTextId) {
+            return { ...l, value: textInputValue }
+          }
+          return l
+        }))
+      }
+      setEditingTextId(null)
+      setTextInputValue('')
+    }
+  }
+
+  const handleLabelMouseDown = (labelId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const label = textLabels.find(l => l.id === labelId)
+    if (!label) return
+
+    const { x, y } = getCoordinates(e)
+    dragStartOffsetRef.current = {
+      x: x - label.x,
+      y: y - label.y,
+    }
+    setDraggedLabelId(labelId)
+  }
+
+  const handleLabelTouchStart = (labelId: string, e: React.TouchEvent) => {
+    e.stopPropagation()
+    const label = textLabels.find(l => l.id === labelId)
+    if (!label) return
+
+    const { x, y } = getCoordinates(e)
+    dragStartOffsetRef.current = {
+      x: x - label.x,
+      y: y - label.y,
+    }
+    setDraggedLabelId(labelId)
+  }
+
+  const handleLabelClick = (labelId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (tool === 'text') {
+      const label = textLabels.find(l => l.id === labelId)
+      if (label) {
+        setTextInputValue(label.value)
+        setEditingTextId(labelId)
+      }
+    }
+  }
 
   const saveState = (ctx: CanvasRenderingContext2D) => {
     const canvas = canvasRef.current
@@ -377,11 +437,25 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
       if (e && typeof e.preventDefault === 'function') {
         e.preventDefault()
       }
-      if (textInput) {
-        stampText(textInput, textInputValue)
+      if (editingTextId) {
+        handleStampText()
       }
-      setTextInput({ x, y })
+      const newId = Math.random().toString(36).substring(2, 9)
+      const newLabel: TextLabel = {
+        id: newId,
+        x,
+        y,
+        value: '',
+        fontSize,
+        fontFamily,
+        fontWeight,
+        fontStyle,
+        textAlign,
+        color,
+      }
+      setTextLabels((prev) => [...prev, newLabel])
       setTextInputValue('')
+      setEditingTextId(newId)
       return
     }
 
@@ -401,6 +475,21 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
   // Desenhar
   const draw = (e: any) => {
+    if (draggedLabelId) {
+      const { x, y } = getCoordinates(e)
+      setTextLabels(prev => prev.map(l => {
+        if (l.id === draggedLabelId) {
+          return {
+            ...l,
+            x: x - dragStartOffsetRef.current.x,
+            y: y - dragStartOffsetRef.current.y
+          }
+        }
+        return l
+      }))
+      return
+    }
+
     if (!isDrawingRef.current) return
     const canvas = canvasRef.current
     if (!canvas) return
@@ -500,6 +589,10 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
   // Parar desenho
   const stopDrawing = () => {
+    if (draggedLabelId) {
+      setDraggedLabelId(null)
+      return
+    }
     if (!isDrawingRef.current) return
     isDrawingRef.current = false
     pointsRef.current = []
@@ -516,7 +609,17 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
     setIsSaving(true)
 
-    canvas.toBlob(async (blob) => {
+    // Cria um canvas clone para carimbar as caixas de texto apenas no salvamento
+    const tempCanvas = document.createElement('canvas')
+    tempCanvas.width = canvas.width
+    tempCanvas.height = canvas.height
+    const tempCtx = tempCanvas.getContext('2d')
+    if (tempCtx) {
+      tempCtx.drawImage(canvas, 0, 0)
+      stampAllLabels(tempCtx)
+    }
+
+    tempCanvas.toBlob(async (blob) => {
       if (!blob) {
         setIsSaving(false)
         return
@@ -682,43 +785,85 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
         />
 
         {/* Textarea flutuante de texto com autoResize */}
-        {textInput && (
-          <textarea
-            ref={textInputRef as any}
-            value={textInputValue}
-            onChange={(e) => setTextInputValue(e.target.value)}
-            onBlur={handleStampText}
-            onKeyDown={(e) => {
-              // Enter sem Shift finaliza a digitação e estampa no canvas
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleStampText()
-              } else if (e.key === 'Escape') {
-                setTextInput(null)
-                setTextInputValue('')
-              }
-            }}
-            style={{
-              position: 'absolute',
-              left: `${textInput.x * viewport.scale + viewport.offsetX}px`,
-              top: `${textInput.y * viewport.scale + viewport.offsetY}px`,
-              transform: 'translateY(-50%)',
-              color: color,
-              font: `${fontStyle} ${fontWeight} ${fontSize * viewport.scale}px ${fontFamily}, sans-serif`,
-              background: 'rgba(9, 9, 11, 0.95)',
-              border: `1.5px dashed ${color}`,
-              padding: '4px 8px',
-              borderRadius: '6px',
-              outline: 'none',
-              zIndex: 30,
-              minWidth: '150px',
-              textAlign: textAlign as any,
-              caretColor: color,
-              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
-              resize: 'both',
-            }}
-          />
-        )}
+        {textLabels.map((l) => {
+          const isEditing = l.id === editingTextId
+          if (isEditing) {
+            return (
+              <div
+                key={l.id}
+                style={{
+                  position: 'absolute',
+                  left: `${l.x * viewport.scale + viewport.offsetX}px`,
+                  top: `${l.y * viewport.scale + viewport.offsetY}px`,
+                  transform: 'translateY(-50%)',
+                  zIndex: 30,
+                }}
+              >
+                <textarea
+                  ref={textInputRef as any}
+                  value={textInputValue}
+                  onChange={(e) => setTextInputValue(e.target.value)}
+                  onBlur={handleStampText}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleStampText()
+                    } else if (e.key === 'Escape') {
+                      setEditingTextId(null)
+                    }
+                  }}
+                  style={{
+                    color: l.color,
+                    font: `${l.fontStyle} ${l.fontWeight} ${l.fontSize * viewport.scale}px ${l.fontFamily}, sans-serif`,
+                    background: 'rgba(9, 9, 11, 0.95)',
+                    border: `1.5px dashed ${l.color}`,
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    minWidth: '150px',
+                    textAlign: l.textAlign as any,
+                    caretColor: l.color,
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+                    resize: 'both',
+                  }}
+                />
+                <button
+                  onMouseDown={(e) => e.stopPropagation()} // Evita desfocar
+                  onClick={() => {
+                    setTextLabels(prev => prev.filter(item => item.id !== l.id))
+                    setEditingTextId(null)
+                  }}
+                  className="absolute -top-2.5 -right-2.5 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow-md z-40 transition-colors"
+                  title="Remover Texto"
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              </div>
+            )
+          }
+
+          return (
+            <div
+              key={l.id}
+              onMouseDown={(e) => handleLabelMouseDown(l.id, e)}
+              onTouchStart={(e) => handleLabelTouchStart(l.id, e)}
+              onClick={(e) => handleLabelClick(l.id, e)}
+              className="absolute select-none z-20 px-2 py-1 border border-transparent rounded-lg cursor-move hover:border-dashed hover:border-zinc-700 hover:bg-zinc-900/35 transition-all"
+              style={{
+                left: `${l.x * viewport.scale + viewport.offsetX}px`,
+                top: `${l.y * viewport.scale + viewport.offsetY}px`,
+                transform: 'translateY(-50%)',
+                color: l.color,
+                font: `${l.fontStyle} ${l.fontWeight} ${l.fontSize * viewport.scale}px ${l.fontFamily}, sans-serif`,
+                textAlign: l.textAlign as any,
+              }}
+            >
+              {l.value.split('\n').map((line, idx) => (
+                <div key={idx}>{line || '\u00A0'}</div>
+              ))}
+            </div>
+          )
+        })}
 
         {/* Card flutuante de Atalhos de Teclado */}
         {showShortcutsHelp && (
