@@ -17,6 +17,7 @@ import {
   Grid,
   Type,
   HelpCircle,
+  Loader2,
 } from 'lucide-react'
 
 interface SketchpadProps {
@@ -578,31 +579,44 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
       {/* Header */}
-      <header className="flex shrink-0 items-center justify-between border-b border-border bg-zinc-950 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <PenTool className="size-5 text-primary" />
-          <h3 className="text-sm font-bold text-text-strong">Quadro de Esboço (Sketchpad)</h3>
-        </div>
+      <header className="flex shrink-0 items-center justify-between border-b border-border bg-zinc-950 px-3 py-2">
+        {/* Lado esquerdo: Botão fechar/cancelar + Título */}
         <div className="flex items-center gap-2">
           <button
+            onClick={onClose}
+            disabled={isSaving}
+            title="Cancelar"
+            className="p-1.5 text-text-muted hover:text-text-strong hover:bg-surface-muted rounded-lg transition-colors"
+          >
+            <X className="size-4" />
+          </button>
+          <h3 className="text-xs font-bold text-text-strong hidden sm:block">Quadro de Esboço</h3>
+        </div>
+
+        {/* Lado direito: Ações do canvas + Botão Salvar */}
+        <div className="flex items-center gap-1.5">
+          <button
             onClick={() => setShowGrid(!showGrid)}
-            title="Alternar Quadrícula"
-            className={`btn-ghost p-2 rounded-lg ${showGrid ? 'bg-primary/10 text-primary' : 'text-text-muted'}`}
+            title="Alternar Grade"
+            className={`p-1.5 rounded-lg transition-colors ${showGrid ? 'bg-primary/10 text-primary' : 'text-text-muted hover:text-text-strong hover:bg-surface-muted'}`}
           >
             <Grid className="size-4" />
           </button>
           <button
             onClick={() => setShowShortcutsHelp(!showShortcutsHelp)}
             title="Atalhos de Teclado"
-            className={`btn-ghost p-2 rounded-lg hidden md:inline-flex ${showShortcutsHelp ? 'bg-primary/10 text-primary' : 'text-text-muted'}`}
+            className={`p-1.5 rounded-lg hidden md:inline-flex ${showShortcutsHelp ? 'bg-primary/10 text-primary' : 'text-text-muted hover:text-text-strong hover:bg-surface-muted'}`}
           >
             <HelpCircle className="size-4" />
           </button>
+          
+          <div className="w-px h-4 bg-border mx-0.5 hidden sm:block"></div>
+          
           <button
             onClick={handleUndo}
             disabled={historyPointerRef.current <= 0}
             title="Desfazer"
-            className="btn-ghost p-2 rounded-lg text-text-strong disabled:opacity-40"
+            className="p-1.5 rounded-lg text-text-strong hover:bg-surface-muted disabled:opacity-30 disabled:pointer-events-none transition-colors"
           >
             <Undo2 className="size-4" />
           </button>
@@ -610,35 +624,32 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
             onClick={handleRedo}
             disabled={historyPointerRef.current >= historyRef.current.length - 1}
             title="Refazer"
-            className="btn-ghost p-2 rounded-lg text-text-strong disabled:opacity-40"
+            className="p-1.5 rounded-lg text-text-strong hover:bg-surface-muted disabled:opacity-30 disabled:pointer-events-none transition-colors"
           >
             <Redo2 className="size-4" />
           </button>
           <button
             onClick={handleClear}
             title="Limpar Tela"
-            className="btn-ghost p-2 rounded-lg text-error hover:bg-error-soft/10"
+            className="p-1.5 rounded-lg text-error hover:bg-error-soft/10 transition-colors"
           >
             <Trash2 className="size-4" />
           </button>
-          <span className="h-5 w-px bg-border mx-1" />
-          <button
-            onClick={onClose}
-            className="btn-secondary text-xs px-3 py-1.5"
-            disabled={isSaving}
-          >
-            <X className="size-4 mr-1 inline" /> Cancelar
-          </button>
+
+          <div className="w-px h-4 bg-border mx-0.5"></div>
+
           <button
             onClick={handleSave}
-            className="btn-primary text-xs px-3 py-1.5"
             disabled={isSaving}
+            className="btn-primary py-1.5 px-2.5 sm:px-3 text-xs flex items-center gap-1.5 font-bold"
+            title="Inserir na Nota"
           >
-            {isSaving ? 'Salvando...' : (
-              <>
-                <Save className="size-4 mr-1 inline" /> Inserir na Nota
-              </>
+            {isSaving ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
             )}
+            <span className="hidden sm:inline">Inserir na Nota</span>
           </button>
         </div>
       </header>
