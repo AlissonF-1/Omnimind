@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition, useMemo } from 'react'
+import { flushSync } from 'react-dom' // ADICIONADO
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -195,7 +196,6 @@ const TOOLBAR_ACTIONS = [
 ]
 
 export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
-  // Título removido do estado local – gerenciado fora (na sidebar)
   const [content, setContent] = useState(initialNote.content || '')
   const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'split'>('edit')
   const [isSaving, setIsSaving] = useState(false)
@@ -214,6 +214,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans')
   const [showSketchpad, setShowSketchpad] = useState(false)
   const [showLatexAssist, setShowLatexAssist] = useState(false)
+  const [savedSelection, setSavedSelection] = useState<{ start: number; end: number } | null>(null)
 
   const { isRecording, isTranscribing, transcript, startRecording, stopRecording } = useAudioRecorder()
   const { value, setValue, push, undo, redo, canUndo, canRedo } = useHistory(initialNote.content || '')
@@ -238,14 +239,12 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     edit.scrollTop = percentage * (edit.scrollHeight - edit.clientHeight)
   }
 
-  // 🔹 PASSO 1: Estado para o modo de geração
   const [generationMode, setGenerationMode] = useState<'default' | 'concurso'>('default')
   const [showSlashMenu, setShowSlashMenu] = useState(false)
 
   const [selectedText, setSelectedText] = useState('')
   const [isPendingCloze, setIsPendingCloze] = useState(false)
 
-  // Estados do Painel de Preview de Flashcards
   const [previewCards, setPreviewCards] = useState<Array<{
     front: string
     back: string
@@ -273,86 +272,27 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     }
   }
 
-  const handleCreateClozeManual = async () => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selected = content.slice(start, end).trim()
-    if (!selected) return
-
-    setIsPendingCloze(true)
-    try {
-      const lineStart = content.lastIndexOf('\n', start - 1) + 1
-      const nextLineEnd = content.indexOf('\n', end)
-      const lineEnd = nextLineEnd === -1 ? content.length : nextLineEnd
-      const fullLineText = content.slice(lineStart, lineEnd).trim()
-
-      const front = fullLineText.replace(selected, '[...]')
-      const back = selected
-
-      const res = await createFlashcard(initialNote.id, front, back)
-      if (res.error) throw new Error(res.error)
-
-      const newContent = content.slice(0, start) + `**${selected}**` + content.slice(end)
-        commitContent(newContent)
-      
-      showToast('Flashcard Cloze Manual criado!', 'success')
-      setSelectedText('')
-      
-      requestAnimationFrame(() => {
-        textarea.focus()
-        textarea.setSelectionRange(start, start + selected.length + 4)
-      })
-    } catch (err: any) {
-      console.error(err)
-      showToast(err.message || 'Erro ao criar card manual', 'error')
-    } finally {
-      setIsPendingCloze(false)
-    }
-  }
-
-  const handleCreateClozeAI = async () => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selected = content.slice(start, end).trim()
-    if (!selected) return
-
-    setIsPendingCloze(true)
-    try {
-      const resAI = await generateAIClozeCard(selected)
-      if (resAI.error || !resAI.front || !resAI.back) {
-        throw new Error(resAI.error || 'Não foi possível gerar lacunas para essa frase.')
-      }
-
-      const resDb = await createFlashcard(initialNote.id, resAI.front, resAI.back)
-      if (resDb.error) throw new Error(resDb.error)
-
-      const newContent = content.slice(0, start) + `**${selected}**` + content.slice(end)
-        commitContent(newContent)
-
-      showToast('Cloze gerado por IA com sucesso!', 'success')
-      setSelectedText('')
-
-      requestAnimationFrame(() => {
-        textarea.focus()
-        textarea.setSelectionRange(start, start + selected.length + 4)
-      })
-    } catch (err: any) {
-      console.error(err)
-      showToast(err.message || 'Erro ao processar Cloze IA', 'error')
-    } finally {
-      setIsPendingCloze(false)
-    }
-  }
-
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const supabase = useMemo(() => createClient(), [])
+
+  // Commit síncrono para ações do usuário (toolbar, atalhos, botões)
+  const commitContentSync = (newContent: string, shouldPush = true) => {
+    flushSync(() => {
+      setContent(newContent)
+      setValue(newContent)
+      if (shouldPush) push(newContent)
+    })
+  }
+
+  // Commit assíncrono para digitação normal (evita travamentos)
+  const commitContent = (newContent: string, shouldPush = true) => {
+    setContent(newContent)
+    setValue(newContent)
+    if (shouldPush) push(newContent)
+  }
 
   const insertAtCursor = (
     text: string,
@@ -363,7 +303,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
     const newContent = content.slice(0, start) + text + content.slice(end)
-    commitContent(newContent)
+    commitContent(newContent) // mantido assíncrono para uploads etc.
     requestAnimationFrame(() => {
       textarea.focus()
       if (selection) {
@@ -373,12 +313,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         textarea.setSelectionRange(newPos, newPos)
       }
     })
-  }
-
-  const commitContent = (newContent: string, shouldPush = true) => {
-    setContent(newContent)
-    setValue(newContent)
-    if (shouldPush) push(newContent)
   }
 
   const { wordCount, readingTime } = useMemo(() => {
@@ -399,14 +333,14 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     }
   }, [transcript])
 
-  // Auto‑save focado **exclusivamente** no conteúdo
+  // Auto‑save focado exclusivamente no conteúdo (sem push no histórico)
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (content !== initialNote.content) {
         setIsSaving(true)
         try {
           await updateNoteContent(initialNote.id, content)
-          push(content)
+          // não empurra no histórico, pois é ação automática
         } catch (error) {
           console.error('Erro ao salvar conteúdo:', error)
         } finally {
@@ -416,7 +350,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     }, 1500)
 
     return () => clearTimeout(timer)
-  }, [content, initialNote.id, initialNote.content, push])
+  }, [content, initialNote.id, initialNote.content])
 
   const showToast = (
     text: string,
@@ -427,19 +361,14 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     setTimeout(() => setToast(null), duration)
   }
 
+  // Toolbar agora com commit síncrono e leitura direta do textarea.value
   const handleToolbarAction = (action: any) => {
     const textarea = textareaRef.current
     if (!textarea) return
-    const result = action(content, textarea)
-    commitContent(result.newContent)
-    requestAnimationFrame(() => {
-      if (!textareaRef.current) return
-      textareaRef.current.focus()
-      textareaRef.current.setSelectionRange(
-        result.cursorStart,
-        result.cursorEnd
-      )
-    })
+    const result = action(textarea.value, textarea) // usa o valor real do DOM
+    commitContentSync(result.newContent)
+    textarea.focus()
+    textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
   }
 
   const insertTemplateAtCursor = () => {
@@ -448,15 +377,11 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     if (!textarea) return
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
-    const newContent = content.slice(0, start) + template + content.slice(end)
-    commitContent(newContent)
-
-    requestAnimationFrame(() => {
-      if (!textareaRef.current) return
-      textareaRef.current.focus()
-      const cursorTarget = start + template.indexOf('Tema: ') + 6
-      textareaRef.current.setSelectionRange(cursorTarget, cursorTarget)
-    })
+    const newContent = textarea.value.slice(0, start) + template + textarea.value.slice(end)
+    commitContentSync(newContent)
+    textarea.focus()
+    const cursorTarget = start + template.indexOf('Tema: ') + 6
+    textarea.setSelectionRange(cursorTarget, cursorTarget)
   }
 
   const handleSearchNext = () => {
@@ -486,7 +411,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     const isSelection = start !== end
     const selected = content.slice(start, end)
 
-    // 1. Envelopamento de seleção (surround selection) e auto-fechamento
+    // Envelopamento de seleção e auto-fechamento
     const pairs: Record<string, [string, string]> = {
       '(': ['(', ')'],
       '[': ['[', ']'],
@@ -516,14 +441,12 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         newEnd = start + prefix.length
       }
 
-      commitContent(newContent)
-      requestAnimationFrame(() => {
-        textarea.setSelectionRange(newStart, newEnd)
-      })
+      commitContentSync(newContent)
+      textarea.setSelectionRange(newStart, newEnd)
       return
     }
 
-    // 1.1 Avança o cursor se digitar o caractere de fechamento que já está na frente
+    // Avança o cursor se digitar o caractere de fechamento que já está na frente
     const nextChar = content[start]
     const closers = [')', ']', '}', '"', "'", '`', '*', '_', '$']
     if (closers.includes(e.key) && nextChar === e.key && !isSelection) {
@@ -535,7 +458,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       return
     }
 
-    // 1.2 Backspace inteligente (deleta o par auto-fechado de uma vez)
+    // Backspace inteligente (deleta o par auto-fechado de uma vez)
     if (e.key === 'Backspace' && !isSelection) {
       const prevChar = content[start - 1]
       const nextChar = content[start]
@@ -553,49 +476,55 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       if (pairedKeys[prevChar] === nextChar) {
         e.preventDefault()
         const newContent = content.slice(0, start - 1) + content.slice(start + 1)
-        commitContent(newContent)
+        commitContentSync(newContent)
         const newCursor = start - 1
-        requestAnimationFrame(() => {
-          textarea.setSelectionRange(newCursor, newCursor)
-        })
+        textarea.setSelectionRange(newCursor, newCursor)
         return
       }
     }
 
-    // 2. Atalhos de Teclado Universais
+    // Atalhos de Teclado Universais
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
       e.preventDefault()
-      handleToolbarAction((c: string, t: HTMLTextAreaElement) => applyInlineWrap(c, t, '**'))
+      const result = applyInlineWrap(content, textarea, '**')
+      commitContentSync(result.newContent)
+      textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
       return
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
       e.preventDefault()
-      handleToolbarAction((c: string, t: HTMLTextAreaElement) => applyInlineWrap(c, t, '*'))
+      const result = applyInlineWrap(content, textarea, '*')
+      commitContentSync(result.newContent)
+      textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
       return
     }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
       e.preventDefault()
-      handleToolbarAction((c: string, t: HTMLTextAreaElement) => applyLinePrefix(c, t, '- [ ] '))
+      const result = applyLinePrefix(content, textarea, '- [ ] ')
+      commitContentSync(result.newContent)
+      textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
       return
     }
 
-    // 3. Tab e Shift+Tab para recuo/avanço de listas
+    // Tab e Shift+Tab para recuo/avanço de listas
     if (e.key === 'Tab') {
       e.preventDefault()
+      let result
       if (e.shiftKey) {
-        handleToolbarAction((c: string, t: HTMLTextAreaElement) => handleOutdent(c, t))
+        result = handleOutdent(content, textarea)
       } else {
-        handleToolbarAction((c: string, t: HTMLTextAreaElement) => handleIndent(c, t))
+        result = handleIndent(content, textarea)
       }
+      commitContentSync(result.newContent)
+      textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
       return
     }
 
-    // 4. Continuação Inteligente de Linhas (Smart Enter)
-    if (e.key === 'Enter') {
+    // Continuação Inteligente de Linhas (apenas Enter sem Shift e sem composição)
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       const lineStart = content.lastIndexOf('\n', start - 1) + 1
       const currentLine = content.slice(lineStart, start)
 
-      // Listas ordenadas, desordenadas, checklists, citações
       const listRegex = /^(\s*-\s*\[\s*[x ]\s*\]\s*|\s*-\s*|\s*\*\s*|\s*\d+\.\s*|\s*>\s*)/
       const match = currentLine.match(listRegex)
 
@@ -606,10 +535,8 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         if (currentLine.trim() === plainPrefix) {
           e.preventDefault()
           const newContent = content.slice(0, lineStart) + content.slice(start)
-          commitContent(newContent)
-          requestAnimationFrame(() => {
-            textarea.setSelectionRange(lineStart, lineStart)
-          })
+          commitContentSync(newContent)
+          textarea.setSelectionRange(lineStart, lineStart)
         } else {
           e.preventDefault()
           let newPrefix = prefix
@@ -624,12 +551,81 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           const newContent = content.slice(0, start) + '\n' + newPrefix + content.slice(start)
           const newCursor = start + 1 + newPrefix.length
-          commitContent(newContent)
-          requestAnimationFrame(() => {
-            textarea.setSelectionRange(newCursor, newCursor)
-          })
+          commitContentSync(newContent)
+          textarea.setSelectionRange(newCursor, newCursor)
         }
       }
+    }
+  }
+
+  const handleCreateClozeManual = async () => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = textarea.value.slice(start, end).trim()
+    if (!selected) return
+
+    setIsPendingCloze(true)
+    try {
+      const lineStart = textarea.value.lastIndexOf('\n', start - 1) + 1
+      const nextLineEnd = textarea.value.indexOf('\n', end)
+      const lineEnd = nextLineEnd === -1 ? textarea.value.length : nextLineEnd
+      const fullLineText = textarea.value.slice(lineStart, lineEnd).trim()
+
+      const front = fullLineText.replace(selected, '[...]')
+      const back = selected
+
+      const res = await createFlashcard(initialNote.id, front, back)
+      if (res.error) throw new Error(res.error)
+
+      const newContent = textarea.value.slice(0, start) + `**${selected}**` + textarea.value.slice(end)
+      commitContentSync(newContent)
+      
+      showToast('Flashcard Cloze Manual criado!', 'success')
+      setSelectedText('')
+      
+      textarea.focus()
+      textarea.setSelectionRange(start, start + selected.length + 4)
+    } catch (err: any) {
+      console.error(err)
+      showToast(err.message || 'Erro ao criar card manual', 'error')
+    } finally {
+      setIsPendingCloze(false)
+    }
+  }
+
+  const handleCreateClozeAI = async () => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = textarea.value.slice(start, end).trim()
+    if (!selected) return
+
+    setIsPendingCloze(true)
+    try {
+      const resAI = await generateAIClozeCard(selected)
+      if (resAI.error || !resAI.front || !resAI.back) {
+        throw new Error(resAI.error || 'Não foi possível gerar lacunas para essa frase.')
+      }
+
+      const resDb = await createFlashcard(initialNote.id, resAI.front, resAI.back)
+      if (resDb.error) throw new Error(resDb.error)
+
+      const newContent = textarea.value.slice(0, start) + `**${selected}**` + textarea.value.slice(end)
+      commitContentSync(newContent)
+
+      showToast('Cloze gerado por IA com sucesso!', 'success')
+      setSelectedText('')
+
+      textarea.focus()
+      textarea.setSelectionRange(start, start + selected.length + 4)
+    } catch (err: any) {
+      console.error(err)
+      showToast(err.message || 'Erro ao processar Cloze IA', 'error')
+    } finally {
+      setIsPendingCloze(false)
     }
   }
 
@@ -640,7 +636,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       if (result.error) {
         showToast('Erro ao formatar com IA: ' + result.error, 'error')
       } else {
-        commitContent(result.formattedText)
+        commitContent(result.formattedText) // assíncrono para grandes textos
         showToast('Formatado com IA!', 'success')
       }
     })
@@ -692,7 +688,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
 
-  // 🔹 PASSO 2: Geração de Flashcards com Pré-visualização Inline
   const handleGenerateCards = async () => {
     if (content.trim().length < 50) {
       showToast('Escreva mais conteúdo para gerar cards.', 'error')
@@ -734,6 +729,18 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
     }
   }
 
+  // Restaura foco e seleção ao fechar painéis
+  useEffect(() => {
+    if (!showLatexAssist && savedSelection) {
+      const textarea = textareaRef.current
+      if (textarea) {
+        textarea.focus()
+        textarea.setSelectionRange(savedSelection.start, savedSelection.end)
+      }
+      setSavedSelection(null)
+    }
+  }, [showLatexAssist, savedSelection])
+
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col bg-background">
       {/* Toast */}
@@ -758,14 +765,12 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       {!isFocusMode && (
         <header className="flex flex-col shrink-0 border-b border-border bg-surface">
           <div className="flex items-center justify-between gap-3 px-3 py-2">
-            {/* Lado esquerdo: Título da nota */}
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-bold text-text-strong truncate">
                 {initialNote.title || 'Sem título'}
               </h2>
             </div>
 
-            {/* Lado direito: botões */}
             <div className="flex items-center gap-1.5 shrink-0">
               <div className="hidden md:flex items-center gap-1.5 shrink-0">
                 <button
@@ -796,8 +801,15 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
                 <button
                     onClick={() => {
+                      const textarea = textareaRef.current
+                      if (textarea) {
+                        setSavedSelection({
+                          start: textarea.selectionStart,
+                          end: textarea.selectionEnd,
+                        })
+                      }
                       if (window.innerWidth < 768) {
-                        textareaRef.current?.blur()
+                        textarea?.blur()
                         setShowLatexAssist(true)
                         return
                       }
@@ -842,7 +854,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 <Maximize className="size-4" />
               </button>
 
-              {/* Seletor de Tipografia */}
               <div className="hidden md:flex items-center">
                 <select
                   value={fontFamily}
@@ -895,7 +906,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 </button>
               </div>
 
-              {/* Seletor de Modo Concurso */}
               <div className="hidden md:flex items-center">
                 <select
                   value={generationMode}
@@ -924,13 +934,13 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
             </div>
           </div>
 
-          {/* Barra de Ferramentas de Formatação (Movida para o topo) */}
+          {/* Barra de Ferramentas */}
           {viewMode === 'edit' && (
             <div className="flex items-center gap-0.5 overflow-x-auto px-2 py-1.5 border-t border-border/40 bg-surface scrollbar-none">
               <button
                 type="button"
                 aria-label="Inserir Template de Aula"
-                onPointerDown={(e) => { e.preventDefault(); insertTemplateAtCursor() }}
+                onClick={() => insertTemplateAtCursor()}
                 className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-primary bg-primary/5 hover:bg-primary/10 active:bg-primary/20 transition-colors"
               >
                 <LayoutTemplate className="size-4" />
@@ -942,7 +952,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                   type="button"
                   title={title}
                   aria-label={title}
-                  onPointerDown={(e) => { e.preventDefault(); handleToolbarAction(action) }}
+                  onClick={() => handleToolbarAction(action)}
                   className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-text-medium transition-colors active:bg-primary/10 active:text-primary"
                 >
                   <Icon className="size-4" />
@@ -952,7 +962,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               <button
                 type="button"
                 aria-label="Tirar foto do quadro"
-                onPointerDown={(e) => { e.preventDefault(); cameraInputRef.current?.click() }}
+                onClick={() => cameraInputRef.current?.click()}
                 className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-text-medium active:bg-primary/10 active:text-primary"
               >
                 <Camera className="size-4" />
@@ -960,7 +970,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               <button
                 type="button"
                 aria-label="Adicionar imagem"
-                onPointerDown={(e) => { e.preventDefault(); fileInputRef.current?.click() }}
+                onClick={() => fileInputRef.current?.click()}
                 className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-text-medium active:bg-primary/10 active:text-primary"
               >
                 <ImagePlus className="size-4" />
@@ -969,7 +979,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 type="button"
                 aria-label="Formatar com IA"
                 disabled={isPendingGroq || !content.trim()}
-                onPointerDown={(e) => { e.preventDefault(); handleAIAssist() }}
+                onClick={() => handleAIAssist()}
                 className="flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-indigo-500 disabled:opacity-40 active:bg-indigo-500/10"
               >
                 {isPendingGroq ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
@@ -978,7 +988,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               <button
                 type="button"
                 aria-label="Referência rápida"
-                onPointerDown={(e) => { e.preventDefault(); setShowQuickHelp((v) => !v) }}
+                onClick={() => setShowQuickHelp((v) => !v)}
                 className={`flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 transition-colors ${
                   showQuickHelp ? 'bg-primary/10 text-primary' : 'text-text-muted active:bg-surface-muted'
                 }`}
@@ -988,7 +998,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
             </div>
           )}
 
-          {/* Barra de Status secundária e fina */}
+          {/* Barra de Status */}
           <div className="flex items-center justify-between px-3 py-1 bg-surface-muted/30 border-t border-border/40 text-[10px] text-text-muted select-none">
             <div className="flex items-center gap-1.5">
               <span className={`inline-block size-1.5 rounded-full ${isSaving ? 'bg-amber-500 animate-pulse' : 'bg-success'}`} />
@@ -1055,29 +1065,28 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               Ações Rápidas
               <button onClick={() => setShowSlashMenu(false)} className="text-text-muted hover:text-text-strong"><X className="size-3" /></button>
             </div>
-            <button onPointerDown={(e) => { e.preventDefault(); insertTemplateAtCursor(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left">
+            <button onClick={() => { insertTemplateAtCursor(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left">
               <LayoutTemplate className="size-4 text-primary" />
               <div>
                 <div className="font-semibold text-text-strong">Template de Aula</div>
                 <div className="text-[10px] text-text-muted">Insere a estrutura padrão</div>
               </div>
             </button>
-            <button onPointerDown={(e) => { e.preventDefault(); handleAIAssist(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left" disabled={isPendingGroq || !content.trim()}>
+            <button onClick={() => { handleAIAssist(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left" disabled={isPendingGroq || !content.trim()}>
               <Wand2 className="size-4 text-indigo-500" />
               <div>
                 <div className="font-semibold text-text-strong">Formatar com IA</div>
                 <div className="text-[10px] text-text-muted">Melhora e formata o texto</div>
               </div>
             </button>
-            <button onPointerDown={(e) => { e.preventDefault(); handleCreateClozeAI(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left">
+            <button onClick={() => { handleCreateClozeAI(); setShowSlashMenu(false) }} className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-lg text-sm text-left">
               <Sparkles className="size-4 text-amber-500" />
               <div>
                 <div className="font-semibold text-text-strong">Criar Lacuna com IA</div>
                 <div className="text-[10px] text-text-muted">Gera flashcard na frase atual</div>
               </div>
             </button>
-            <button onPointerDown={(e) => { 
-              e.preventDefault(); 
+            <button onClick={() => { 
               const boldAct = TOOLBAR_ACTIONS.find(a => a.title === 'Negrito')?.action;
               if (boldAct) handleToolbarAction(boldAct);
               setShowSlashMenu(false);
@@ -1090,7 +1099,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
         {viewMode === 'split' ? (
           <div className="h-full w-full flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
-            {/* Esquerda: Editor */}
             <div 
               className="h-full w-full md:w-1/2 overflow-hidden px-4 py-4 md:px-6 flex flex-col"
               onMouseEnter={() => setActiveScrollSource('edit')}
@@ -1115,6 +1123,10 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 onKeyUp={handleSelectionChange}
                 onMouseUp={handleSelectionChange}
                 placeholder="Comece a anotar…"
+                inputMode="text"
+                enterKeyHint="enter"
+                autoCapitalize="sentences"
+                autoComplete="off"
                 autoCorrect="on"
                 spellCheck
                 className={`h-full w-full resize-none bg-transparent outline-none placeholder:text-text-muted pb-32 focus:outline-none focus:ring-0 focus:border-none border-none ring-0 ${
@@ -1126,7 +1138,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 } text-text-strong block`}
               />
             </div>
-            {/* Direita: Preview */}
             <div 
               ref={previewRef}
               onMouseEnter={() => setActiveScrollSource('preview')}
@@ -1172,6 +1183,10 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               onKeyUp={handleSelectionChange}
               onMouseUp={handleSelectionChange}
               placeholder="Comece a anotar…"
+              inputMode="text"
+              enterKeyHint="enter"
+              autoCapitalize="sentences"
+              autoComplete="off"
               autoCorrect="on"
               spellCheck
               className={`mx-auto max-w-3xl h-full w-full resize-none bg-transparent outline-none placeholder:text-text-muted pb-32 focus:outline-none focus:ring-0 focus:border-none border-none ring-0 ${
@@ -1208,15 +1223,12 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         )}
       </div>
 
-      {/* ── Mobile Accessory Bar (Scrollable syntax toolbar for mobile keyboards) ── */}
+      {/* ── Mobile Accessory Bar (com onClick, sem preventDefault) ── */}
       {viewMode === 'edit' && (
         <div className="flex md:hidden shrink-0 items-center gap-1.5 overflow-x-auto px-3 py-2 border-t border-border/40 bg-surface scrollbar-none z-30">
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              undo()
-            }}
+            onClick={() => undo()}
             disabled={!canUndo}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium disabled:opacity-30 shrink-0"
             title="Desfazer"
@@ -1226,10 +1238,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              redo()
-            }}
+            onClick={() => redo()}
             disabled={!canRedo}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium disabled:opacity-30 shrink-0"
             title="Refazer"
@@ -1239,10 +1248,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              setShowSketchpad(true)
-            }}
+            onClick={() => setShowSketchpad(true)}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium shrink-0"
             title="Quadro de Desenho"
           >
@@ -1251,9 +1257,15 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              textareaRef.current?.blur()
+            onClick={() => {
+              const textarea = textareaRef.current
+              if (textarea) {
+                setSavedSelection({
+                  start: textarea.selectionStart,
+                  end: textarea.selectionEnd,
+                })
+                textarea.blur()
+              }
               setShowLatexAssist(true)
             }}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted text-text-medium shrink-0"
@@ -1264,10 +1276,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              isRecording ? stopRecording() : startRecording()
-            }}
+            onClick={() => isRecording ? stopRecording() : startRecording()}
             disabled={isTranscribing}
             className={`flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-surface-muted shrink-0 ${isRecording ? 'text-red-500' : 'text-text-medium'} disabled:opacity-30`}
             title="Gravar áudio para transcrição"
@@ -1279,7 +1288,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
           <button
             type="button"
-            onPointerDown={(e) => { e.preventDefault(); insertTemplateAtCursor() }}
+            onClick={() => insertTemplateAtCursor()}
             className="flex h-8 items-center justify-center rounded-lg px-3 text-xs font-bold text-primary bg-primary/10 shrink-0"
           >
             Template
@@ -1291,17 +1300,15 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
             <button
               key={key.label}
               type="button"
-              onPointerDown={(e) => { 
-                e.preventDefault()
+              onClick={() => {
                 const textarea = textareaRef.current
-                if (textarea) {
-                  const result = key.action(content, textarea)
-                  commitContent(result.newContent)
-                  requestAnimationFrame(() => {
-                    textarea.focus()
-                    textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
-                  })
-                }
+                if (!textarea) return
+                // Garante uso do valor mais recente do DOM
+                const currentContent = textarea.value
+                const result = key.action(currentContent, textarea)
+                commitContentSync(result.newContent)
+                textarea.focus()
+                textarea.setSelectionRange(result.cursorStart, result.cursorEnd)
               }}
               className="flex h-8 min-w-[36px] items-center justify-center rounded-lg border border-border/60 bg-surface-muted px-2.5 text-xs font-bold text-text-medium active:bg-primary/10 active:text-primary shrink-0"
               title={key.title}
@@ -1314,8 +1321,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
           
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.preventDefault()
+            onClick={() => {
               const textarea = textareaRef.current
               if (textarea) {
                 const pos = Math.max(0, textarea.selectionStart - 1)
@@ -1330,8 +1336,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
           </button>
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.preventDefault()
+            onClick={() => {
               const textarea = textareaRef.current
               if (textarea) {
                 const pos = Math.min(content.length, textarea.selectionStart + 1)
@@ -1350,7 +1355,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       {/* ── Barra de ferramentas inferior (apenas modo edição) ──────── */}
       {viewMode === 'edit' && !isFocusMode && (
         <div className="shrink-0 border-t border-border bg-surface safe-area-bottom">
-          {/* ── Barra Flutuante de Seleção (Criar Cloze) ──────── */}
           {selectedText.trim().length > 0 && (
             <div className="mx-4 my-2 p-3 bg-gradient-to-r from-primary/10 to-indigo-500/10 border border-primary/20 rounded-xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom-2 duration-200 shadow-sm shrink-0">
               <div className="min-w-0 flex-1">
@@ -1386,45 +1390,23 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
             </div>
           )}
 
-          {/* Quick-help */}
           {showQuickHelp && (
             <div className="border-b border-border bg-surface-muted/60 px-3 py-3">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                 Sintaxe rápida
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs text-text-medium">
-                <span>
-                  <span className="text-text-strong">**texto**</span> →{' '}
-                  <strong>negrito</strong>
-                </span>
-                <span>
-                  <span className="text-text-strong">*texto*</span> →{' '}
-                  <em>itálico</em>
-                </span>
-                <span>
-                  <span className="text-text-strong">## </span> → subtítulo
-                </span>
-                <span>
-                  <span className="text-text-strong">- </span> → lista
-                </span>
-                <span>
-                  <span className="text-text-strong">- [ ] </span> → checklist
-                </span>
-                <span>
-                  <span className="text-text-strong">{'>>'} </span> → citação
-                </span>
-                <span>
-                  <span className="text-text-strong">$x^2$</span> → fórmula
-                  inline
-                </span>
-                <span>
-                  <span className="text-text-strong">$$…$$</span> → bloco de
-                  equação
-                </span>
+                <span><span className="text-text-strong">**texto**</span> → <strong>negrito</strong></span>
+                <span><span className="text-text-strong">*texto*</span> → <em>itálico</em></span>
+                <span><span className="text-text-strong">## </span> → subtítulo</span>
+                <span><span className="text-text-strong">- </span> → lista</span>
+                <span><span className="text-text-strong">- [ ] </span> → checklist</span>
+                <span><span className="text-text-strong">{'>>'} </span> → citação</span>
+                <span><span className="text-text-strong">$x^2$</span> → fórmula inline</span>
+                <span><span className="text-text-strong">$$…$$</span> → bloco de equação</span>
               </div>
             </div>
           )}
-
         </div>
       )}
 
@@ -1450,7 +1432,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-3xl border border-border bg-surface shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
             
-            {/* Header do Painel */}
             <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-surface-muted/30 shrink-0">
               <div className="space-y-0.5">
                 <h3 className="text-base font-black text-text-strong flex items-center gap-2">
@@ -1466,7 +1447,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               </button>
             </div>
 
-            {/* Lista Scrollable de Cards */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-surface/50">
               {previewCards.map((card, idx) => (
                 <div 
@@ -1477,7 +1457,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                       : 'border-border bg-surface opacity-60'
                   }`}
                 >
-                  {/* Checkbox de Seleção */}
                   <input
                     type="checkbox"
                     checked={card.selected}
@@ -1485,7 +1464,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                     className="size-4 mt-1 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
                   />
 
-                  {/* Inputs Editáveis */}
                   <div className="flex-1 space-y-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-extrabold text-text-muted uppercase tracking-wider">Pergunta</label>
@@ -1506,7 +1484,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                       />
                     </div>
                     
-                    {/* Analogia e Mnemônicos info */}
                     {(card.analogia || card.mnemonico) && (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {card.analogia && (
@@ -1526,7 +1503,6 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               ))}
             </div>
 
-            {/* Rodapé de Ações */}
             <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-surface-muted/30 shrink-0">
               <span className="text-xs font-semibold text-text-muted">
                 {previewCards.filter(c => c.selected).length} de {previewCards.length} selecionados
