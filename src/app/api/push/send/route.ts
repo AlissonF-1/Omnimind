@@ -2,6 +2,10 @@ import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
 
+export const dynamic = 'force-dynamic'; // Impede que a rota seja tratada como estática
+export const runtime = 'nodejs';        // Garante que rode no Node, não no Edge (caso você use web-push)
+
+
 // Configura o web-push com as chaves VAPID
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
 const privateKey = process.env.VAPID_PRIVATE_KEY || ''
