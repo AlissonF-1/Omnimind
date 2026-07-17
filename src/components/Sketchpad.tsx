@@ -45,6 +45,8 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const lastXRef = useRef(0)
   const lastYRef = useRef(0)
   const snapshotRef = useRef<ImageData | null>(null)
+  const [fillMode, setFillMode] = useState(false)
+  const pointsRef = useRef<{ x: number; y: number }[]>([])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -82,6 +84,76 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     return () => {
       window.removeEventListener('resize', resizeCanvas)
     }
+  }, [])
+
+  // 1. Previne scroll no mobile quando desenhando no canvas
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const preventScroll = (e: TouchEvent) => {
+      if (e.target === canvas) {
+        e.preventDefault()
+      }
+    }
+
+    canvas.addEventListener('touchstart', preventScroll, { passive: false })
+    canvas.addEventListener('touchmove', preventScroll, { passive: false })
+    canvas.addEventListener('touchend', preventScroll, { passive: false })
+
+    return () => {
+      canvas.removeEventListener('touchstart', preventScroll)
+      canvas.removeEventListener('touchmove', preventScroll)
+      canvas.removeEventListener('touchend', preventScroll)
+    }
+  }, [])
+
+  // 2. Atalhos de Teclado para Desktop
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement || 
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return
+      }
+      
+      const key = e.key.toLowerCase()
+
+      if ((e.ctrlKey || e.metaKey) && key === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          handleRedo()
+        } else {
+          handleUndo()
+        }
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && key === 'y') {
+        e.preventDefault()
+        handleRedo()
+        return
+      }
+      
+      switch(key) {
+        case 'b': setTool('pen'); break
+        case 'e': setTool('eraser'); break
+        case 'r': setTool('rect'); break
+        case 'c': setTool('circle'); break
+        case 'l': setTool('line'); break
+        case 'a': setTool('arrow'); break
+        case '[': setLineWidth(w => Math.max(1, w - 1)); break
+        case ']': setLineWidth(w => Math.min(20, w + 1)); break
+        case 'delete':
+        case 'backspace':
+          handleClear()
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   const saveState = (ctx: CanvasRenderingContext2D) => {
@@ -170,6 +242,10 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     lastXRef.current = x
     lastYRef.current = y
 
+    if (tool === 'pen') {
+      pointsRef.current = [{ x, y }]
+    }
+
     // Salva o snapshot atual para preview de formas geométricas
     snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height)
   }
@@ -201,14 +277,27 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
     ctx.strokeStyle = color
 
-    // Se for ferramenta de caneta livre
+    // Caneta livre com suavização por curva quadrática
     if (tool === 'pen') {
+      pointsRef.current.push({ x, y })
+      if (pointsRef.current.length < 2) return
+
+      if (snapshotRef.current) {
+        ctx.putImageData(snapshotRef.current, 0, 0)
+      }
+
       ctx.beginPath()
-      ctx.moveTo(lastXRef.current, lastYRef.current)
-      ctx.lineTo(x, y)
+      ctx.moveTo(pointsRef.current[0].x, pointsRef.current[0].y)
+
+      for (let i = 1; i < pointsRef.current.length - 1; i++) {
+        const xc = (pointsRef.current[i].x + pointsRef.current[i + 1].x) / 2
+        const yc = (pointsRef.current[i].y + pointsRef.current[i + 1].y) / 2
+        ctx.quadraticCurveTo(pointsRef.current[i].x, pointsRef.current[i].y, xc, yc)
+      }
+
+      const lastPoint = pointsRef.current[pointsRef.current.length - 1]
+      ctx.lineTo(lastPoint.x, lastPoint.y)
       ctx.stroke()
-      lastXRef.current = x
-      lastYRef.current = y
       return
     }
 
@@ -225,10 +314,18 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     } else if (tool === 'rect') {
       const width = x - startXRef.current
       const height = y - startYRef.current
+      if (fillMode) {
+        ctx.fillStyle = color
+        ctx.fillRect(startXRef.current, startYRef.current, width, height)
+      }
       ctx.strokeRect(startXRef.current, startYRef.current, width, height)
     } else if (tool === 'circle') {
       const radius = Math.sqrt(Math.pow(x - startXRef.current, 2) + Math.pow(y - startYRef.current, 2))
       ctx.arc(startXRef.current, startYRef.current, radius, 0, 2 * Math.PI)
+      if (fillMode) {
+        ctx.fillStyle = color
+        ctx.fill()
+      }
       ctx.stroke()
     } else if (tool === 'arrow') {
       const sx = startXRef.current
@@ -253,6 +350,7 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const stopDrawing = () => {
     if (!isDrawingRef.current) return
     isDrawingRef.current = false
+    pointsRef.current = []
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -304,9 +402,16 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const COLORS = [
     { name: 'Branco', hex: '#ffffff' },
     { name: 'Vermelho', hex: '#ef4444' },
-    { name: 'Azul', hex: '#3b82f6' },
-    { name: 'Verde', hex: '#22c55e' },
+    { name: 'Laranja', hex: '#f97316' },
     { name: 'Amarelo', hex: '#eab308' },
+    { name: 'Verde', hex: '#22c55e' },
+    { name: 'Azul', hex: '#3b82f6' },
+    { name: 'Indigo', hex: '#6366f1' },
+    { name: 'Roxo', hex: '#a855f7' },
+    { name: 'Rosa', hex: '#ec4899' },
+    { name: 'Teal', hex: '#14b8a6' },
+    { name: 'Cinza', hex: '#78716c' },
+    { name: 'Preto', hex: '#000000' }
   ]
 
   const TOOLS = [
@@ -407,39 +512,54 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
       {/* Caixa de Ferramentas Inferior */}
       <footer className="flex flex-col gap-3 border-t border-border bg-zinc-950 p-4 shrink-0 sm:flex-row sm:items-center sm:justify-between">
         {/* Ferramentas */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1 justify-center sm:justify-start">
           {TOOLS.map((t) => {
             const Icon = t.icon
             return (
               <button
                 key={t.id}
                 onClick={() => setTool(t.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                   tool === t.id
                     ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20'
                     : 'bg-surface border-border text-text-medium hover:bg-surface-muted'
                 }`}
+                title={t.label}
               >
-                <Icon className="size-3.5" />
-                <span>{t.label}</span>
+                <Icon className="size-4" />
+                <span className="hidden sm:inline">{t.label}</span>
               </button>
             )
           })}
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-4 justify-between sm:justify-end flex-1 sm:flex-none">
+          {/* Preenchimento Toggle */}
+          {(tool === 'rect' || tool === 'circle') && (
+            <button
+              onClick={() => setFillMode(!fillMode)}
+              className={`px-3 py-1.5 text-xs font-bold uppercase rounded-lg border transition-all ${
+                fillMode 
+                  ? 'bg-primary/20 text-primary border-primary/30 shadow-sm' 
+                  : 'bg-surface border-border text-text-muted hover:text-text-medium'
+              }`}
+            >
+              Preencher
+            </button>
+          )}
+
           {/* Paleta de Cores */}
           {tool !== 'eraser' && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">Cor:</span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1 max-w-[130px] sm:max-w-none">
                 {COLORS.map((c) => (
                   <button
                     key={c.hex}
                     onClick={() => setColor(c.hex)}
                     style={{ backgroundColor: c.hex }}
                     title={c.name}
-                    className={`size-6 rounded-full border-2 transition-all ${
+                    className={`size-5 rounded-full border transition-all ${
                       color === c.hex
                         ? 'border-primary scale-110 shadow-md ring-2 ring-primary/20'
                         : 'border-zinc-800 scale-100 hover:scale-105'
