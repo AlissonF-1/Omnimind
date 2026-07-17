@@ -52,11 +52,34 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
+  // Se o usuário clicou em "Lembrar em 1h"
+  if (event.action === 'snooze-1h') {
+    console.log('🕒 Usuário pediu para lembrar em 1 hora');
+    event.waitUntil(
+      new Promise((resolve) => {
+        setTimeout(() => {
+          self.registration.showNotification('🔥 Hora de Estudo OmniMind!', {
+            body: 'Lembrete: Vamos voltar aos seus estudos acumulados?',
+            icon: '/icon-192x192.png',
+            badge: '/notification-badge.png',
+            sound: '/notification_sound.mp3',
+            data: { url: '/dashboard/revisoes' },
+            actions: [
+              { action: 'review-now', title: '✅ Revisar agora' }
+            ]
+          }).then(resolve);
+        }, 3600000); // 1 hora
+      })
+    );
+    return;
+  }
+
+  // Ação padrão (clicar no corpo da notificação ou em "Revisar agora")
+  const targetUrl = event.notification.data?.url || '/dashboard/revisoes';
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      const targetUrl = event.notification.data.url;
-      
       for (const client of clientList) {
         if (client.url.includes('/dashboard') && 'focus' in client) {
           client.postMessage({ type: 'NAVIGATE', url: targetUrl });

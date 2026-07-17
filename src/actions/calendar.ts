@@ -141,10 +141,14 @@ export async function getExamGoals(): Promise<ExamGoal[]> {
   return data || []
 }
 
-export async function getDynamicDailyGoal(): Promise<{ goal: number; activeGoal: ExamGoal | null }> {
+export async function getDynamicDailyGoal(userId?: string): Promise<{ goal: number; activeGoal: ExamGoal | null }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { goal: 10, activeGoal: null }
+  let targetUserId = userId
+  if (!targetUserId) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { goal: 10, activeGoal: null }
+    targetUserId = user.id
+  }
 
   const todayStr = getLocalISODate(new Date())
   
@@ -152,7 +156,7 @@ export async function getDynamicDailyGoal(): Promise<{ goal: number; activeGoal:
   const { data: targetGoal } = await supabase
     .from('exam_goals')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', targetUserId)
     .gte('exam_date', todayStr)
     .order('is_active_goal', { ascending: false }) // ativas (true) primeiro
     .order('exam_date', { ascending: true })
@@ -174,7 +178,7 @@ export async function getDynamicDailyGoal(): Promise<{ goal: number; activeGoal:
   const { count: pendingCards } = await supabase
     .from('flashcards')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
+    .eq('user_id', targetUserId)
     .neq('state', 0)
     .lte('due', examDate.toISOString())
 

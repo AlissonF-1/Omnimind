@@ -1,6 +1,18 @@
 import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
+import { getUserStreak } from '@/actions/achievements'
+import { getDynamicDailyGoal } from '@/actions/calendar'
+
+async function getMostUrgentWorkspaceId(supabase: any, userId: string): Promise<string | null> {
+  const { data: workspaces } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_archived', false)
+    .limit(1)
+  return workspaces && workspaces.length > 0 ? workspaces[0].id : null
+}
 
 export const dynamic = 'force-dynamic'; 
 export const runtime = 'nodejs';
@@ -126,14 +138,42 @@ async function handleSend(req: Request) {
 
       if (dueCount > 0) {
         const estimatedMinutes = Math.max(2, Math.round(dueCount * 0.5))
+        
+        // 1. Pega dados de gamificação
+        const streak = await getUserStreak(userId)
+        const dailyGoal = await getDynamicDailyGoal(userId)
+
+        // 2. Monta a mensagem personalizada
+        let bodyMessage = ''
+        if (SKIP_DUE_CHECK) {
+          bodyMessage = 'Esta é uma notificação de teste. Sua assinatura está funcionando!'
+        } else if (streak > 5 && dailyGoal && dueCount > 0) {
+          const remaining = Math.max(0, dailyGoal.goal - dueCount)
+          bodyMessage = `🔥 Você está com ${streak} dias de streak! Hoje faltam ${remaining} cards para cumprir sua meta.`
+        } else if (dueCount > 5) {
+          bodyMessage = `📚 Você tem ${dueCount} cards acumulados. Revisar agora leva ${estimatedMinutes} minutos.`
+        } else {
+          bodyMessage = `Você tem ${dueCount} cards pendentes. Vamos revisar?`
+        }
+
+        // 3. Descobre o melhor workspace para Deep Linking
+        const topWorkspaceId = await getMostUrgentWorkspaceId(supabase, userId)
+        const targetUrl = topWorkspaceId 
+          ? `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes?workspaceId=${topWorkspaceId}`
+          : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`
+
+        // 4. Monta o Payload com Botões de Ação
         const payload = JSON.stringify({
           title: SKIP_DUE_CHECK ? '🧠 TESTE DE NOTIFICAÇÃO' : '🔥 Hora de Estudo OmniMind!',
-          body: SKIP_DUE_CHECK 
-            ? 'Esta é uma notificação de teste. Sua assinatura está funcionando!' 
-            : `Você tem ${dueCount} cards pendentes. Isso vai demorar apenas ${estimatedMinutes} minutos. Vamos revisar?`,
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`,
+          body: bodyMessage,
           icon: '/icon-192x192.png',
-          badge: '/notification-badge.png'
+          badge: '/notification-badge.png',
+          sound: '/notification_sound.mp3',
+          data: { url: targetUrl },
+          actions: [
+            { action: 'review-now', title: '✅ Revisar agora' },
+            { action: 'snooze-1h', title: '⏰ Lembrar em 1h' }
+          ]
         })
 
         try {
