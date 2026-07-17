@@ -226,6 +226,62 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     }
   }, [tool, editingTextId])
 
+  // 🟢 Efeito para tratar arrasto de caixas de texto a nível global (document)
+  useEffect(() => {
+    if (!draggedLabelId) return
+
+    const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
+      let clientX = 0
+      let clientY = 0
+
+      if ('touches' in e && e.touches.length > 0) {
+        clientX = e.touches[0].clientX
+        clientY = e.touches[0].clientY
+      } else if ('clientX' in e) {
+        clientX = e.clientX
+        clientY = e.clientY
+      } else {
+        return
+      }
+
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      
+      const screenX = clientX - rect.left
+      const screenY = clientY - rect.top
+      const modelX = (screenX - viewport.offsetX) / viewport.scale
+      const modelY = (screenY - viewport.offsetY) / viewport.scale
+
+      setTextLabels(prev => prev.map(l => {
+        if (l.id === draggedLabelId) {
+          return {
+            ...l,
+            x: modelX - dragStartOffsetRef.current.x,
+            y: modelY - dragStartOffsetRef.current.y
+          }
+        }
+        return l
+      }))
+    }
+
+    const handleGlobalUp = () => {
+      setDraggedLabelId(null)
+    }
+
+    document.addEventListener('mousemove', handleGlobalMove)
+    document.addEventListener('mouseup', handleGlobalUp)
+    document.addEventListener('touchmove', handleGlobalMove, { passive: false })
+    document.addEventListener('touchend', handleGlobalUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMove)
+      document.removeEventListener('mouseup', handleGlobalUp)
+      document.removeEventListener('touchmove', handleGlobalMove)
+      document.removeEventListener('touchend', handleGlobalUp)
+    }
+  }, [draggedLabelId, viewport])
+
   // Estampa os textos finais no Canvas com suporte a múltiplas linhas e viewport ao salvar
   const stampAllLabels = (ctx: CanvasRenderingContext2D) => {
     textLabels.forEach((l) => {
@@ -475,21 +531,6 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
   // Desenhar
   const draw = (e: any) => {
-    if (draggedLabelId) {
-      const { x, y } = getCoordinates(e)
-      setTextLabels(prev => prev.map(l => {
-        if (l.id === draggedLabelId) {
-          return {
-            ...l,
-            x: x - dragStartOffsetRef.current.x,
-            y: y - dragStartOffsetRef.current.y
-          }
-        }
-        return l
-      }))
-      return
-    }
-
     if (!isDrawingRef.current) return
     const canvas = canvasRef.current
     if (!canvas) return
@@ -589,10 +630,6 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
   // Parar desenho
   const stopDrawing = () => {
-    if (draggedLabelId) {
-      setDraggedLabelId(null)
-      return
-    }
     if (!isDrawingRef.current) return
     isDrawingRef.current = false
     pointsRef.current = []
@@ -842,13 +879,25 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
             )
           }
 
+          // Rótulo estático arrastável e clicável
+          const isTextTool = tool === 'text'
           return (
             <div
               key={l.id}
-              onMouseDown={(e) => handleLabelMouseDown(l.id, e)}
-              onTouchStart={(e) => handleLabelTouchStart(l.id, e)}
-              onClick={(e) => handleLabelClick(l.id, e)}
-              className="absolute select-none z-20 px-2 py-1 border border-transparent rounded-lg cursor-move hover:border-dashed hover:border-zinc-700 hover:bg-zinc-900/35 transition-all"
+              onMouseDown={(e) => {
+                if (isTextTool) handleLabelMouseDown(l.id, e)
+              }}
+              onTouchStart={(e) => {
+                if (isTextTool) handleLabelTouchStart(l.id, e)
+              }}
+              onClick={(e) => {
+                if (isTextTool) handleLabelClick(l.id, e)
+              }}
+              className={`absolute select-none z-20 px-2 py-1 border border-transparent rounded-lg ${
+                isTextTool 
+                  ? 'cursor-move hover:border-dashed hover:border-zinc-700 hover:bg-zinc-900/35 transition-all' 
+                  : 'pointer-events-none'
+              }`}
               style={{
                 left: `${l.x * viewport.scale + viewport.offsetX}px`,
                 top: `${l.y * viewport.scale + viewport.offsetY}px`,
