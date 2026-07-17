@@ -16,6 +16,7 @@ import {
   Minus,
   Grid,
   Type,
+  HelpCircle,
 } from 'lucide-react'
 
 interface SketchpadProps {
@@ -35,6 +36,18 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
 
+  // 🟢 Configurações da Ferramenta de Texto
+  const [fontSize, setFontSize] = useState<number>(20)
+  const [fontFamily, setFontFamily] = useState<string>('Inter')
+  const [fontWeight, setFontWeight] = useState<'bold' | 'normal'>('bold')
+  const [fontStyle, setFontStyle] = useState<'italic' | 'normal'>('normal')
+  const [textAlign, setTextAlign] = useState<string>('left')
+
+  // 🟢 Estados do Viewport (Zoom e Pan)
+  const [viewport, setViewport] = useState({ scale: 1, offsetX: 0, offsetY: 0 })
+  const pinchStartDistRef = useRef(0)
+  const pinchStartScaleRef = useRef(1)
+
   // Histórico para Desfazer/Refazer do Canvas
   const historyRef = useRef<ImageData[]>([])
   const historyPointerRef = useRef<number>(-1)
@@ -53,6 +66,9 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null)
   const [textInputValue, setTextInputValue] = useState('')
   const textInputRef = useRef<HTMLInputElement | null>(null)
+  
+  // Estado de ajuda de atalhos
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -163,7 +179,16 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Estampa o texto final no Canvas
+  // 🟢 Aplica transformação de escala e pan no contexto
+  const applyViewport = (ctx: CanvasRenderingContext2D) => {
+    ctx.setTransform(
+      viewport.scale, 0,
+      0, viewport.scale,
+      viewport.offsetX, viewport.offsetY
+    )
+  }
+
+  // Estampa o texto final no Canvas com suporte a múltiplas linhas e viewport
   const stampText = (coords: { x: number; y: number }, value: string) => {
     if (!value.trim()) return
 
@@ -172,10 +197,22 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    ctx.save()
+    // Aplica o zoom/pan antes de estampar
+    applyViewport(ctx)
+
     ctx.fillStyle = color
-    ctx.font = `bold ${Math.max(14, lineWidth * 4)}px Inter, sans-serif`
+    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`
     ctx.textBaseline = 'middle'
-    ctx.fillText(value, coords.x, coords.y)
+    ctx.textAlign = textAlign as CanvasTextAlign
+
+    const lines = value.split('\n')
+    const lineHeight = fontSize * 1.2
+    lines.forEach((line, index) => {
+      ctx.fillText(line, coords.x, coords.y + index * lineHeight)
+    })
+
+    ctx.restore()
     saveState(ctx)
   }
 
@@ -187,10 +224,15 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     }
   }
 
-  // Foca o input de texto automaticamente
+  // Foca o input de texto automaticamente com um pequeno timeout para aguardar a montagem no DOM
   useEffect(() => {
-    if (textInput && textInputRef.current) {
-      textInputRef.current.focus()
+    if (textInput) {
+      const timer = setTimeout(() => {
+        if (textInputRef.current) {
+          textInputRef.current.focus()
+        }
+      }, 50)
+      return () => clearTimeout(timer)
     }
   }, [textInput])
 
@@ -250,7 +292,52 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     saveState(ctx)
   }
 
-  // Obter coordenadas relativas corretas
+  // Eventos de Zoom e Pan (Desktop e Mobile)
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1
+      setViewport(prev => ({
+        ...prev,
+        scale: Math.max(0.1, Math.min(5, prev.scale * zoomFactor)),
+      }))
+    } else {
+      setViewport(prev => ({
+        ...prev,
+        offsetX: prev.offsetX - e.deltaX,
+        offsetY: prev.offsetY - e.deltaY,
+      }))
+    }
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      pinchStartDistRef.current = dist
+      pinchStartScaleRef.current = viewport.scale
+    } else {
+      startDrawing(e)
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault()
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      const newScale = (dist / pinchStartDistRef.current) * pinchStartScaleRef.current
+      setViewport(prev => ({ ...prev, scale: Math.max(0.1, Math.min(5, newScale)) }))
+    } else {
+      draw(e)
+    }
+  }
+
+  // Obter coordenadas relativas corrigidas pelo viewport
   const getCoordinates = (e: any): { x: number; y: number } => {
     const canvas = canvasRef.current
     if (!canvas) return { x: 0, y: 0 }
@@ -267,9 +354,12 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
       clientY = e.clientY
     }
 
+    const screenX = clientX - rect.left
+    const screenY = clientY - rect.top
+
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
+      x: (screenX - viewport.offsetX) / viewport.scale,
+      y: (screenY - viewport.offsetY) / viewport.scale,
     }
   }
 
@@ -283,6 +373,9 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     const { x, y } = getCoordinates(e)
 
     if (tool === 'text') {
+      if (e && typeof e.preventDefault === 'function') {
+        e.preventDefault()
+      }
       if (textInput) {
         stampText(textInput, textInputValue)
       }
@@ -314,6 +407,9 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     if (!ctx) return
 
     const { x, y } = getCoordinates(e)
+
+    // Aplica o transform de zoom/pan antes de desenhar
+    applyViewport(ctx)
 
     ctx.lineWidth = lineWidth
     ctx.lineCap = 'round'
@@ -496,6 +592,13 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
             <Grid className="size-4" />
           </button>
           <button
+            onClick={() => setShowShortcutsHelp(!showShortcutsHelp)}
+            title="Atalhos de Teclado"
+            className={`btn-ghost p-2 rounded-lg hidden md:inline-flex ${showShortcutsHelp ? 'bg-primary/10 text-primary' : 'text-text-muted'}`}
+          >
+            <HelpCircle className="size-4" />
+          </button>
+          <button
             onClick={handleUndo}
             disabled={historyPointerRef.current <= 0}
             title="Desfazer"
@@ -541,7 +644,10 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
       </header>
 
       {/* Área de Desenho */}
-      <div className="relative flex-1 min-h-0 overflow-hidden bg-zinc-950 select-none">
+      <div 
+        className="relative flex-1 min-h-0 overflow-hidden bg-zinc-950 select-none"
+        onWheel={handleWheel}
+      >
         {/* Grade de fundo estilo caderno */}
         {showGrid && (
           <div 
@@ -558,22 +664,23 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={stopDrawing}
-          className="h-full w-full cursor-crosshair touch-none"
+          className={`h-full w-full cursor-${tool === 'text' ? 'text' : 'crosshair'} touch-none`}
         />
 
-        {/* Input flutuante de texto */}
+        {/* Textarea flutuante de texto com autoResize */}
         {textInput && (
-          <input
-            ref={textInputRef}
-            type="text"
+          <textarea
+            ref={textInputRef as any}
             value={textInputValue}
             onChange={(e) => setTextInputValue(e.target.value)}
             onBlur={handleStampText}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              // Enter sem Shift finaliza a digitação e estampa no canvas
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
                 handleStampText()
               } else if (e.key === 'Escape') {
                 setTextInput(null)
@@ -582,21 +689,87 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
             }}
             style={{
               position: 'absolute',
-              left: `${textInput.x}px`,
-              top: `${textInput.y}px`,
+              left: `${textInput.x * viewport.scale + viewport.offsetX}px`,
+              top: `${textInput.y * viewport.scale + viewport.offsetY}px`,
               transform: 'translateY(-50%)',
               color: color,
-              font: `bold ${Math.max(14, lineWidth * 4)}px Inter, sans-serif`,
+              font: `${fontStyle} ${fontWeight} ${fontSize * viewport.scale}px ${fontFamily}, sans-serif`,
               background: 'rgba(9, 9, 11, 0.95)',
-              border: `1px dashed ${color}`,
-              padding: '2px 6px',
-              borderRadius: '4px',
+              border: `1.5px dashed ${color}`,
+              padding: '4px 8px',
+              borderRadius: '6px',
               outline: 'none',
               zIndex: 30,
-              minWidth: '140px',
+              minWidth: '150px',
+              textAlign: textAlign as any,
               caretColor: color,
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+              resize: 'both',
             }}
           />
+        )}
+
+        {/* Card flutuante de Atalhos de Teclado */}
+        {showShortcutsHelp && (
+          <div className="absolute top-4 right-4 z-40 bg-zinc-950/95 border border-border rounded-xl p-4 shadow-2xl w-56 animate-in slide-in-from-top-2 fade-in duration-200">
+            <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
+              <span className="text-[10px] font-bold text-text-strong uppercase tracking-wider">Atalhos de Teclado</span>
+              <button onClick={() => setShowShortcutsHelp(false)} className="text-text-muted hover:text-text-strong p-0.5">
+                <X className="size-3.5" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 text-[10px] font-medium text-text-medium">
+              <div className="flex items-center justify-between">
+                <span>Caneta</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">B</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Borracha</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">E</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Retângulo</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">R</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Círculo</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">C</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Reta</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">L</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Seta</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">A</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Texto</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">T</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Limpar</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">Del</kbd>
+              </div>
+              <div className="border-t border-border pt-2 mt-1 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span>Desfazer</span>
+                  <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">Ctrl+Z</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Refazer</span>
+                  <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">Ctrl+Y</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Linha - / +</span>
+                  <div className="flex gap-0.5">
+                    <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">[</kbd>
+                    <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-text-strong bg-surface border border-border rounded-md shadow-xs">]</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -637,6 +810,77 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
             >
               Preencher
             </button>
+          )}
+
+          {/* Opções de formatação exclusivas da ferramenta de texto */}
+          {tool === 'text' && (
+            <div className="flex flex-wrap items-center gap-2.5 border-l border-zinc-800 pl-3">
+              {/* Tamanho da Fonte */}
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] uppercase font-bold text-text-muted tracking-wider">Tamanho:</span>
+                <select
+                  value={fontSize}
+                  onChange={(e) => setFontSize(parseInt(e.target.value))}
+                  className="bg-surface border border-border text-text-strong rounded-md px-1.5 py-0.5 text-xs outline-none focus:border-primary/50"
+                >
+                  {[12, 14, 16, 20, 24, 28, 32, 40, 48].map((size) => (
+                    <option key={size} value={size}>{size}px</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Família da Fonte */}
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] uppercase font-bold text-text-muted tracking-wider">Fonte:</span>
+                <select
+                  value={fontFamily}
+                  onChange={(e) => setFontFamily(e.target.value)}
+                  className="bg-surface border border-border text-text-strong rounded-md px-1.5 py-0.5 text-xs outline-none focus:border-primary/50"
+                >
+                  <option value="Inter">Inter (Sans)</option>
+                  <option value="Arial">Arial</option>
+                  <option value="Courier New">Courier (Mono)</option>
+                  <option value="Georgia">Georgia (Serif)</option>
+                </select>
+              </div>
+
+              {/* Alinhamento */}
+              <div className="flex items-center gap-0.5 bg-surface border border-border rounded-md p-0.5">
+                {['left', 'center', 'right'].map((align) => (
+                  <button
+                    key={align}
+                    onClick={() => setTextAlign(align)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-all ${
+                      textAlign === align ? 'bg-primary text-white shadow-xs' : 'text-text-muted hover:text-text-strong'
+                    }`}
+                  >
+                    {align === 'left' ? 'Esq' : align === 'center' ? 'Cent' : 'Dir'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Negrito / Itálico */}
+              <div className="flex items-center gap-0.5 bg-surface border border-border rounded-md p-0.5">
+                <button
+                  onClick={() => setFontWeight(fontWeight === 'bold' ? 'normal' : 'bold')}
+                  className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${
+                    fontWeight === 'bold' ? 'bg-primary/20 text-primary border border-primary/30' : 'text-text-muted hover:text-text-strong'
+                  }`}
+                  title="Negrito"
+                >
+                  B
+                </button>
+                <button
+                  onClick={() => setFontStyle(fontStyle === 'italic' ? 'normal' : 'italic')}
+                  className={`px-2 py-0.5 rounded text-[9px] font-bold italic transition-all ${
+                    fontStyle === 'italic' ? 'bg-primary/20 text-primary border border-primary/30' : 'text-text-muted hover:text-text-strong'
+                  }`}
+                  title="Itálico"
+                >
+                  I
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Paleta de Cores */}
