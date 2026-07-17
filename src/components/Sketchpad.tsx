@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Minus,
   Grid,
+  Type,
 } from 'lucide-react'
 
 interface SketchpadProps {
@@ -23,7 +24,7 @@ interface SketchpadProps {
   onSave: (imageUrl: string) => void
 }
 
-type Tool = 'pen' | 'line' | 'arrow' | 'rect' | 'circle' | 'eraser'
+type Tool = 'pen' | 'line' | 'arrow' | 'rect' | 'circle' | 'eraser' | 'text'
 
 export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const supabase = createClient()
@@ -47,6 +48,11 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
   const snapshotRef = useRef<ImageData | null>(null)
   const [fillMode, setFillMode] = useState(false)
   const pointsRef = useRef<{ x: number; y: number }[]>([])
+  
+  // Estados da Ferramenta de Texto
+  const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null)
+  const [textInputValue, setTextInputValue] = useState('')
+  const textInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -143,6 +149,7 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
         case 'c': setTool('circle'); break
         case 'l': setTool('line'); break
         case 'a': setTool('arrow'); break
+        case 't': setTool('text'); break
         case '[': setLineWidth(w => Math.max(1, w - 1)); break
         case ']': setLineWidth(w => Math.min(20, w + 1)); break
         case 'delete':
@@ -155,6 +162,44 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Estampa o texto final no Canvas
+  const stampText = (coords: { x: number; y: number }, value: string) => {
+    if (!value.trim()) return
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.fillStyle = color
+    ctx.font = `bold ${Math.max(14, lineWidth * 4)}px Inter, sans-serif`
+    ctx.textBaseline = 'middle'
+    ctx.fillText(value, coords.x, coords.y)
+    saveState(ctx)
+  }
+
+  const handleStampText = () => {
+    if (textInput) {
+      stampText(textInput, textInputValue)
+      setTextInput(null)
+      setTextInputValue('')
+    }
+  }
+
+  // Foca o input de texto automaticamente
+  useEffect(() => {
+    if (textInput && textInputRef.current) {
+      textInputRef.current.focus()
+    }
+  }, [textInput])
+
+  // Estampa texto automaticamente caso mude de ferramenta
+  useEffect(() => {
+    if (tool !== 'text' && textInput) {
+      handleStampText()
+    }
+  }, [tool])
 
   const saveState = (ctx: CanvasRenderingContext2D) => {
     const canvas = canvasRef.current
@@ -236,6 +281,16 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     if (!ctx) return
 
     const { x, y } = getCoordinates(e)
+
+    if (tool === 'text') {
+      if (textInput) {
+        stampText(textInput, textInputValue)
+      }
+      setTextInput({ x, y })
+      setTextInputValue('')
+      return
+    }
+
     isDrawingRef.current = true
     startXRef.current = x
     startYRef.current = y
@@ -420,6 +475,7 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
     { id: 'arrow', label: 'Seta', icon: ArrowRight },
     { id: 'rect', label: 'Retângulo', icon: Square },
     { id: 'circle', label: 'Círculo', icon: Circle },
+    { id: 'text', label: 'Texto', icon: Type },
     { id: 'eraser', label: 'Borracha', icon: Eraser },
   ] as const
 
@@ -507,6 +563,41 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
           onTouchEnd={stopDrawing}
           className="h-full w-full cursor-crosshair touch-none"
         />
+
+        {/* Input flutuante de texto */}
+        {textInput && (
+          <input
+            ref={textInputRef}
+            type="text"
+            value={textInputValue}
+            onChange={(e) => setTextInputValue(e.target.value)}
+            onBlur={handleStampText}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleStampText()
+              } else if (e.key === 'Escape') {
+                setTextInput(null)
+                setTextInputValue('')
+              }
+            }}
+            style={{
+              position: 'absolute',
+              left: `${textInput.x}px`,
+              top: `${textInput.y}px`,
+              transform: 'translateY(-50%)',
+              color: color,
+              font: `bold ${Math.max(14, lineWidth * 4)}px Inter, sans-serif`,
+              background: 'rgba(9, 9, 11, 0.95)',
+              border: `1px dashed ${color}`,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              outline: 'none',
+              zIndex: 30,
+              minWidth: '140px',
+              caretColor: color,
+            }}
+          />
+        )}
       </div>
 
       {/* Caixa de Ferramentas Inferior */}
