@@ -132,8 +132,8 @@ async function handleSend(req: Request) {
             ? 'Esta é uma notificação de teste. Sua assinatura está funcionando!' 
             : `Você tem ${dueCount} cards pendentes. Isso vai demorar apenas ${estimatedMinutes} minutos. Vamos revisar?`,
           url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`,
-          icon: '/logo.png',
-          badge: '/logo.png'
+          icon: '/icon-192x192.png',
+          badge: '/notification-badge.png'
         })
 
         try {

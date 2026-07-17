@@ -34,8 +34,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
       body: payload.body,
-      icon: '/logo.png',
-      badge: '/logo.png',
+      icon: '/icon-192x192.png',
+      badge: '/notification-badge.png',
       vibrate: [100, 50, 100],
       data: {
         url: payload.url || '/dashboard/revisoes'

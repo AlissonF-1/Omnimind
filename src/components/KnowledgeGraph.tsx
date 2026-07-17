@@ -13,7 +13,8 @@ import { getNoteById, createNoteWithTitle } from '@/actions/notes'
 import { backfillEmbeddings } from '@/actions/embeddings'
 import { 
   Network, Loader2, ZoomIn, ZoomOut, Maximize2, 
-  BookOpen, MessageSquare, RefreshCw, X, ArrowRight, ListChecks 
+  BookOpen, MessageSquare, RefreshCw, X, ArrowRight, ListChecks,
+  HelpCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -98,6 +99,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('')
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false)
   const [isCreatingNote, setIsCreatingNote] = useState(false)
+  const [showLegendModal, setShowLegendModal] = useState(false)
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] })
   const [nodes, setNodes] = useState<SimulatedNode[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -573,33 +575,29 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-          <div className="flex items-center gap-2">
-            <label htmlFor="ws-select" className="text-[10px] md:text-xs font-semibold text-text-muted uppercase whitespace-nowrap">Workspace:</label>
-            <select
-              id="ws-select"
-              value={selectedWorkspaceId}
-              onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-              className="flex-1 bg-surface-muted border border-border text-text-strong rounded-lg px-2.5 md:px-3 py-1.5 text-[10px] md:text-xs min-w-[140px] md:min-w-[180px] outline-none focus:border-primary/50"
-            >
-              {workspaces.map(w => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
-          </div>
+        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end mt-1 md:mt-0">
+          <select
+            id="ws-select"
+            value={selectedWorkspaceId}
+            onChange={(e) => setSelectedWorkspaceId(e.target.value)}
+            className="flex-1 bg-surface-muted border border-border text-text-strong rounded-lg px-2.5 py-1.5 text-[11px] md:text-xs outline-none focus:border-primary/50"
+          >
+            {workspaces.map(w => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
           <button
             onClick={handleGenerateMap}
             disabled={isIndexing}
-            className="btn-primary py-1.5 px-2.5 md:px-3 text-[10px] md:text-xs flex items-center justify-center gap-1"
+            className="btn-primary py-1.5 px-3 text-[11px] md:text-xs flex items-center justify-center gap-1.5 shrink-0"
             title="Mapear pré-requisitos via IA de todas as notas do workspace"
           >
             {isIndexing ? (
-              <Loader2 className="size-3 md:size-3.5 animate-spin" />
+              <Loader2 className="size-3 animate-spin" />
             ) : (
-              <RefreshCw className="size-3 md:size-3.5" />
+              <RefreshCw className="size-3" />
             )}
             <span className="hidden sm:inline">Gerar Mapa</span>
-            <span className="sm:hidden">Mapa</span>
           </button>
         </div>
       </header>
@@ -672,17 +670,45 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
                 <button onClick={() => zoom(1.15)} className="p-1.5 md:p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom In"><ZoomIn className="size-3.5 md:size-4" /></button>
                 <button onClick={() => zoom(0.85)} className="p-1.5 md:p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Zoom Out"><ZoomOut className="size-3.5 md:size-4" /></button>
                 <button onClick={resetZoom} className="p-1.5 md:p-2 rounded-full hover:bg-surface-muted text-text-medium transition-colors" title="Focar Grafo"><Maximize2 className="size-3.5 md:size-4" /></button>
-                {!hasConnections && (
-                  <button 
-                    onClick={handleStartIndex}
-                    disabled={isIndexing}
-                    className="flex items-center gap-1 px-2 py-1 md:px-3 md:py-1.5 ml-1 md:ml-2 text-[9px] md:text-[10px] font-bold uppercase tracking-wide bg-primary/10 text-primary border border-primary/20 rounded-full hover:bg-primary/20 transition-all"
-                  >
-                    <RefreshCw className={`size-2.5 md:size-3 ${isIndexing ? 'animate-spin' : ''}`} /> 
-                    <span className="hidden md:inline">Indexar Conexões</span>
-                  </button>
-                )}
+                <div className="w-px h-3.5 md:h-4 bg-border md:hidden"></div>
+                <button 
+                  onClick={() => setShowLegendModal(!showLegendModal)} 
+                  className={`p-1.5 md:p-2 rounded-full transition-colors md:hidden ${showLegendModal ? 'bg-primary text-white shadow-lg' : 'hover:bg-surface-muted text-text-medium'}`} 
+                  title="Ver Legenda do Mapa"
+                >
+                  <HelpCircle className="size-3.5 md:size-4" />
+                </button>
               </div>
+
+              {/* Legenda para Mobile */}
+              {showLegendModal && (
+                <div className="absolute bottom-16 left-2 right-2 z-30 md:hidden bg-surface/95 border border-border rounded-xl p-3 shadow-xl backdrop-blur-md animate-in slide-in-from-bottom-2 fade-in duration-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[10px] font-bold text-text-strong uppercase tracking-wider">Legenda do Mapa</h4>
+                    <button onClick={() => setShowLegendModal(false)} className="text-text-muted hover:text-text-strong p-1">
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-medium text-text-medium">
+                    <div className="flex items-center gap-1.5">
+                      <div className="size-2 rounded-full bg-violet-600 shadow-[0_0_6px_rgba(139,92,246,0.5)]"></div> 
+                      <span>Conceito Alvo (Final)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="size-2 rounded-full bg-sky-500 shadow-[0_0_6px_rgba(14,165,233,0.5)]"></div> 
+                      <span>Intermediário</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="size-2 rounded-full bg-emerald-600 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></div> 
+                      <span>Conceito Base</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="size-2 rounded-full bg-zinc-900 border border-dashed border-zinc-500"></div>
+                      <span>Pré-requisito Ausente</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Elementos Vetoriais */}
               <svg
@@ -822,7 +848,7 @@ export default function KnowledgeGraph({ workspaces }: KnowledgeGraphProps) {
               </svg>
               
               {/* Legenda Explicativa do Grafo - Mobile otimizada */}
-              <div className="absolute bottom-2 md:bottom-4 right-2 md:right-4 z-10 flex flex-col gap-1.5 md:gap-2">
+              <div className="absolute bottom-2 md:bottom-4 right-2 md:right-4 z-10 hidden md:flex flex-col gap-1.5 md:gap-2">
                 <div className="bg-surface/90 border border-border rounded-lg md:rounded-xl p-2 md:p-3 shadow-lg backdrop-blur-sm max-w-[180px] md:max-w-none">
                   <h4 className="text-[9px] md:text-[10px] font-bold text-text-strong uppercase tracking-wider mb-1.5 md:mb-2">Estrutura do Mapa</h4>
                   <div className="flex flex-col gap-1 md:gap-1.5 text-[9px] md:text-xs font-medium text-text-medium">
