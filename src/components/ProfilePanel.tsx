@@ -5,6 +5,7 @@ import { Shield, Sparkles, RefreshCw, Edit3, Check, X, Trophy } from 'lucide-rea
 import { generatePlayerTitle, updatePlayerAvatar } from '@/actions/achievements'
 import { AVATAR_ICONS } from '@/utils/avatars'
 import { ACHIEVEMENTS } from '@/types/achievements'
+import StudyCompanion from '@/components/StudyCompanion'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -19,6 +20,7 @@ interface ProfileData {
   totalXp: number
   currentLevel: number
   streakShields: number
+  streak: number
   maxStreak: number
   cardsReviewed: number
   notesCreated: number
@@ -175,6 +177,11 @@ export default function ProfilePanel({ initialData }: { initialData: ProfileData
               <span>Nível {currentLevel + 1}</span>
             </div>
           </div>
+        </div>
+
+        {/* 🆕 Golem do Perfil (Maior e Animado) */}
+        <div className="hidden sm:block z-10 shrink-0 scale-125 ml-auto mr-4">
+          <StudyCompanion streak={data.streak || 0} />
         </div>
       </div>
 

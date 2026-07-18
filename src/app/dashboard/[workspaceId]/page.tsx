@@ -2,7 +2,7 @@ import { getNotes, createNote } from '@/actions/notes'
 import { getWorkspaceById } from '@/actions/workspaces'
 import { getWorkspaceFlashcardCounts } from '@/actions/stats'
 import { redirect, notFound } from 'next/navigation'
-import { FilePlus, FileText, Layers, Calendar, Archive, Sparkles } from 'lucide-react'
+import { FilePlus, FileText, Layers, Calendar, Archive, Sparkles, Trophy } from 'lucide-react'
 import SprintControl from '@/components/SprintControl'
 import WorkspaceFilterBar from '@/components/WorkspaceFilterBar'
 import WorkspaceNotesGrid from '@/components/WorkspaceNotesGrid'
@@ -100,6 +100,29 @@ export default async function WorkspacePage({
               <Calendar className="size-4" />
               {new Date(workspace.created_at).toLocaleDateString('pt-BR')}
             </span>
+          </div>
+
+          {/* Barra de Domínio/Maestria do Workspace */}
+          <div className="mt-4 max-w-md bg-surface/50 border border-border/40 rounded-xl p-3 shadow-sm select-none">
+            <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
+              <span className="text-text-strong flex items-center gap-1.5">
+                <Trophy className="size-3.5 text-amber-500 fill-amber-500/10 animate-pulse" />
+                Domínio da Matéria:
+              </span>
+              <span className="text-primary font-extrabold">
+                {workspace.mastery_level >= 10 ? 'Nível 10/10 (Mestre) 👑' : `Nível ${workspace.mastery_level || 1}/10`}
+              </span>
+            </div>
+            <div className="h-2 bg-border/40 rounded-full overflow-hidden relative border border-border/10">
+              <div 
+                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500 ease-out" 
+                style={{ width: `${workspace.mastery_level >= 10 ? 100 : (workspace.mastery_xp || 0) % 100}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-medium text-text-muted mt-1">
+              <span>{workspace.mastery_level >= 10 ? 'Max' : `${(workspace.mastery_xp || 0) % 100} / 100 XP`}</span>
+              <span>{workspace.mastery_level >= 10 ? 'Maestria Conquistada!' : `${100 - ((workspace.mastery_xp || 0) % 100)} XP para evoluir`}</span>
+            </div>
           </div>
         </div>
 

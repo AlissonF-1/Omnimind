@@ -1,4 +1,4 @@
-import { BrainCircuit, FolderPlus, NotebookPen, Sparkles, CalendarDays, AlertCircle } from 'lucide-react'
+import { BrainCircuit, FolderPlus, NotebookPen, Sparkles, CalendarDays, AlertCircle, Zap, Flame } from 'lucide-react'
 import Heatmap from '@/components/Heatmap'
 import DashboardStatsCards from '@/components/DashboardStatsCards'
 import DashboardRelearningAlert from '@/components/DashboardRelearningAlert'
@@ -7,9 +7,10 @@ import DailyProgressCircle from '@/components/DailyProgressCircle'
 import AchievementNotifier from '@/components/AchievementNotifier'
 import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, CriticalAlert, getWeeklyLearningCycleReport } from '@/actions/stats'
 import StudyInsightsPanel from '@/components/StudyInsightsPanel'
+import StudyCompanion from '@/components/StudyCompanion'
 import { getDynamicDailyGoal } from '@/actions/calendar'
 import { getBlindSpots } from '@/actions/blindspots'
-import { getUserStudyStats, checkAndUnlockAchievements, getDailyQuests, getStreakJeopardyStatus } from '@/actions/achievements'
+import { getUserStudyStats, checkAndUnlockAchievements, getDailyQuests, getStreakJeopardyStatus, getUserStreak } from '@/actions/achievements'
 import StreakRescueModal from '@/components/StreakRescueModal'
 import { getWorkspacesHealth } from '@/actions/workspaces'
 import { getUserPreferences } from '@/actions/settings'
@@ -104,28 +105,39 @@ export default async function DashboardPage() {
     year: 'numeric'
   }).format(new Date())
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const streak = user ? await getUserStreak(user.id) : 0
+
   return (
     <div className="page-container px-4 sm:px-6 py-4 sm:py-6">
       {/* Cabeçalho com data */}
-      <header className="mb-6 border-b border-border/50 pb-4 sm:pb-5">
-        <div className="flex items-center gap-2 mb-1">
-          <p className="text-sm font-medium text-primary flex items-center gap-2">
-            Painel
-          </p>
-          <span className="text-text-muted">•</span>
-          <span className="text-xs text-text-muted font-normal capitalize">
-            {today}
-          </span>
-        </div>
-        
-        <h1 className="page-title text-2xl sm:text-3xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <div className="relative size-14 sm:size-16 shrink-0 overflow-hidden rounded-full shadow-[0_0_25px_rgba(255,255,255,0.15)] border border-white/10">
-            <Image src={iconImage} alt={greeting} fill className="object-cover" />
+      <header className="mb-6 border-b border-border/50 pb-4 sm:pb-5 flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-sm font-medium text-primary flex items-center gap-2">
+              Painel
+            </p>
+            <span className="text-text-muted">•</span>
+            <span className="text-xs text-text-muted font-normal capitalize">
+              {today}
+            </span>
           </div>
-          <span>
-            {greeting} — sua memória te espera.
-          </span>
-        </h1>
+          
+          <h1 className="page-title text-2xl sm:text-3xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="relative size-14 sm:size-16 shrink-0 overflow-hidden rounded-full shadow-[0_0_25px_rgba(255,255,255,0.15)] border border-white/10">
+              <Image src={iconImage} alt={greeting} fill className="object-cover" />
+            </div>
+            <span>
+              {greeting} — sua memória te espera.
+            </span>
+          </h1>
+        </div>
+
+        {/* 🆕 O Golem (Study Companion) aparece aqui */}
+        <div className="hidden sm:block shrink-0">
+          <StudyCompanion streak={streak} />
+        </div>
       </header>
 
       <Suspense fallback={<DashboardLoading />}>
@@ -248,6 +260,26 @@ async function DashboardContent() {
               streakShields={userStats?.streak_shields || 0}
               isJeopardy={streakJeopardy?.isJeopardy}
             />
+
+            {/* ⚡ CARD DO MODO ULTIMATO */}
+            <div className="panel bg-gradient-to-br from-red-950/20 to-zinc-900/50 border-red-500/20 p-5 rounded-2xl flex flex-col justify-between shadow-[0_0_15px_rgba(239,68,68,0.02)]">
+              <div>
+                <h4 className="text-xs font-black text-red-500 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Zap className="size-3.5 animate-pulse text-red-400 fill-red-400/10" />
+                  Modo Ultimato
+                </h4>
+                <p className="text-[11px] text-text-medium mt-2 leading-relaxed">
+                  Força bruta de véspera de provas. Estude todos os cards dos próximos 15 dias ordenados por <strong>menor estabilidade primeiro</strong> em formato Quiz rápido.
+                </p>
+              </div>
+              <Link 
+                href="/dashboard/revisoes?mode=ultimato"
+                className="mt-4 w-full text-center py-2 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white text-[11px] font-bold transition-all active:scale-95 flex items-center justify-center gap-1 shadow-[0_4px_12px_rgba(239,68,68,0.15)]"
+              >
+                <Flame className="size-3 fill-current" />
+                Iniciar Força Bruta
+              </Link>
+            </div>
           </div>
         </div>
 

@@ -128,8 +128,16 @@ export async function getDueFlashcards(filters?: { workspaceId?: string; noteId?
 export async function submitReview(
   cardId: string,
   currentFsrsState: FsrsCardState,
-  grade: Rating
-): Promise<{ success?: boolean; error?: string; newlyUnlocked?: AchievementDetails[]; leveledUp?: { oldLevel: number; newLevel: number } | null; earnedDisciplineBadge?: boolean }> {
+  grade: Rating,
+  comboCount: number = 0
+): Promise<{ 
+  success?: boolean; 
+  error?: string; 
+  newlyUnlocked?: AchievementDetails[]; 
+  leveledUp?: { oldLevel: number; newLevel: number } | null; 
+  earnedDisciplineBadge?: boolean;
+  masteryLevelUp?: { oldLevel: number; newLevel: number; workspaceName: string } | null;
+}> {
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()
 
@@ -158,7 +166,7 @@ export async function submitReview(
     // Verifica se o flashcard está em uma nota do usuário
     const { data: note, error: noteError } = await supabase
       .from('notes')
-      .select('user_id, workspaces(name)')
+      .select('user_id, workspace_id, workspaces(name, mastery_level, mastery_xp)')
       .eq('id', card.note_id)
       .single()
 
@@ -244,6 +252,13 @@ export async function submitReview(
         }
       }
 
+      // Aplica multiplicador do Combo de Precisão ("Pegada do Mestre")
+      if (comboCount >= 10) {
+        xpAwarded = xpAwarded * 3
+      } else if (comboCount >= 5) {
+        xpAwarded = xpAwarded * 2
+      }
+
       // Adiciona XP calculado
       const xpRes = await addXp(xpAwarded)
       if (xpRes?.leveledUp) {
@@ -300,6 +315,64 @@ export async function submitReview(
       console.error('[submitReview] Erro ao processar gamificação e meta diária:', goalErr)
     }
 
+    // 4.2. Lógica do Domínio/Maestria do Workspace
+    let masteryLevelUp = null
+    try {
+      if (note && note.workspaces && note.workspace_id) {
+        const currentLevel = (note.workspaces as any).mastery_level || 1
+        const currentXp = (note.workspaces as any).mastery_xp || 0
+        
+        let masteryXpGain = 5
+        if (isCorrect) {
+          if (currentFsrsState.due) {
+            const dueDate = new Date(currentFsrsState.due)
+            const dueDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+            const today = new Date()
+            const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+            const diffTime = todayDay.getTime() - dueDay.getTime()
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+            
+            if (diffDays === -1 || diffDays === 0 || diffDays === 1) {
+              masteryXpGain = 10
+            }
+          }
+        } else {
+          masteryXpGain = -1
+        }
+
+        const newXp = Math.max(0, currentXp + masteryXpGain)
+        const newLevel = Math.min(10, Math.floor(newXp / 100) + 1)
+
+        // Se subiu de nível, salva
+        if (newLevel !== currentLevel) {
+          masteryLevelUp = {
+            oldLevel: currentLevel,
+            newLevel: newLevel,
+            workspaceName: (note.workspaces as any).name || 'Matéria'
+          }
+          
+          // Se chegou ao nível máximo 10 (Patriarca), atualiza título global do usuário
+          if (newLevel === 10) {
+            const workspaceName = (note.workspaces as any).name || 'Matéria'
+            await supabase.auth.updateUser({
+              data: { player_title: `Patriarca de ${workspaceName}` }
+            })
+          }
+        }
+
+        // Atualiza no banco com RLS/coluna fallback silenciosa
+        await supabase
+          .from('workspaces')
+          .update({
+            mastery_level: newLevel,
+            mastery_xp: newXp
+          })
+          .eq('id', note.workspace_id)
+      }
+    } catch (masteryErr) {
+      console.warn('[submitReview] Erro ao atualizar maestria (pode ser que as colunas da migration não estejam criadas na nuvem ainda):', masteryErr)
+    }
+
     // 5. Revalida paths
     revalidatePath('/dashboard/revisoes')
     revalidatePath('/dashboard')
@@ -317,9 +390,71 @@ export async function submitReview(
     const newlyUnlocked = await checkAndUnlockAchievements()
     const allNewlyUnlocked = [...newlyUnlocked, ...timeAchievements]
 
-    return { success: true, newlyUnlocked: allNewlyUnlocked, leveledUp: levelUpData, earnedDisciplineBadge }
+    return { success: true, newlyUnlocked: allNewlyUnlocked, leveledUp: levelUpData, earnedDisciplineBadge, masteryLevelUp }
   } catch (error) {
     console.error('[submitReview] Erro inesperado:', error)
     return { error: error instanceof Error ? error.message : 'Erro interno no processamento' }
+  }
+}
+
+/**
+ * Busca todos os flashcards do usuário (novos, vencidos ou vencendo nos próximos 15 dias)
+ * e os ordena por estabilidade (stability) crescente (menor estabilidade primeiro).
+ */
+export async function getUltimatumCards(filters?: { workspaceId?: string }) {
+  const supabase = await createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+  if (userError || !user) return []
+
+  try {
+    // 1. Busca todos os workspaces ativos do usuário
+    const { data: activeWs } = await supabase
+      .from('workspaces')
+      .select('id')
+      .eq('is_archived', false)
+      .eq('user_id', user.id)
+
+    const activeWsIds = activeWs?.map(w => w.id) || []
+    if (activeWsIds.length === 0) return []
+
+    // 2. Calcula data limite de 15 dias no futuro
+    const fifteenDaysFromNow = new Date()
+    fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15)
+    const limitIso = fifteenDaysFromNow.toISOString()
+
+    // 3. Query principal: cards sem data de vencimento OR vencidos OR vencendo nos próximos 15 dias
+    let query = supabase
+      .from('flashcards')
+      .select(`
+        *,
+        notes!inner (
+          id, title, content, workspace_id, user_id  
+        )
+      `)
+      .eq('notes.user_id', user.id)
+      .in('notes.workspace_id', activeWsIds)
+      .or(`due.is.null,state.eq.0,state.is.null,due.lte.${limitIso}`)
+
+    if (filters?.workspaceId) {
+      query = query.eq('notes.workspace_id', filters.workspaceId)
+    }
+
+    const { data, error } = await query
+
+    if (error || !data) return []
+
+    // 4. Ordena por estabilidade crescente (stability menor primeiro)
+    const sorted = [...data]
+    sorted.sort((a: any, b: any) => {
+      const stabA = a.stability !== undefined && a.stability !== null ? a.stability : 0
+      const stabB = b.stability !== undefined && b.stability !== null ? b.stability : 0
+      return stabA - stabB
+    })
+
+    return sorted
+  } catch (error) {
+    console.error('[getUltimatumCards] Erro inesperado:', error)
+    return []
   }
 }

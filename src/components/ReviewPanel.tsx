@@ -36,10 +36,11 @@ import {
   Minimize2,
   Skull,
   Ghost,
+  Zap,
 } from 'lucide-react'
 import RelearningAlert from './RelearningAlert'
 import { useSettings } from '@/contexts/SettingsContext'
-import { getBestVoice } from '@/utils/audio'
+import { getBestVoice, playButtonClick, playEvaluationSound } from '@/utils/audio'
 import { evaluateAnswerWithGroq, generateDistractorsWithGroq } from '@/actions/groq'
 import { searchYoutubeExplanation } from '@/actions/externalContent' // NOVA IMPORT
 
@@ -66,7 +67,12 @@ interface ReviewCard {
   }
 }
 
-export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard[] }) {
+interface ReviewPanelProps {
+  initialCards: ReviewCard[]
+  mode?: 'default' | 'ultimato'
+}
+
+export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPanelProps) {
   const { settings } = useSettings()
   const [cards, setCards] = useState<ReviewCard[]>(initialCards)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -120,10 +126,25 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0, hard: 0 })
 
   // ESTADOS DO MODO SIMULADO
-  const [isSimuladoMode, setIsSimuladoMode] = useState(false)
+  const [isSimuladoMode, setIsSimuladoMode] = useState(mode === 'ultimato')
   const [quizOptions, setQuizOptions] = useState<string[]>([])
   const [selectedQuizOption, setSelectedQuizOption] = useState<string | null>(null)
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false)
+
+  // ESTADO DO TIMER DE LEITURA OBRIGATÓRIA (MODO ULTIMATO)
+  const [ultimatumTimer, setUltimatumTimer] = useState(0)
+
+  // 🟢 ESTADOS DO COMBO DE PRECISÃO ("PEGADA DO MESTRE")
+  const [comboCount, setComboCount] = useState(0)
+
+  useEffect(() => {
+    if (ultimatumTimer > 0) {
+      const timer = setTimeout(() => {
+        setUltimatumTimer(prev => prev - 1)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [ultimatumTimer])
   
   // ESTADOS DO MODO BATALHA (BOSS FIGHT)
   const [isBossMode, setIsBossMode] = useState(false)
@@ -332,6 +353,24 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       }
     })
   }, [])
+
+  const [hasLoggedFinishMilestone, setHasLoggedFinishMilestone] = useState(false)
+
+  useEffect(() => {
+    if (!activeCard && cards.length > 0 && !hasLoggedFinishMilestone) {
+      setHasLoggedFinishMilestone(true)
+      const runFinishMilestone = async () => {
+        const { addMilestone } = await import('@/actions/milestones')
+        const topicName = cards[0]?.notes?.title || 'Estudos'
+        if (sessionStats.wrong === 0 && sessionStats.correct > 0) {
+          await addMilestone(`Você sobreviveu à ofensiva em ${topicName} e completou a revisão com 100% de acertos! ⚔️`, 'perfect_review')
+        } else if (sessionStats.correct > 0) {
+          await addMilestone(`Você finalizou a campanha de estudos de hoje em ${topicName}.`, 'session_complete')
+        }
+      }
+      runFinishMilestone().catch(console.error)
+    }
+  }, [activeCard, cards, sessionStats, hasLoggedFinishMilestone])
 
   // --- Verificação de alerta de reaprendizagem ---
   useEffect(() => {
@@ -749,7 +788,40 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
     setSelectedQuizOption(option)
     
     const isCorrect = option === activeCard.back
+
+    if (mode === 'ultimato') {
+      if (isCorrect) {
+        if (settings.enable_sounds) {
+          playEvaluationSound(true)
+        }
+        setAiFeedback({
+          correct: true,
+          feedback: 'Parabéns! Alternativa correta.'
+        })
+        addXp(XP_CONFIG.PERFECT_SIMULADO).catch(console.error)
+        
+        // Avanço automático após 1 segundo no acerto
+        setTimeout(() => {
+          handleReview(Rating.Good)
+        }, 1000)
+      } else {
+        if (settings.enable_sounds) {
+          playEvaluationSound(false)
+        }
+        setAiFeedback({
+          correct: false,
+          feedback: `Alternativa incorreta. A resposta correta é: "${activeCard.back}".`
+        })
+        setIsFlipped(true)
+        setUltimatumTimer(3) // Bloqueia avanço por 3 segundos
+      }
+      return
+    }
+
     if (isCorrect) {
+      if (settings.enable_sounds) {
+        playEvaluationSound(true)
+      }
       setAiFeedback({
         correct: true,
         feedback: 'Parabéns! Você escolheu a alternativa correta.'
@@ -785,6 +857,9 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         }
       }
     } else {
+      if (settings.enable_sounds) {
+        playEvaluationSound(false)
+      }
       setAiFeedback({
         correct: false,
         feedback: `Você escolheu a alternativa incorreta. A resposta correta é: "${activeCard.back}".`
@@ -813,12 +888,27 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       navigator.vibrate(10)
     }
 
+    if (settings.enable_sounds) {
+      playButtonClick(grade)
+    }
+
     // Para qualquer leitura de voz em andamento ao avançar o card
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
       setIsTtsLoading(false);
     }
+
+    // Lógica do Combo de Precisão ("Pegada do Mestre")
+    const isCorrect = grade === Rating.Good || grade === Rating.Easy
+    const newCombo = isCorrect ? comboCount + 1 : 0
+    setComboCount(newCombo)
+
+    // Se o usuário alcançou o combo mestre (>= 10), ativa glow do Golem no Dashboard
+    if (newCombo >= 10 && typeof window !== 'undefined') {
+      localStorage.setItem('omnimind_mastery_combo_glow', 'true')
+    }
+
     // Desafio de Resgate de Streak
     if (isJeopardy && !rescueSuccess) {
       if (grade === Rating.Good || grade === Rating.Easy) {
@@ -873,7 +963,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
     setCurrentIndex(prev => prev + 1)
 
     // 3. Salva a revisão no banco em background sem bloquear a interface do usuário
-    submitReview(activeCard.id, activeCard, grade)
+    submitReview(activeCard.id, activeCard, grade, newCombo)
       .then((res) => {
         if (isCrammingMode) return // Sem barulho ou toasts de conquistas no Cramming!
 
@@ -889,6 +979,18 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         if (res && res.leveledUp) {
           window.dispatchEvent(new CustomEvent('level-up', {
             detail: { oldLevel: res.leveledUp.oldLevel, newLevel: res.leveledUp.newLevel }
+          }))
+        }
+        // Dispara subida de nível de domínio (Maestria) do workspace
+        if (res && res.masteryLevelUp) {
+          window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+            detail: {
+              id: `mastery_${res.masteryLevelUp.workspaceName}`,
+              title: res.masteryLevelUp.newLevel === 10 ? '👑 Patriarca da Matéria!' : '🏆 Domínio Evoluiu!',
+              description: res.masteryLevelUp.newLevel === 10 
+                ? `Você se tornou o Patriarca de ${res.masteryLevelUp.workspaceName}!`
+                : `Seu domínio em ${res.masteryLevelUp.workspaceName} subiu para o Nível ${res.masteryLevelUp.newLevel}!`
+            }
           }))
         }
       })
@@ -1115,6 +1217,18 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       <div className="w-full mb-6 flex items-center justify-between text-sm font-medium shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-text-muted">Cartão {currentIndex + 1} de {cards.length}</span>
+          
+          {/* Badge de Combo de Precisão */}
+          {comboCount >= 5 && (
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border animate-pulse select-none ${
+              comboCount >= 10 
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+            }`}>
+              {comboCount >= 10 ? <Zap className="size-3 text-amber-400 fill-amber-400/20 animate-bounce" /> : <Flame className="size-3 text-orange-400 fill-orange-400/20" />}
+              <span>{comboCount >= 10 ? `Mestre x${comboCount}` : `Combo x${comboCount}`}</span>
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -1150,17 +1264,28 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         </div>
       </div>
 
-      {/* Painel principal do card */}
-      <div
-        className={`w-full panel p-6 md:p-10 flex-1 min-h-0 overflow-y-auto flex flex-col relative transition-all duration-300 custom-scrollbar cursor-pointer
-          ${isEnrageMode ? 'shadow-[0_0_20px_rgba(239,68,68,0.6)] border-red-500/50' : ''}
-          ${combatFeedback === 'miss' ? 'animate-shake border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : ''}
-          ${combatFeedback === 'hit' ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}
-        `}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onClick={() => !isFlipped && !responseMethod && !isSimuladoMode && setIsFlipped(true)}
-      >
+      {/* Container com Glow do Combo de Precisão */}
+      <div className="w-full flex-1 min-h-0 flex flex-col relative">
+        {comboCount >= 5 && (
+          <div className={`absolute -inset-1 rounded-[20px] opacity-35 blur-xl transition-all duration-500 animate-[pulse_3s_ease-in-out_infinite] pointer-events-none -z-10 ${
+            comboCount >= 10
+              ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 shadow-[0_0_35px_rgba(245,158,11,0.4)]'
+              : 'bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 shadow-[0_0_20px_rgba(249,115,22,0.25)]'
+          }`} />
+        )}
+
+        {/* Painel principal do card */}
+        <div
+          className={`w-full panel p-6 md:p-10 flex-1 min-h-0 overflow-y-auto flex flex-col relative transition-all duration-300 custom-scrollbar cursor-pointer
+            ${isEnrageMode ? 'shadow-[0_0_20px_rgba(239,68,68,0.6)] border-red-500/50' : ''}
+            ${combatFeedback === 'miss' ? 'animate-shake border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : ''}
+            ${combatFeedback === 'hit' ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}
+            ${comboCount >= 10 ? 'ring-2 ring-amber-500/80 border-amber-500/50' : comboCount >= 5 ? 'ring-2 ring-orange-500/60 border-orange-500/40' : ''}
+          `}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onClick={() => !isFlipped && !responseMethod && !isSimuladoMode && setIsFlipped(true)}
+        >
         {isEvaluating ? (
           <div className="text-center flex flex-col h-full justify-center items-center my-auto animate-pulse">
             <BrainCircuit className="size-16 text-primary animate-bounce mb-4" />
@@ -1411,7 +1536,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
       {/* Barra FSRS ou botões de resposta por Voz/Texto */}
       <div className="w-full mt-6 space-y-3 shrink-0">
         {/* Simulado e Áudio posicionados na base antes das opções de resposta */}
-        {!isFlipped && !responseMethod && (
+        {!isFlipped && !responseMethod && mode !== 'ultimato' && (
           <div className="flex items-center justify-between gap-3 w-full border-t border-border/40 pt-3.5 pb-1" onClick={e => e.stopPropagation()}>
             <div className="flex flex-wrap gap-1.5 max-w-[70%]">
               <button
@@ -1536,86 +1661,47 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         )}
 
         {isFlipped && (
-          <div className="flex gap-2 justify-center text-xs">
-            <div className="px-3 py-1.5 bg-success-soft/50 rounded-full text-success font-medium border border-success/20">✓ {sessionStats.correct}</div>
-            <div className="px-3 py-1.5 bg-warning-soft/50 rounded-full text-warning font-medium border border-warning/20">⚠ {sessionStats.hard}</div>
-            <div className="px-3 py-1.5 bg-error-soft/50 rounded-full text-error font-medium border border-error/20">✗ {sessionStats.wrong}</div>
-          </div>
-        )}
-
-        {!isFlipped ? (
-          isSimuladoMode ? (
-            <div className="w-full text-center py-4 text-xs text-text-muted font-medium bg-surface-muted/20 border border-border/50 rounded-2xl animate-in fade-in duration-200">
-              Escolha uma das alternativas acima para responder o simulado.
-            </div>
-          ) : responseMethod ? (
-            <div className="flex gap-3 w-full">
-              <button onClick={handleCancelRecording} className="btn-secondary h-14 text-sm font-semibold rounded-2xl flex-1 hover:bg-surface-hover" disabled={isEvaluating}>
-                Cancelar
-              </button>
-              {responseMethod === 'voice' && isRecording ? (
-                <button onClick={toggleRecording} className="btn-secondary h-14 text-sm font-semibold rounded-2xl flex-1 text-error border-error/20 hover:bg-error-soft/50 flex items-center justify-center gap-2 animate-pulse">
-                  <Square className="size-4 fill-current animate-scale" />
-                  Concluir Fala
+          mode === 'ultimato' ? (
+            <div className="w-full" onClick={e => e.stopPropagation()}>
+              {ultimatumTimer > 0 ? (
+                <button
+                  disabled
+                  className="w-full h-14 bg-surface border border-border/40 text-text-muted text-xs font-semibold rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed opacity-50"
+                >
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Leitura Obrigatória: {ultimatumTimer}s...</span>
                 </button>
               ) : (
-                <button onClick={handleEvaluateWithAI} disabled={!userAnswerText.trim() || isEvaluating} className="btn-primary h-14 text-base font-semibold rounded-2xl flex-[2] bg-gradient-to-r from-primary to-primary-hover flex items-center justify-center gap-2 shadow-[var(--shadow-soft)] disabled:opacity-50">
-                  {isEvaluating ? (
-                    <><Loader2 className="size-5 animate-spin" /><span>Analisando...</span></>
-                  ) : (
-                    <><Sparkles className="size-5" /><span>Avaliar com IA</span></>
-                  )}
+                <button
+                  onClick={() => handleReview(Rating.Again)}
+                  className="w-full h-14 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-1 shadow-[0_4px_12px_rgba(239,68,68,0.25)] active:scale-95 transition-all"
+                >
+                  <span>Avançar (Marcar como Errado) ➡️</span>
                 </button>
               )}
             </div>
           ) : (
-            <div className="w-full flex flex-col gap-3">
-              {/* Opção de Transcrição Avançada */}
-              <div className="flex items-center justify-end gap-2 px-1">
-                <label className="text-xs font-semibold text-text-muted cursor-pointer flex items-center gap-1.5 select-none">
-                  <input
-                    type="checkbox"
-                    checked={isUsingAdvancedSpeech}
-                    onChange={(e) => setIsUsingAdvancedSpeech(e.target.checked)}
-                    className="rounded border-border text-primary focus:ring-primary size-3.5"
-                  />
-                  <span>Transcrição Avançada (Groq Whisper ⚡)</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 w-full">
-                <button onClick={() => { setResponseMethod('voice'); toggleRecording() }} className="col-span-1 flex items-center justify-center gap-2 btn-secondary h-14 text-base font-semibold rounded-2xl flex-1 hover:bg-surface-hover transition-colors">
-                  <Mic className="size-5 text-primary" /><span>Voz</span>
-                </button>
-                <button onClick={() => { setResponseMethod('text'); setUserAnswerText(''); setTimeout(() => { const textarea = document.querySelector('textarea'); textarea?.focus() }, 50) }} className="col-span-1 flex items-center justify-center gap-2 btn-secondary h-14 text-base font-semibold rounded-2xl flex-1 hover:bg-surface-hover transition-colors">
-                  <Keyboard className="size-5 text-primary" /><span>Texto</span>
-                </button>
-                <button onClick={() => setIsFlipped(true)} className="col-span-2 btn-primary h-14 text-base font-semibold rounded-2xl flex-1 sm:flex-[1.5] bg-primary hover:bg-primary-hover text-white flex items-center justify-center shadow-[var(--shadow-soft)]">
-                  Mostrar Resposta
-                </button>
-              </div>
+            <div className="grid grid-cols-4 gap-2 w-full animate-in fade-in duration-200">
+              <button disabled={isSubmitting} onClick={() => handleReview(Rating.Again)} className="flex flex-col items-center justify-center bg-error-soft/50 hover:bg-error-soft border border-error/20 rounded-2xl text-error transition-all active:scale-95 disabled:opacity-50 py-3">
+                <span className="font-bold mb-1 md:text-base text-sm">Errei</span>
+                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Again)}</span>
+              </button>
+              <button disabled={isSubmitting} onClick={() => handleReview(Rating.Hard)} className="flex flex-col items-center justify-center bg-warning-soft/50 hover:bg-warning-soft border border-warning/20 rounded-2xl text-warning transition-all active:scale-95 disabled:opacity-50 py-3">
+                <span className="font-bold mb-1 md:text-base text-sm">Difícil</span>
+                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Hard)}</span>
+              </button>
+              <button disabled={isSubmitting} onClick={() => handleReview(Rating.Good)} className="flex flex-col items-center justify-center bg-primary-soft/50 hover:bg-primary-soft border border-primary/20 rounded-2xl text-primary transition-all active:scale-95 disabled:opacity-50 py-3">
+                <span className="font-bold mb-1 md:text-base text-sm">Bom</span>
+                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Good)}</span>
+              </button>
+              <button disabled={isSubmitting || (aiFeedback !== null && !aiFeedback.correct)} onClick={() => handleReview(Rating.Easy)} className={`flex flex-col items-center justify-center bg-success-soft/50 hover:bg-success-soft border border-success/20 rounded-2xl text-success transition-all active:scale-95 py-3 ${aiFeedback !== null && !aiFeedback.correct ? 'opacity-40 cursor-not-allowed hover:bg-success-soft/50 active:scale-100' : 'disabled:opacity-50'}`} title={aiFeedback !== null && !aiFeedback.correct ? "O Tutor AI avaliou que você errou a resposta, por isso a opção 'Fácil' foi desabilitada." : undefined}>
+                <span className="font-bold mb-1 md:text-base text-sm">Fácil</span>
+                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Easy)}</span>
+              </button>
             </div>
           )
-        ) : (
-          <div className="grid grid-cols-4 gap-2 w-full animate-in fade-in duration-200">
-            <button disabled={isSubmitting} onClick={() => handleReview(Rating.Again)} className="flex flex-col items-center justify-center bg-error-soft/50 hover:bg-error-soft border border-error/20 rounded-2xl text-error transition-all active:scale-95 disabled:opacity-50 py-3">
-              <span className="font-bold mb-1 md:text-base text-sm">Errei</span>
-              <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Again)}</span>
-            </button>
-            <button disabled={isSubmitting} onClick={() => handleReview(Rating.Hard)} className="flex flex-col items-center justify-center bg-warning-soft/50 hover:bg-warning-soft border border-warning/20 rounded-2xl text-warning transition-all active:scale-95 disabled:opacity-50 py-3">
-              <span className="font-bold mb-1 md:text-base text-sm">Difícil</span>
-              <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Hard)}</span>
-            </button>
-            <button disabled={isSubmitting} onClick={() => handleReview(Rating.Good)} className="flex flex-col items-center justify-center bg-primary-soft/50 hover:bg-primary-soft border border-primary/20 rounded-2xl text-primary transition-all active:scale-95 disabled:opacity-50 py-3">
-              <span className="font-bold mb-1 md:text-base text-sm">Bom</span>
-              <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Good)}</span>
-            </button>
-            <button disabled={isSubmitting || (aiFeedback !== null && !aiFeedback.correct)} onClick={() => handleReview(Rating.Easy)} className={`flex flex-col items-center justify-center bg-success-soft/50 hover:bg-success-soft border border-success/20 rounded-2xl text-success transition-all active:scale-95 py-3 ${aiFeedback !== null && !aiFeedback.correct ? 'opacity-40 cursor-not-allowed hover:bg-success-soft/50 active:scale-100' : 'disabled:opacity-50'}`} title={aiFeedback !== null && !aiFeedback.correct ? "O Tutor AI avaliou que você errou a resposta, por isso a opção 'Fácil' foi desabilitada." : undefined}>
-              <span className="font-bold mb-1 md:text-base text-sm">Fácil</span>
-              <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Easy)}</span>
-            </button>
-          </div>
         )}
+        </div>
       </div>
 
       {/* Modal de contexto da nota */}

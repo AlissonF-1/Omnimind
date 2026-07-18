@@ -221,6 +221,33 @@ export async function toggleActiveGoal(goalId: string) {
   revalidatePath('/dashboard/calendario')
 }
 
+// Helper local para traduzir o título da prova em campanha militar épica
+function generateCampaignName(title: string): string {
+  const adjetivos = [
+    'A Marcha',
+    'O Cerco',
+    'A Ofensiva',
+    'A Batalha',
+    'A Conquista',
+    'A Campanha',
+    'A Travessia',
+    'A Epopeia',
+    'O Despertar',
+    'O Destino'
+  ];
+  const cleanedTitle = title
+    .replace(/^(prova de|exame de|estudo de|revisão de|prova|exame|simulado de|simulado)\s+/i, '')
+    .trim();
+    
+  const index = title.length % adjetivos.length;
+  const prefix = adjetivos[index];
+  
+  const firstLetter = cleanedTitle.charAt(0).toLowerCase();
+  const prep = ['a', 'e', 'i', 'o', 'u'].includes(firstLetter) ? "d'" : "de ";
+  
+  return `${prefix} ${prep}${cleanedTitle}`;
+}
+
 export async function createExamGoal(
   title: string,
   examDate: string,
@@ -241,6 +268,16 @@ export async function createExamGoal(
   })
 
   if (error) throw new Error(error.message)
+
+  // Dispara a criação do marco narrativo do semestre
+  try {
+    const { addMilestone } = await import('@/actions/milestones')
+    const campaign = generateCampaignName(title)
+    const formattedDate = new Date(examDate).toLocaleDateString('pt-BR')
+    await addMilestone(`A campanha militar "${campaign}" foi declarada para o dia ${formattedDate}. 🛡️`, 'exam_created')
+  } catch (err) {
+    console.warn('[createExamGoal] Erro ao criar marco da jornada:', err)
+  }
 
   // Dispara checagem de conquistas em background (ex: O Planejador)
   const { checkAndUnlockAchievements } = await import('@/actions/achievements')

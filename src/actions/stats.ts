@@ -329,6 +329,7 @@ export async function getProfileStats() {
     totalXp: userStats?.total_xp || 0,
     currentLevel: userStats?.current_level || 1,
     streakShields: userStats?.streak_shields || 0,
+    streak: await getUserStreak(user.id),
     maxStreak: maxStreak,
     cardsReviewed: totalReviews,
     notesCreated: notesCount || 0,
