@@ -30,7 +30,7 @@ if (publicKey && privateKey) {
 }
 
 // ⚠️ FLAG DE TESTE: Ignora a contagem de cards e envia uma notificação de teste para TODOS os usuários registrados
-const SKIP_DUE_CHECK = true; // Mude para false quando quiser voltar ao normal
+const SKIP_DUE_CHECK = false; // Mude para false quando quiser voltar ao normal
 
 async function getUserDueCardsCount(supabase: any, userId: string): Promise<number> {
   // ... (seu código original de contagem permanece idêntico) ...
