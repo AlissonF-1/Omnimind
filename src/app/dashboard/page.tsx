@@ -5,7 +5,8 @@ import DashboardRelearningAlert from '@/components/DashboardRelearningAlert'
 import BlindSpotsPanel from '@/components/BlindSpotsPanel'
 import DailyProgressCircle from '@/components/DailyProgressCircle'
 import AchievementNotifier from '@/components/AchievementNotifier'
-import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, CriticalAlert } from '@/actions/stats'
+import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, CriticalAlert, getWeeklyLearningCycleReport } from '@/actions/stats'
+import StudyInsightsPanel from '@/components/StudyInsightsPanel'
 import { getDynamicDailyGoal } from '@/actions/calendar'
 import { getBlindSpots } from '@/actions/blindspots'
 import { getUserStudyStats, checkAndUnlockAchievements, getDailyQuests, getStreakJeopardyStatus } from '@/actions/achievements'
@@ -153,7 +154,8 @@ async function DashboardContent() {
       dynamicGoalData,
       streakJeopardy,
       workspacesHealth,
-      settings
+      settings,
+      weeklyAiReport
     ] = await Promise.all([
       getDailyStudyLogs(),
       getUserDashboardStats(),
@@ -165,7 +167,8 @@ async function DashboardContent() {
       getDynamicDailyGoal(),
       getStreakJeopardyStatus(),
       getWorkspacesHealth(),
-      getUserPreferences()
+      getUserPreferences(),
+      getWeeklyLearningCycleReport()
     ])
 
     const hasActivity = studyLogs && studyLogs.length > 0
@@ -250,6 +253,9 @@ async function DashboardContent() {
 
         {/* Grid de Saúde de Retenção dos Workspaces */}
         <WorkspaceHealthGrid healths={workspacesHealth} />
+
+        {/* 🧠 Insights do Cérebro (Horário de Ouro & Relatório de Ciclo IA) */}
+        <StudyInsightsPanel logs={studyLogs || []} aiReport={weeklyAiReport?.report || ''} />
 
 
 

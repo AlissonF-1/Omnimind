@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { getUserStudyStats, getUserStreak } from '@/actions/achievements'
+import { callAIWithFallback } from '@/lib/ai-fallback'
 
 export async function getDailyStudyLogs() {
   const supabase = await createClient()
@@ -334,5 +335,88 @@ export async function getProfileStats() {
     perfectExams: userStats?.perfect_exams_count || 0,
     unlockedAchievements: userStats?.unlocked_achievements || [],
     recentActivity: last7Days
+  }
+}
+
+export async function getWeeklyLearningCycleReport() {
+  const supabase = await createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return { report: 'Não autenticado' }
+
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  try {
+    // 1. Verifica se já temos o relatório de hoje salvo no banco
+    const { data: todayLog } = await supabase
+      .from('daily_study_logs')
+      .select('ai_report')
+      .eq('user_id', user.id)
+      .eq('study_date', todayStr)
+      .maybeSingle()
+
+    if (todayLog?.ai_report) {
+      return { report: todayLog.ai_report }
+    }
+
+    // 2. Busca estatísticas dos flashcards
+    const { data: flashcards } = await supabase
+      .from('flashcards')
+      .select(`
+        stability, difficulty, lapses, reps,
+        notes!inner(user_id, title)
+      `)
+      .eq('notes.user_id', user.id)
+
+    if (!flashcards || flashcards.length === 0) {
+      return { report: 'Ainda não há dados suficientes de flashcards para gerar o relatório de ciclo. Estude alguns cards primeiro!' }
+    }
+
+    const totalCards = flashcards.length
+    const masteredCount = flashcards.filter(c => c.stability >= 15).length
+    const lowRetentionCount = flashcards.filter(c => c.lapses >= 2 || c.stability < 3).length
+    
+    const topicLapses: Record<string, number> = {}
+    flashcards.forEach(c => {
+      const topicName = (c.notes as any)?.title || 'Estudos Gerais'
+      topicLapses[topicName] = (topicLapses[topicName] || 0) + (c.lapses || 0)
+    })
+    const worstTopics = Object.entries(topicLapses)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(entry => `${entry[0]} (Lapsos: ${entry[1]})`)
+      .join(', ')
+
+    // 3. IA Llama 3
+    const systemPrompt = `Você é um tutor inteligente e motivador (Coach do OmniMind). Seu objetivo é analisar as estatísticas de estudo semanais e gerar um relatório do Ciclo de Aprendizado resumido e motivador em exatamente 2 parágrafos no formato Markdown. Seja direto e encorajador. Fale diretamente com o estudante.`
+    const userPrompt = `Aqui estão meus dados acumulados:
+- Total de Cards: ${totalCards}
+- Cards Consolidados (Stability >= 15d): ${masteredCount} (Taxa: ${Math.round((masteredCount/totalCards)*100)}%)
+- Tópicos com dificuldade (Lapses >= 2 ou Stability < 3d): ${lowRetentionCount} cards
+- Tópicos com maior recorrência de lapsos: ${worstTopics || 'Nenhum por enquanto'}
+
+Escreva o relatório de ciclo em português. Não use títulos grandes, apenas quebras de parágrafo.`
+
+    const result = await callAIWithFallback(systemPrompt, userPrompt, 'simple', false)
+
+    if (!result.success) {
+      throw new Error(result.error || 'Erro na resposta do modelo de IA')
+    }
+
+    const reportText = result.content || 'Não foi possível gerar o sumário semanal.'
+
+    // 4. Salva o relatório no log de hoje
+    await supabase
+      .from('daily_study_logs')
+      .upsert({
+        user_id: user.id,
+        study_date: todayStr,
+        ai_report: reportText
+      }, { onConflict: 'user_id,study_date' })
+
+    return { report: reportText }
+
+  } catch (error: any) {
+    console.error('Erro ao gerar relatório de ciclo semanal:', error)
+    return { report: `Não foi possível carregar seu relatório semanal agora. Erro: ${error.message}` }
   }
 }

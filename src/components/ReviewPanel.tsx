@@ -141,6 +141,99 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   const [currentBattleTrack, setCurrentBattleTrack] = useState('/sounds/battle.mp3')
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  // 🟢 ESTADOS E REFS DOS NOVOS MODOS DE ESTUDO (SOBREVIVÊNCIA & ZEN)
+  const [isCrammingMode, setIsCrammingMode] = useState(false)
+  const [isZenMode, setIsZenMode] = useState(false)
+
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null)
+  const gainNodeRef = useRef<GainNode | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedCramming = localStorage.getItem('omnimind_cramming_mode') === 'true'
+      const savedZen = localStorage.getItem('omnimind_zen_mode') === 'true'
+      setIsCrammingMode(savedCramming)
+      setIsZenMode(savedZen)
+    }
+  }, [])
+
+  const startZenNoise = useCallback(() => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      const ctx = new AudioContextClass()
+      audioCtxRef.current = ctx
+
+      const bufferSize = 2 * ctx.sampleRate
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+      const output = noiseBuffer.getChannelData(0)
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1
+      }
+
+      const whiteNoise = ctx.createBufferSource()
+      whiteNoise.buffer = noiseBuffer
+      whiteNoise.loop = true
+
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(350, ctx.currentTime) // Som de chuva macio
+
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.10, ctx.currentTime) // Volume de fundo suave
+
+      whiteNoise.connect(filter)
+      filter.connect(gain)
+      gain.connect(ctx.destination)
+
+      whiteNoise.start()
+      noiseNodeRef.current = whiteNoise
+      gainNodeRef.current = gain
+    } catch (e) {
+      console.warn('Web Audio rain generator error', e)
+    }
+  }, [])
+
+  const stopZenNoise = useCallback(() => {
+    if (noiseNodeRef.current) {
+      try {
+        noiseNodeRef.current.stop()
+      } catch (e) {}
+      noiseNodeRef.current = null
+    }
+    if (audioCtxRef.current) {
+      try {
+        audioCtxRef.current.close()
+      } catch (e) {}
+      audioCtxRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isZenMode) {
+      startZenNoise()
+    } else {
+      stopZenNoise()
+    }
+    return () => stopZenNoise()
+  }, [isZenMode, startZenNoise, stopZenNoise])
+
+  const toggleCrammingMode = () => {
+    const newState = !isCrammingMode
+    setIsCrammingMode(newState)
+    localStorage.setItem('omnimind_cramming_mode', String(newState))
+    if (newState) {
+      setIsBossMode(false)
+      setIsSimuladoMode(false)
+    }
+  }
+
+  const toggleZenMode = () => {
+    const newState = !isZenMode
+    setIsZenMode(newState)
+    localStorage.setItem('omnimind_zen_mode', String(newState))
+  }
+
   const activeCard = cards[currentIndex]
   
   // Variáveis computadas para o Boss Mode
@@ -217,6 +310,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
 
   // --- Busca status de Jeopardy da Streak ---
   const playMKSFX = useCallback((type: 'fight' | 'finish-him' | 'flawless' | 'fatality' | 'yousuck') => {
+    if (isCrammingMode) return // Sem barulho no Cramming!
     if (!settings.enable_sounds) return
     const urls = {
       'fight': '/sounds/mk/fight.mp3',
@@ -765,11 +859,19 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
     setUserAnswerText('')
     setSelectedQuizOption(null)
     setQuizOptions([])
+
+    // Se for Modo Sobrevivência (Véspera de Prova) e errou/teve dificuldade, põe no fim da fila
+    if (isCrammingMode && (grade === Rating.Again || grade === Rating.Hard)) {
+      setCards(prev => [...prev, activeCard])
+    }
+
     setCurrentIndex(prev => prev + 1)
 
     // 3. Salva a revisão no banco em background sem bloquear a interface do usuário
     submitReview(activeCard.id, activeCard, grade)
       .then((res) => {
+        if (isCrammingMode) return // Sem barulho ou toasts de conquistas no Cramming!
+
         // Dispara conquistas em background se houver alguma desbloqueada
         if (res && 'newlyUnlocked' in res && Array.isArray(res.newlyUnlocked)) {
           res.newlyUnlocked.forEach((achievement: any) => {
@@ -893,7 +995,21 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center h-[calc(100vh-140px)] relative">
+    <div className={
+      isZenMode 
+        ? "fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300"
+        : "w-full max-w-2xl mx-auto flex flex-col items-center justify-center h-[calc(100vh-140px)] relative"
+    }>
+      {/* Botão de Fechar do Modo Zen */}
+      {isZenMode && (
+        <button
+          onClick={() => setIsZenMode(false)}
+          className="absolute top-6 right-6 p-2 rounded-full bg-surface border border-border text-text-muted hover:text-text-strong transition-all z-50"
+          title="Sair do Modo Imersão"
+        >
+          <X className="size-5" />
+        </button>
+      )}
       {/* Heartbeat Overlay */}
       {isCriticalDanger && (
         <div className="fixed inset-0 pointer-events-none z-50 animate-[pulse_1.5s_ease-in-out_infinite] shadow-[inset_0_0_150px_rgba(239,68,68,0.3)] border-[8px] border-red-500/10 mix-blend-multiply dark:mix-blend-screen" />
@@ -1292,17 +1408,18 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
         {/* Simulado e Áudio posicionados na base antes das opções de resposta */}
         {!isFlipped && !responseMethod && (
           <div className="flex items-center justify-between gap-3 w-full border-t border-border/40 pt-3.5 pb-1" onClick={e => e.stopPropagation()}>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-1.5 max-w-[70%]">
               <button
                 onClick={() => {
                   setIsSimuladoMode(!isSimuladoMode)
                   if (isBossMode) setIsBossMode(false) // Desliga boss mode se desligar simulado
+                  if (isCrammingMode) setIsCrammingMode(false)
                   setSelectedQuizOption(null)
                   setQuizOptions([])
                   setAiFeedback(null)
                   setIsFlipped(false)
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
                   isSimuladoMode && !isBossMode
                     ? 'bg-primary/20 text-primary border-primary/30 hover:bg-primary/30'
                     : 'bg-surface-muted text-text-medium border-border hover:border-border-strong hover:bg-surface-elevated hover:text-text-strong'
@@ -1310,7 +1427,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
                 title="Alternar para Simulado de Múltipla Escolha"
               >
                 <Sparkles className="size-3" />
-                <span>{isSimuladoMode && !isBossMode ? '⚖️ Simulado ON' : 'Simulado OFF'}</span>
+                <span>⚖️ <span className="hidden sm:inline">Simulado {isSimuladoMode && !isBossMode ? 'ON' : 'OFF'}</span></span>
               </button>
 
               <button
@@ -1319,6 +1436,7 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
                   setIsBossMode(newState)
                   if (newState) {
                     setIsSimuladoMode(true)
+                    setIsCrammingMode(false)
                     const remainingCards = cards.length - currentIndex
                     // Define o HP como no máximo 5, ou a quantidade de cards restantes (o que for menor)
                     const calculatedHp = Math.max(1, Math.min(5, Math.floor(remainingCards * 0.8))) 
@@ -1339,27 +1457,53 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
                     const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
                     setCurrentBattleTrack(randomTrack)
                     
-                    playMKSFX('fight')
+                    if (!isZenMode) playMKSFX('fight')
                   }
                   setSelectedQuizOption(null)
                   setQuizOptions([])
                   setAiFeedback(null)
                   setIsFlipped(false)
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
                   isBossMode
                     ? 'bg-red-500/20 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.3)]'
                     : 'bg-surface-muted text-text-medium border-border hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500'
                 }`}
                 title="Modo Batalha (Boss Fight)"
               >
-                <span className={isBossMode ? "animate-pulse" : ""}>⚔️ Batalha</span>
+                <span>⚔️ <span className="hidden sm:inline">Batalha</span></span>
+              </button>
+
+              {/* Botão de Modo Sobrevivência */}
+              <button
+                onClick={toggleCrammingMode}
+                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
+                  isCrammingMode
+                    ? 'bg-orange-500/20 text-orange-500 border-orange-500/30 shadow-[0_0_10px_rgba(249,115,22,0.3)]'
+                    : 'bg-surface-muted text-text-medium border-border hover:border-orange-500/30 hover:bg-orange-500/10 hover:text-orange-500'
+                }`}
+                title="Modo Sobrevivência (Estudo Rápido de Véspera)"
+              >
+                <span>🚨 <span className="hidden sm:inline">Véspera</span></span>
+              </button>
+
+              {/* Botão de Modo Imersão */}
+              <button
+                onClick={toggleZenMode}
+                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
+                  isZenMode
+                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.3)]'
+                    : 'bg-surface-muted text-text-medium border-border hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-400'
+                }`}
+                title="Modo Imersão (Sons de Chuva e Layout Clean)"
+              >
+                <span>🎧 <span className="hidden sm:inline">Imersão</span></span>
               </button>
             </div>
 
             <button
               onClick={() => speakText(`${activeCard.front}. A resposta é: ${activeCard.back}`)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+              className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
                 isSpeaking 
                   ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_10px_rgba(99,102,241,0.2)]'
                   : 'border-border bg-surface-muted text-text-medium hover:text-text-strong hover:border-border-strong hover:bg-surface-elevated'
@@ -1368,18 +1512,18 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
             >
               {isTtsLoading ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  <span>Carregando...</span>
+                  <Loader2 className="size-3 animate-spin" />
+                  <span className="hidden sm:inline">Carregando...</span>
                 </>
               ) : isSpeaking ? (
                 <>
-                  <VolumeX className="size-3.5" />
-                  <span>Parar Leitura</span>
+                  <VolumeX className="size-3" />
+                  <span className="hidden sm:inline">Parar Leitura</span>
                 </>
               ) : (
                 <>
-                  <Volume2 className="size-3.5" />
-                  <span>Ouvir Card</span>
+                  <Volume2 className="size-3" />
+                  <span className="hidden sm:inline">Ouvir Card</span>
                 </>
               )}
             </button>

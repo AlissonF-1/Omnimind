@@ -209,7 +209,12 @@ export async function submitReview(
 
     // 4. Incrementa log de estudo (assíncrono, não bloquear)
     const workspaceName = (note as any).workspaces?.name || 'Estudos Gerais'
-    const { error: rpcError } = await supabase.rpc('increment_study_log', { p_user_id: user.id, p_topic: workspaceName })
+    const isCorrect = grade === Rating.Good || grade === Rating.Easy
+    const { error: rpcError } = await supabase.rpc('increment_study_log', { 
+      p_user_id: user.id, 
+      p_topic: workspaceName,
+      p_is_correct: isCorrect
+    })
     if (rpcError) {
       console.error('[submitReview] Erro ao atualizar log de estudo (não crítico):', rpcError)
       // Não falha a operação principal

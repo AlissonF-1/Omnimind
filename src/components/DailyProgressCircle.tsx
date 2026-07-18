@@ -1,5 +1,6 @@
-﻿'use client'
+'use client'
 
+import { useState, useEffect } from 'react'
 import { CheckCircle2, Flame, Award, Target } from 'lucide-react'
 import Link from 'next/link'
 
@@ -20,8 +21,17 @@ export default function DailyProgressCircle({
   dailyGoal,
   activeGoalTitle
 }: DailyProgressCircleProps) {
-  const goal = dailyGoal || 10
-  const isDynamic = !!dailyGoal && dailyGoal !== 10
+  const [localCramming, setLocalCramming] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLocalCramming(localStorage.getItem('omnimind_cramming_mode') === 'true')
+    }
+  }, [])
+
+  const goal = localCramming ? 30 : (dailyGoal || 10)
+  const isGoalCompletedToday = localCramming ? (reviewCount >= 30) : isGoalCompleted
+  const isDynamic = !localCramming && !!dailyGoal && dailyGoal !== 10
   const percentage = Math.min(100, Math.round((reviewCount / goal) * 100))
   
   // Constantes do circulo SVG de progresso
@@ -32,7 +42,7 @@ export default function DailyProgressCircle({
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-sm flex items-center justify-between gap-5 group">
       {/* Background glow sutil se concluido */}
-      {isGoalCompleted && (
+      {isGoalCompletedToday && (
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 opacity-100 transition-opacity duration-300 pointer-events-none" />
       )}
 
@@ -56,8 +66,15 @@ export default function DailyProgressCircle({
           </Link>
         )}
 
+        {/* Badge do Modo Sobrevivência */}
+        {localCramming && (
+          <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-orange-500 bg-orange-500/10 border border-orange-500/20 rounded-md px-2 py-0.5 animate-pulse">
+            <Target className="size-3" /> 🚨 Modo Véspera Ativo
+          </div>
+        )}
+
         <p className="text-xs text-text-muted mt-2 leading-snug">
-          {isGoalCompleted 
+          {isGoalCompletedToday 
             ? '🎉 Meta diaria concluida! Seu multiplicador esta ativo.' 
             : `Revise mais ${Math.max(0, goal - reviewCount)} cards hoje para completar a meta.`}
         </p>
@@ -88,9 +105,9 @@ export default function DailyProgressCircle({
             cy="48"
             r={radius}
             className={`fill-none transition-all duration-500 ease-out ${
-              isGoalCompleted 
+              isGoalCompletedToday 
                 ? 'stroke-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
-                : isDynamic ? 'stroke-violet-500' : 'stroke-primary'
+                : (isDynamic ? 'stroke-violet-500' : (localCramming ? 'stroke-orange-500' : 'stroke-primary'))
             }`}
             strokeWidth="7"
             strokeDasharray={circumference}
