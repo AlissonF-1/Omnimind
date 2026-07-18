@@ -245,7 +245,8 @@ export default function SettingsTabs() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-surface-muted rounded-xl border border-border">
                   <div>
-                    <h4 className="font-semibold text-sm">Sons de Conquista</h4>
+                    <h4 className="font-semibold text-sm">Efeitos Sonoros</h4>
+                    <p className="text-xs text-text-muted mt-0.5">Silencia todo o app (cliques de botões, bipes de acerto/erro, troféus e combos) de uma vez só.</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" checked={settings.enable_sounds} onChange={(e) => handleUpdate('enable_sounds', e.target.checked)} disabled={isUpdating} />

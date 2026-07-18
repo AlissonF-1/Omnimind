@@ -12,7 +12,7 @@ export async function getDailyStudyLogs() {
 
   const { data, error } = await supabase
     .from('daily_study_logs')
-    .select('study_date, review_count, topics')
+    .select('study_date, review_count, topics, hourly_reviews, hourly_correct')
     .gte('study_date', oneYearAgo.toISOString())
     .order('study_date', { ascending: true })
 
