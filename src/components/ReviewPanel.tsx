@@ -808,6 +808,11 @@ export default function ReviewPanel({ initialCards }: { initialCards: ReviewCard
   }
 
   const handleReview = async (grade: Rating) => {
+    // Feedback tátil (vibração de 10ms no mobile)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10)
+    }
+
     // Para qualquer leitura de voz em andamento ao avançar o card
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
