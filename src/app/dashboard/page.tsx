@@ -135,7 +135,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* 🆕 O Golem (Study Companion) aparece aqui */}
-        <div className="shrink-0 flex items-center">
+        <div className="hidden sm:block shrink-0">
           <StudyCompanion streak={streak} />
         </div>
       </header>

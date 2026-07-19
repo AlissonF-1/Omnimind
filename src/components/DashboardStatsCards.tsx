@@ -3,6 +3,7 @@
 import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import StudyCompanion from './StudyCompanion'
 
 interface DashboardStatsCardsProps {
   totalCards: number
@@ -87,8 +88,14 @@ export default function DashboardStatsCards({
 
         {/* Sequência */}
         <div className="rounded-xl bg-surface-muted/50 p-4 relative overflow-hidden group">
-          <div className="absolute top-2 right-2 opacity-100 sm:opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden">
-            <Image src="/images/stat_streak_3d.png" alt="Ofensiva" fill className="object-cover" />
+          {/* Golem no mobile, chama chama 3D no desktop */}
+          <div className="absolute top-2 right-2 transition-all z-20">
+            <div className="block sm:hidden scale-75 origin-top-right">
+              <StudyCompanion streak={streak} />
+            </div>
+            <div className="hidden sm:block opacity-20 group-hover:opacity-100 transition-opacity size-10 rounded-lg overflow-hidden relative">
+              <Image src="/images/stat_streak_3d.png" alt="Ofensiva" fill className="object-cover" />
+            </div>
           </div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted mb-2 relative z-10">
             Sequência
