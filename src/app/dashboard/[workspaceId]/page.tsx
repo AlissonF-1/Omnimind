@@ -22,33 +22,16 @@ export default async function WorkspacePage({
 
   const [workspace, notesRes, flashcardCounts] = await Promise.all([
     getWorkspaceById(workspaceId),
-    getNotes(workspaceId),
+    getNotes(workspaceId, { search: searchParamsObj.search, sort: searchParamsObj.sort }),
     getWorkspaceFlashcardCounts(workspaceId)
   ])
 
   if (!workspace) notFound()
   let notes = notesRes
 
-  // Filtro por busca (case-insensitive)
-  if (searchParamsObj.search) {
-    const searchLower = searchParamsObj.search.toLowerCase()
-    notes = notes.filter(note =>
-      note.title.toLowerCase().includes(searchLower)
-    )
-  }
-
-  // Ordenação
-  const sortType = searchParamsObj.sort || 'recent'
-  switch (sortType) {
-    case 'name':
-      notes.sort((a, b) => a.title.localeCompare(b.title))
-      break
-    case 'cards':
-      notes.sort((a, b) => (flashcardCounts[b.id] || 0) - (flashcardCounts[a.id] || 0))
-      break
-    case 'recent':
-    default:
-      notes.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+  // Se a ordenação for por contagem de flashcards, ordena em memória por contagem
+  if (searchParamsObj.sort === 'cards') {
+    notes = [...notes].sort((a, b) => (flashcardCounts[b.id] || 0) - (flashcardCounts[a.id] || 0))
   }
 
   // Totais
@@ -148,7 +131,7 @@ export default async function WorkspacePage({
         <div className="mb-6">
           <WorkspaceFilterBar
             initialSearch={searchParamsObj.search || ''}
-            initialSort={sortType}
+            initialSort={searchParamsObj.sort || 'recent'}
           />
           {hasActiveFilter && (
             <p className="text-xs text-text-muted mt-2 flex items-center gap-1">

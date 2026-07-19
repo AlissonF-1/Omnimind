@@ -15,15 +15,11 @@ function getLocalISODate(date: Date = new Date()): string {
   }).format(date)
 }
 
-export async function getUserStudyStats(): Promise<UserStudyStats | null> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
+export async function getUserStudyStatsInternal(supabase: any, userId: string): Promise<UserStudyStats | null> {
   const { data, error } = await supabase
     .from('user_study_stats')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle()
 
   if (error) {
@@ -35,7 +31,7 @@ export async function getUserStudyStats(): Promise<UserStudyStats | null> {
     const { data: newRow, error: insertError } = await supabase
       .from('user_study_stats')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         daily_goal_completed: false,
         streak_multiplier: 1.0,
         tutor_queries_count: 0,
@@ -64,7 +60,7 @@ export async function getUserStudyStats(): Promise<UserStudyStats | null> {
         daily_goal_completed: false,
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .select()
       .single()
 
@@ -76,12 +72,19 @@ export async function getUserStudyStats(): Promise<UserStudyStats | null> {
   return data
 }
 
+export async function getUserStudyStats(): Promise<UserStudyStats | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  return getUserStudyStatsInternal(supabase, user.id)
+}
+
 export async function checkAndUnlockAchievements(forceUnlockIds: string[] = []): Promise<AchievementDetails[]> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const stats = await getUserStudyStats()
+  const stats = await getUserStudyStatsInternal(supabase, user.id)
   if (!stats) return []
 
   const unlocked = new Set(stats.unlocked_achievements || [])
@@ -169,6 +172,7 @@ export async function checkAndUnlockAchievements(forceUnlockIds: string[] = []):
       .eq('user_id', user.id)
 
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/conquistas')
   }
 
   return newlyUnlocked
@@ -419,14 +423,16 @@ export async function incrementQuestProgress(questId: 'guerreiro' | 'escritor' |
 
   const todayStr = getLocalISODate(new Date())
   
-  // 1. Busca a quest de hoje
-  let { data: quest } = await supabase
+  // 1. Busca a quest de hoje (limit 1 para evitar exceção PGRST116 se houver duplicatas)
+  const { data: existingQuests } = await supabase
     .from('daily_quests')
     .select('*')
     .eq('user_id', user.id)
     .eq('date', todayStr)
     .eq('quest_id', questId)
-    .maybeSingle()
+    .limit(1)
+
+  const quest = existingQuests?.[0] || null
 
   const stats = await getUserStudyStats()
   const level = stats?.current_level || 1
@@ -507,7 +513,29 @@ export async function getDailyQuests() {
     .eq('user_id', user.id)
     .eq('date', todayStr)
 
-  // Se nÃ£o tem as 3 quests, inicializa
+  // Deduplicação e limpeza no banco de dados se houver registros duplicados
+  if (quests && quests.length > 0) {
+    const seenTypes = new Set<string>()
+    const uniqueQuests: any[] = []
+    const duplicateIdsToDelete: string[] = []
+
+    for (const q of quests) {
+      if (!seenTypes.has(q.quest_id)) {
+        seenTypes.add(q.quest_id)
+        uniqueQuests.push(q)
+      } else {
+        duplicateIdsToDelete.push(q.id)
+      }
+    }
+
+    if (duplicateIdsToDelete.length > 0) {
+      await supabase.from('daily_quests').delete().in('id', duplicateIdsToDelete)
+    }
+
+    quests = uniqueQuests
+  }
+
+  // Se não tem as 3 quests, inicializa
   const questTypes = ['guerreiro', 'escritor', 'curioso']
   if (!quests || quests.length < 3) {
     const existingIds = quests?.map(q => q.quest_id) || []
@@ -544,7 +572,15 @@ export async function getDailyQuests() {
         .select('*')
         .eq('user_id', user.id)
         .eq('date', todayStr)
-      quests = reloaded
+
+      if (reloaded) {
+        const seen = new Set<string>()
+        quests = reloaded.filter(q => {
+          if (seen.has(q.quest_id)) return false
+          seen.add(q.quest_id)
+          return true
+        })
+      }
     }
   }
 
@@ -719,6 +755,8 @@ Retorne APENAS o título gerado, sem aspas, sem explicações.`
 
   // 3. Unlock achievement
   const newlyUnlocked = await checkAndUnlockAchievements(['o_matador_de_chefes'])
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/conquistas')
   return { success: true, newlyUnlocked }
 }
 

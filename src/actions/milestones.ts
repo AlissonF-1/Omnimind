@@ -29,7 +29,7 @@ export async function addMilestone(title: string, type: string) {
       .single()
 
     if (error) {
-      console.warn('[addMilestone] Erro ao inserir marco (pode ser que as tabelas de migração não estejam criadas ainda):', error)
+      console.warn('[addMilestone] Erro ao inserir marco:', error)
       return null
     }
 
@@ -41,19 +41,26 @@ export async function addMilestone(title: string, type: string) {
   }
 }
 
-export async function getMilestones(): Promise<JourneyMilestone[]> {
+export async function getMilestones(typeFilter?: string): Promise<JourneyMilestone[]> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('journey_milestones')
       .select('*')
-      .order('created_at', { ascending: false })
+      .eq('user_id', user.id)
+      .order('milestone_date', { ascending: false })
+
+    if (typeFilter && typeFilter !== 'all') {
+      query = query.eq('type', typeFilter)
+    }
+
+    const { data, error } = await query
 
     if (error) {
-      console.warn('[getMilestones] Erro ao obter marcos (pode ser que as tabelas de migração não estejam criadas ainda):', error)
+      console.warn('[getMilestones] Erro ao obter marcos:', error)
       return []
     }
 

@@ -219,9 +219,9 @@ async function DashboardContent() {
 
         {topAlert && <DashboardRelearningAlert topAlert={topAlert} />}
 
-        {/* Grid de Estatísticas e Progresso Diário */}
+        {/* Grid de Estatísticas e Progresso Diário (Com Animação Cascata Staggered) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 flex flex-col gap-6">
+          <div className="lg:col-span-2 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <DashboardStatsCards
               totalCards={stats?.totalCards || 0}
               overdueCards={stats?.overdueCards || 0}
@@ -250,7 +250,7 @@ async function DashboardContent() {
             <DailyQuestsCard quests={dailyQuests} />
           </div>
 
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <DailyProgressCircle
               reviewCount={todayReviewCount}
               streak={stats?.streak || 0}
@@ -267,22 +267,31 @@ async function DashboardContent() {
               isJeopardy={streakJeopardy?.isJeopardy}
             />
 
-            {/* ⚡ CARD DO MODO ULTIMATO */}
-            <div className="panel bg-gradient-to-br from-red-950/20 to-zinc-900/50 border-red-500/20 p-5 rounded-2xl flex flex-col justify-between shadow-[0_0_15px_rgba(239,68,68,0.02)]">
-              <div>
-                <h4 className="text-xs font-black text-red-500 flex items-center gap-1.5 uppercase tracking-wider">
-                  <Zap className="size-3.5 animate-pulse text-red-400 fill-red-400/10" />
-                  Modo Ultimato
-                </h4>
-                <p className="text-[11px] text-text-medium mt-2 leading-relaxed">
-                  Força bruta de véspera de provas. Estude todos os cards dos próximos 15 dias ordenados por <strong>menor estabilidade primeiro</strong> em formato Quiz rápido.
+            {/* ⚡ CARD DO MODO ULTIMATO (ESTÉTIKA CYBER-URGÊNCIA) */}
+            <div className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-br from-red-950/40 via-surface/90 to-surface-muted/50 p-5 flex flex-col justify-between shadow-[0_0_20px_rgba(239,68,68,0.1)] hover:border-red-500/50 hover:shadow-[0_0_25px_rgba(239,68,68,0.2)] transition-all duration-300 group">
+              {/* Efeito de brilho / scanline pulsante */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-red-500/10 to-transparent animate-pulse pointer-events-none" />
+
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-red-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Zap className="size-3.5 animate-pulse text-red-400 fill-red-400/30" />
+                    Modo Ultimato
+                  </h4>
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-red-400/80 bg-red-500/10 border border-red-500/20 rounded-md px-2 py-0.5 animate-pulse">
+                    Alta Urgência
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-medium mt-2.5 leading-relaxed font-medium">
+                  Força bruta de véspera de provas. Estude todos os cards dos próximos 15 dias ordenados por <strong className="text-red-300 font-bold">menor estabilidade primeiro</strong> em formato Quiz rápido.
                 </p>
               </div>
+
               <Link 
                 href="/dashboard/revisoes?mode=ultimato"
-                className="mt-4 w-full text-center py-2 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white text-[11px] font-bold transition-all active:scale-95 flex items-center justify-center gap-1 shadow-[0_4px_12px_rgba(239,68,68,0.15)]"
+                className="relative z-10 mt-5 w-full text-center py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-orange-600 to-red-600 hover:from-red-500 hover:to-orange-500 text-white text-xs font-extrabold transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-[0_4px_16px_rgba(239,68,68,0.3)] group-hover:shadow-[0_6px_20px_rgba(239,68,68,0.4)]"
               >
-                <Flame className="size-3 fill-current" />
+                <Flame className="size-3.5 fill-current animate-pulse" />
                 Iniciar Força Bruta
               </Link>
             </div>
@@ -290,12 +299,14 @@ async function DashboardContent() {
         </div>
 
         {/* Grid de Saúde de Retenção dos Workspaces */}
-        <WorkspaceHealthGrid healths={workspacesHealth} />
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          <WorkspaceHealthGrid healths={workspacesHealth} />
+        </div>
 
         {/* 🧠 Insights do Cérebro (Horário de Ouro & Relatório de Ciclo IA) */}
-        <StudyInsightsPanel logs={studyLogs || []} aiReport={weeklyAiReport?.report || ''} />
-
-
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          <StudyInsightsPanel logs={studyLogs || []} aiReport={weeklyAiReport?.report || ''} />
+        </div>
 
         {/* Nossa nova feature acionável */}
         {blindSpots && blindSpots.length > 0 && (

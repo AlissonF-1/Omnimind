@@ -5,7 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { indexNote } from '@/actions/embeddings'
 import { incrementQuestProgress } from '@/actions/achievements'
 
-export async function getNotes(workspaceId: string) {
+export async function getNotes(
+  workspaceId: string,
+  options?: { search?: string; sort?: string }
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -26,12 +29,22 @@ export async function getNotes(workspaceId: string) {
     return []
   }
 
-  // IMPORTANTE: Adicionado a coluna 'topic' no select
-  const { data, error } = await supabase
+  let query = supabase
     .from('notes')
     .select('id, title, updated_at, topic')
     .eq('workspace_id', workspaceId)
-    .order('updated_at', { ascending: false })
+
+  if (options?.search?.trim()) {
+    query = query.ilike('title', `%${options.search.trim()}%`)
+  }
+
+  if (options?.sort === 'name') {
+    query = query.order('title', { ascending: true })
+  } else {
+    query = query.order('updated_at', { ascending: false })
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('[getNotes] Erro ao buscar notas:', error)

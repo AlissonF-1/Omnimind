@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSettings } from '@/contexts/SettingsContext'
 import ReactMarkdown from 'react-markdown'
+import confetti from 'canvas-confetti' // Upgrade 2
 
 interface Workspace {
   id: string
@@ -98,6 +99,43 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
     }
   }, [])
 
+  // Upgrade 2: Confetes ao atingir score >= 9
+  useEffect(() => {
+    if (result && result.score >= 9) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6']
+      });
+      setTimeout(() => {
+        confetti({
+          particleCount: 50,
+          spread: 50,
+          origin: { y: 0.7 }
+        });
+      }, 300);
+    }
+  }, [result]);
+
+  // Upgrade 5: Atalho de teclado (Espaço para Gravar/Pausar, Esc para cancelar)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === ' ' && !result && !isSubmitting) {
+        e.preventDefault();
+        if (mode === 'voice') {
+          isRecording ? stopRecording() : startRecording();
+        }
+      }
+      if (e.key === 'Escape' && isRecording) {
+        cancelRecording();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isRecording, mode, result, isSubmitting]);
+
   // Inicia gravação com analisador de ondas de som
   const startRecording = async () => {
     setError(null)
@@ -182,6 +220,9 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
       setIsRecording(true)
       setDuration(0)
       
+      // Upgrade 4: Vibração tátil ao iniciar gravação
+      if (navigator.vibrate) navigator.vibrate(15)
+
       // Pequeno delay para garantir montagem do canvas
       setTimeout(drawWave, 100)
 
@@ -195,6 +236,8 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
+      // Upgrade 4: Vibração ao parar gravação
+      if (navigator.vibrate) navigator.vibrate(10)
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
       if (audioContextRef.current) {
         audioContextRef.current.close()
@@ -304,6 +347,8 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
     const textToCopy = `Score: ${result.score}/10\n\n[Pontos Fortes]\n${result.strengths}\n\n[Lacunas]\n${result.gaps}\n\n[Correções]\n${result.corrections}`
     navigator.clipboard.writeText(textToCopy)
     setCopied(true)
+    // Upgrade 4: Vibração ao copiar
+    if (navigator.vibrate) navigator.vibrate(8)
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -455,8 +500,43 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
                 <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
                   {isRecording ? (
                     <>
+                      {/* Upgrade 1: Círculo de contagem regressiva */}
+                      <div className="flex flex-col items-center gap-4 relative">
+                        <div className="relative size-28">
+                          <svg className="transform -rotate-90 size-full">
+                            <circle
+                              cx="56"
+                              cy="56"
+                              r="48"
+                              className="stroke-border/30 fill-none"
+                              strokeWidth="4"
+                            />
+                            <circle
+                              cx="56"
+                              cy="56"
+                              r="48"
+                              className={`fill-none transition-all duration-1000 ease-linear ${
+                                duration > 90 ? 'stroke-rose-500' : 'stroke-amber-500'
+                              }`}
+                              strokeWidth="4"
+                              strokeDasharray={2 * Math.PI * 48}
+                              strokeDashoffset={2 * Math.PI * 48 * (1 - duration / 120)}
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className={`text-3xl font-black tabular-nums ${duration > 90 ? 'text-rose-500 animate-pulse' : 'text-text-strong'}`}>
+                              {formatTime(duration)}
+                            </span>
+                            <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest mt-0.5">
+                              {duration > 90 ? 'Limite!' : 'Gravando'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Waveform real-time (mantido) */}
                       <div className="relative w-full max-w-[280px] h-[70px] flex items-center justify-center">
-                        {/* Canvas do Waveform Real-time */}
                         <canvas ref={canvasRef} width={280} height={70} className="w-full h-full rounded-xl bg-transparent" />
                       </div>
                       
@@ -467,15 +547,6 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
                         <Square className="size-6 fill-current" />
                       </button>
 
-                      <div className="space-y-1">
-                        <span className="block text-2xl font-black text-text-strong tracking-wide animate-pulse">
-                          {formatTime(duration)}
-                        </span>
-                        <span className="text-[10px] font-extrabold text-rose-500 uppercase tracking-widest block">
-                          Tutor Feynman gravando...
-                        </span>
-                      </div>
-                      
                       <button
                         onClick={cancelRecording}
                         className="text-xs font-semibold text-text-muted hover:text-text-strong hover:underline cursor-pointer"
@@ -551,9 +622,19 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="panel p-5 sm:p-6 space-y-6">
                 
-                {/* Score Header */}
-                <div className="flex flex-col sm:flex-row items-center gap-5 pb-5 border-b border-border/40">
+                {/* Score Header com estrelas / confetes (Upgrade 2) */}
+                <div className="flex flex-col sm:flex-row items-center gap-5 pb-5 border-b border-border/40 relative">
                   <div className={`size-16 shrink-0 rounded-full flex flex-col items-center justify-center border-4 ${scoreStyle.border} ${scoreStyle.bg} ${scoreStyle.glow} relative`}>
+                    {result.score >= 8 && (
+                      <div className="absolute -top-3 -right-2 animate-bounce text-amber-400 text-xs">
+                        ✨
+                      </div>
+                    )}
+                    {result.score >= 9 && (
+                      <div className="absolute -bottom-2 -left-3 animate-pulse text-amber-400 text-sm">
+                        ⭐
+                      </div>
+                    )}
                     <span className="text-xl font-black text-text-strong leading-none">{result.score}</span>
                     <span className="text-[9px] text-text-muted font-bold mt-0.5 leading-none">/ 10</span>
                   </div>
@@ -645,7 +726,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
                     )}
                   </div>
 
-                  {/* Esquecidos */}
+                  {/* Esquecidos (agora como links de revisão) - Upgrade 3 */}
                   <div className="space-y-2">
                     <h4 className="text-[10px] font-extrabold text-rose-500 uppercase tracking-widest flex items-center gap-1.5">
                       <span className="size-1.5 rounded-full bg-rose-500 animate-pulse" /> Conceitos Esquecidos ({result.forgotten.length})
@@ -655,9 +736,13 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {result.forgotten.map((term, i) => (
-                          <span key={i} className="inline-flex items-center gap-1 text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/15 rounded-lg px-2.5 py-1">
-                            ✗ {term}
-                          </span>
+                          <Link 
+                            key={i} 
+                            href={`/dashboard/revisoes?search=${encodeURIComponent(term)}`}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/15 rounded-lg px-2.5 py-1 hover:bg-rose-500 hover:text-white transition-all cursor-pointer"
+                          >
+                            ✗ {term} → Revisar
+                          </Link>
                         ))}
                       </div>
                     )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { ACHIEVEMENTS } from '@/types/achievements'
 import { Trophy, Lock, Check, Music } from 'lucide-react'
 import { playTrophySound } from '@/utils/audio'
@@ -12,6 +13,48 @@ interface AchievementsPanelProps {
   totalReviews: number
 }
 
+function getAchievementProgress(
+  itemId: string,
+  secret: boolean | undefined,
+  isUnlocked: boolean,
+  stats: { totalReviews: number; notesCount: number; tutorCount: number; perfectExamsCount: number; unlockedSet: Set<string> }
+): { currentVal: number; targetVal: number } {
+  let currentVal = 0
+  let targetVal = 1
+
+  if (itemId === 'o_inicio') {
+    currentVal = stats.totalReviews
+    targetVal = 1
+  } else if (itemId === 'a_chama') {
+    currentVal = stats.totalReviews >= 1 ? (stats.unlockedSet.has('a_chama') ? 7 : 0) : 0
+    targetVal = 7
+  } else if (itemId.startsWith('o_arquivista')) {
+    currentVal = stats.notesCount
+    if (itemId.includes('bronze')) targetVal = 10
+    else if (itemId.includes('prata')) targetVal = 50
+    else if (itemId.includes('ouro')) targetVal = 100
+    else if (itemId.includes('diamante')) targetVal = 500
+  } else if (itemId.startsWith('a_banca')) {
+    currentVal = stats.perfectExamsCount
+    if (itemId.includes('bronze')) targetVal = 1
+    else if (itemId.includes('prata')) targetVal = 10
+    else if (itemId.includes('ouro')) targetVal = 50
+  } else if (itemId.startsWith('o_tutor')) {
+    currentVal = stats.tutorCount
+    if (itemId.includes('bronze')) targetVal = 5
+    else if (itemId.includes('prata')) targetVal = 50
+    else if (itemId.includes('ouro')) targetVal = 200
+  } else if (itemId === 'o_planejador') {
+    currentVal = stats.unlockedSet.has('o_planejador') ? 1 : 0
+    targetVal = 1
+  } else if (secret) {
+    currentVal = isUnlocked ? 1 : 0
+    targetVal = 1
+  }
+
+  return { currentVal, targetVal }
+}
+
 export default function AchievementsPanel({
   unlockedList,
   tutorCount,
@@ -19,7 +62,7 @@ export default function AchievementsPanel({
   notesCount,
   totalReviews
 }: AchievementsPanelProps) {
-  const unlockedSet = new Set(unlockedList || [])
+  const unlockedSet = useMemo(() => new Set(unlockedList || []), [unlockedList])
 
   const handleTestChime = () => {
     // 1. Toca o som sintetizado de console
@@ -59,38 +102,12 @@ export default function AchievementsPanel({
         {list.map((item) => {
           const isUnlocked = unlockedSet.has(item.id)
           
-          // Calcula progresso específico por troféu
-          let currentVal = 0
-          let targetVal = 1
-          if (item.id === 'o_inicio') {
-            currentVal = totalReviews
-            targetVal = 1
-          } else if (item.id === 'a_chama') {
-            currentVal = totalReviews >= 1 ? (unlockedSet.has('a_chama') ? 7 : 0) : 0
-            targetVal = 7
-          } else if (item.id.startsWith('o_arquivista')) {
-            currentVal = notesCount
-            if (item.id.includes('bronze')) targetVal = 10
-            else if (item.id.includes('prata')) targetVal = 50
-            else if (item.id.includes('ouro')) targetVal = 100
-            else if (item.id.includes('diamante')) targetVal = 500
-          } else if (item.id.startsWith('a_banca')) {
-            currentVal = perfectExamsCount
-            if (item.id.includes('bronze')) targetVal = 1
-            else if (item.id.includes('prata')) targetVal = 10
-            else if (item.id.includes('ouro')) targetVal = 50
-          } else if (item.id.startsWith('o_tutor')) {
-            currentVal = tutorCount
-            if (item.id.includes('bronze')) targetVal = 5
-            else if (item.id.includes('prata')) targetVal = 50
-            else if (item.id.includes('ouro')) targetVal = 200
-          } else if (item.id === 'o_planejador') {
-            currentVal = unlockedSet.has('o_planejador') ? 1 : 0
-            targetVal = 1
-          } else if (item.secret) {
-            currentVal = isUnlocked ? 1 : 0
-            targetVal = 1
-          }
+          const { currentVal, targetVal } = getAchievementProgress(
+            item.id,
+            item.secret,
+            isUnlocked,
+            { totalReviews, notesCount, tutorCount, perfectExamsCount, unlockedSet }
+          )
 
           const progressPercent = Math.min(100, Math.round((currentVal / targetVal) * 100))
 

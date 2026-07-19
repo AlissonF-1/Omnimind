@@ -126,31 +126,34 @@ export async function getUserDashboardStats() {
 export async function getWorkspaceFlashcardCounts(workspaceId: string) {
   const supabase = await createClient()
 
-  // Busca as notas e os cards do workspace de forma concorrente em paralelo
-  const [notesRes, cardsRes] = await Promise.all([
-    supabase
-      .from('notes')
-      .select('id')
-      .eq('workspace_id', workspaceId),
-    supabase
-      .from('flashcards')
-      .select('note_id, notes!inner(workspace_id)')
-      .eq('notes.workspace_id', workspaceId)
-  ])
+  // 1. Busca apenas os IDs das notas do workspace
+  const { data: notes, error: notesError } = await supabase
+    .from('notes')
+    .select('id')
+    .eq('workspace_id', workspaceId)
 
-  const notes = notesRes.data || []
-  const cards = cardsRes.data || []
+  if (notesError || !notes || notes.length === 0) return {}
+
+  const noteIds = notes.map((n) => n.id)
+
+  // 2. Busca ultra-leve: seleciona apenas o note_id dos flashcards que pertencem a essas notas
+  const { data: cards, error: cardsError } = await supabase
+    .from('flashcards')
+    .select('note_id')
+    .in('note_id', noteIds)
 
   const counts: Record<string, number> = {}
-  notes.forEach(note => {
+  notes.forEach((note) => {
     counts[note.id] = 0
   })
 
-  cards.forEach((card: any) => {
-    if (counts[card.note_id] !== undefined) {
-      counts[card.note_id]++
-    }
-  })
+  if (!cardsError && cards) {
+    cards.forEach((card: any) => {
+      if (counts[card.note_id] !== undefined) {
+        counts[card.note_id]++
+      }
+    })
+  }
 
   return counts
 }
