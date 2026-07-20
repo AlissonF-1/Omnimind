@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X, Settings, Pencil } from 'lucide-react'
@@ -89,6 +89,14 @@ function deriveConversationTitle(text: string): string {
 
   return capitalized.length > 32 ? `${capitalized.slice(0, 29)}...` : capitalized
 }
+
+const MemoizedMarkdown = React.memo(function MemoizedMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      {content}
+    </ReactMarkdown>
+  )
+})
 
 function loadChatState(storageKey: string): ChatStorageState | null {
   if (typeof window === 'undefined') return null
@@ -259,6 +267,15 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const recognitionRef = useRef<any>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setIsLoading(false)
+  }, [])
 
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? conversations[0] ?? null
   const activeMessages = activeConversation?.messages ?? []
@@ -309,11 +326,19 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
     }
   }, [conversations, storageKey, isMounted, activeConversationId])
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  const scrollToBottomIfNear = useCallback((force = false) => {
+    if (!scrollRef.current) return
+    const { scrollHeight, scrollTop, clientHeight } = scrollRef.current
+    const isAtBottom = scrollHeight - scrollTop - clientHeight <= 100
+
+    if (force || isAtBottom) {
+      scrollRef.current.scrollTo({ top: scrollHeight, behavior: 'smooth' })
     }
-  }, [activeMessages, isLoading])
+  }, [])
+
+  useEffect(() => {
+    scrollToBottomIfNear(false)
+  }, [activeMessages, isLoading, scrollToBottomIfNear])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -499,10 +524,14 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
 
     const activeWorkspaceName = workspaces.find(w => w.id === workspaceId)?.name || 'Todo o App'
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           question: trimmed,
           workspaceId,
@@ -613,7 +642,11 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        console.log('[ChatPanel] Geração de resposta cancelada pelo usuário.')
+        return
+      }
       setConversations((prev) =>
         prev.map((conversation) => {
           if (conversation.id !== targetConversationId) return conversation
@@ -630,6 +663,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
         })
       )
     } finally {
+      abortControllerRef.current = null
       setIsLoading(false)
     }
   }
@@ -1056,9 +1090,7 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                             ) : (
                               <div className="flex-1 min-w-0 pb-1 w-full max-w-full overflow-hidden text-left">
                                 <div className={`prose ${settings.ai_font_size === 'small' ? 'prose-sm text-xs' : settings.ai_font_size === 'large' ? 'prose-base' : 'prose-sm'} max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:border prose-pre:border-border prose-pre:bg-surface-muted prose-p:text-text-strong prose-li:text-text-strong`}>
-                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {msg.content}
-                                  </ReactMarkdown>
+                                  <MemoizedMarkdown content={msg.content} />
                                 </div>
                               </div>
                             )}
@@ -1181,13 +1213,25 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
                 rows={1}
               />
               
-              <button
-                type="submit"
-                disabled={isLoading || query.trim().length < 3 || !isWorkspaceValid}
-                className="absolute right-2.5 bottom-2 flex size-9 items-center justify-center rounded-full bg-primary text-white shadow-sm transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-muted"
-              >
-                <Send className="size-4" />
-              </button>
+              {isLoading ? (
+                <button
+                  type="button"
+                  onClick={handleStopGeneration}
+                  title="Parar geração de resposta"
+                  aria-label="Parar geração de resposta"
+                  className="absolute right-2.5 bottom-2 flex size-9 items-center justify-center rounded-full bg-error/10 text-error border border-error/30 shadow-sm transition-all hover:bg-error/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error"
+                >
+                  <Square className="size-4 fill-error" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={query.trim().length < 3 || !isWorkspaceValid}
+                  className="absolute right-2.5 bottom-2 flex size-9 items-center justify-center rounded-full bg-primary text-white shadow-sm transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-muted"
+                >
+                  <Send className="size-4" />
+                </button>
+              )}
             </div>
 
             {activeMessages.some((message) => message.role === 'ai') && (
