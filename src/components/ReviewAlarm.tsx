@@ -151,6 +151,44 @@ export default function ReviewAlarm() {
     )
   }
 
+  const handleTestNotification = async () => {
+    try {
+      setIsLoading(true)
+      setStatusMessage('')
+
+      // 1. Tenta enviar via Service Worker nativo para simular o Push Real do SO
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration()
+        if (reg && 'showNotification' in reg) {
+          await reg.showNotification('🔥 Alarme de Revisão OmniMind (Teste)', {
+            body: 'Seu alarme está ativo e funcionando no seu sistema! 🎯',
+            icon: '/icons/icon-192.png',
+            tag: 'test-notification'
+          } as any)
+          setStatusMessage('Disparada! Verifique a central de notificações do seu computador/celular. 🚀')
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // 2. Fallback para Notification API padrão
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🔥 Alarme de Revisão OmniMind (Teste)', {
+          body: 'Seu alarme está ativo e funcionando no seu sistema! 🎯',
+          icon: '/icons/icon-192.png'
+        })
+        setStatusMessage('Disparada! Verifique as notificações do seu sistema. 🚀')
+      } else {
+        setStatusMessage('Permissão de notificação ainda não concedida no navegador.')
+      }
+    } catch (err: any) {
+      console.error('Erro ao testar notificação:', err)
+      setStatusMessage('Erro ao disparar teste: ' + (err.message || 'Erro desconhecido.'))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="relative group overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-sm transition-all hover:shadow-md">
       {/* Glow decorativo se ativo */}
@@ -191,6 +229,21 @@ export default function ReviewAlarm() {
           />
         </button>
       </div>
+
+      {/* Botão de Teste Instantâneo quando Ativo */}
+      {isEnabled && !isLoading && (
+        <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between gap-2 z-10 relative">
+          <span className="text-xs text-text-muted">Quer ver como a notificação aparece no seu sistema?</span>
+          <button
+            type="button"
+            onClick={handleTestNotification}
+            className="btn-secondary py-1 px-3 text-xs font-bold flex items-center gap-1.5 text-emerald-500 border-emerald-500/20 hover:border-emerald-500/40 hover:bg-emerald-500/10 transition-all shrink-0"
+          >
+            <Bell className="size-3.5" />
+            Testar Agora
+          </button>
+        </div>
+      )}
 
       {isLoading && (
         <div className="mt-3 flex items-center gap-2 text-[11px] text-text-muted animate-pulse">
