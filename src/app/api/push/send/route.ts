@@ -136,69 +136,86 @@ async function handleSend(req: Request) {
         dueCount = await getUserDueCardsCount(supabase, userId);
       }
 
-      if (dueCount > 0) {
-        const estimatedMinutes = Math.max(2, Math.round(dueCount * 0.5))
-        
-        // 1. Pega dados de gamificação
-        const streak = await getUserStreak(userId)
-        const dailyGoal = await getDynamicDailyGoal(userId)
+      // 1. Pega dados de gamificação
+      const streak = await getUserStreak(userId)
+      const dailyGoal = await getDynamicDailyGoal(userId)
 
-        // 2. Monta a mensagem personalizada
-        let bodyMessage = ''
+      let title = ''
+      let bodyMessage = ''
+      let targetUrl = ''
+      let actions = []
+
+      if (dueCount > 0 || SKIP_DUE_CHECK) {
+        // 🚨 PRIORIDADE 1: Cards pendentes para revisar
+        const estimatedMinutes = Math.max(2, Math.round(dueCount * 0.5))
+        title = SKIP_DUE_CHECK ? '🧠 TESTE DE NOTIFICAÇÃO' : '🔥 Hora de Estudo OmniMind!'
+
         if (SKIP_DUE_CHECK) {
           bodyMessage = 'Esta é uma notificação de teste. Sua assinatura está funcionando!'
-        } else if (streak > 5 && dailyGoal && dueCount > 0) {
+        } else if (streak >= 3 && dailyGoal) {
           const remaining = Math.max(0, dailyGoal.goal - dueCount)
-          bodyMessage = `🔥 Você está com ${streak} dias de streak! Hoje faltam ${remaining} cards para cumprir sua meta.`
+          bodyMessage = `🔥 Você está com ${streak} dias de streak! Faltam ${remaining} cards para cumprir a meta do dia.`
         } else if (dueCount > 5) {
-          bodyMessage = `📚 Você tem ${dueCount} cards acumulados. Revisar agora leva ${estimatedMinutes} minutos.`
+          bodyMessage = `📚 Você tem ${dueCount} cards acumulados. Revisar agora leva cerca de ${estimatedMinutes} minutos.`
         } else {
-          bodyMessage = `Você tem ${dueCount} cards pendentes. Vamos revisar?`
+          bodyMessage = `Você tem ${dueCount} card${dueCount > 1 ? 's' : ''} pendente${dueCount > 1 ? 's' : ''} para revisar. Vamos manter a mente afiada?`
         }
 
-        // 3. Descobre o melhor workspace para Deep Linking
         const topWorkspaceId = await getMostUrgentWorkspaceId(supabase, userId)
-        const targetUrl = topWorkspaceId 
+        targetUrl = topWorkspaceId
           ? `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes?workspaceId=${topWorkspaceId}`
           : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`
 
-        // 4. Monta o Payload com Botões de Ação
-        const payload = JSON.stringify({
-          title: SKIP_DUE_CHECK ? '🧠 TESTE DE NOTIFICAÇÃO' : '🔥 Hora de Estudo OmniMind!',
-          body: bodyMessage,
-          icon: '/icon-192x192.png',
-          badge: '/notification-badge.png',
-          sound: '/notification_sound.mp3',
-          data: { url: targetUrl },
-          actions: [
-            { action: 'review-now', title: '✅ Revisar agora' },
-            { action: 'snooze-1h', title: '⏰ Lembrar em 1h' }
-          ]
-        })
-
-        try {
-          console.log(`[DEBUG] Tentando enviar para: ${subscriptionData.endpoint}`);
-          await webpush.sendNotification(subscriptionData, payload)
-          notifiedCount++
-          console.log(`[DEBUG] Notificação enviada com sucesso para ${userId}`);
-        } catch (pushErr: any) {
-          console.error(`[ERRO] Falha crítica ao enviar push para usuário ${userId}:`, {
-            statusCode: pushErr.statusCode,
-            message: pushErr.message,
-            endpoint: subscriptionData.endpoint || 'N/A'
-          });
-          // Se a assinatura expirou, remove do banco
-          if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
-            console.log(`[DEBUG] Removendo assinatura expirada: ${subItem.id}`);
-            await supabase
-              .from('push_subscriptions')
-              .delete()
-              .eq('id', subItem.id)
-          }
-          errorCount++
-        }
+        actions = [
+          { action: 'review-now', title: '✅ Revisar agora' },
+          { action: 'snooze-1h', title: '⏰ Lembrar em 1h' }
+        ]
       } else {
-        console.log(`[DEBUG] Usuário ${userId} não tem cards pendentes. Nenhuma notificação enviada.`);
+        // ✨ PRIORIDADE 2: Lembrete diário / Check-in quando todas as revisões já estão em dia
+        title = '✨ Suas revisões estão em dia!'
+
+        if (streak >= 1) {
+          bodyMessage = `🔥 Incrível! Suas revisões estão completas e seu streak é de ${streak} dia${streak > 1 ? 's' : ''}! Que tal criar uma nova nota hoje?`
+        } else {
+          bodyMessage = '🧠 Seu segundo cérebro está em dia! Que tal registrar um novo conceito ou explorar suas notas no OmniMind?'
+        }
+
+        targetUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard`
+        actions = [
+          { action: 'open-app', title: '🚀 Abrir OmniMind' }
+        ]
+      }
+
+      // 4. Monta o Payload com Botões de Ação
+      const payload = JSON.stringify({
+        title,
+        body: bodyMessage,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        data: { url: targetUrl },
+        actions
+      })
+
+      try {
+        console.log(`[DEBUG] Tentando enviar para: ${subscriptionData.endpoint}`)
+        await webpush.sendNotification(subscriptionData, payload)
+        notifiedCount++
+        console.log(`[DEBUG] Notificação enviada com sucesso para ${userId}`)
+      } catch (pushErr: any) {
+        console.error(`[ERRO] Falha ao enviar push para usuário ${userId}:`, {
+          statusCode: pushErr.statusCode,
+          message: pushErr.message,
+          endpoint: subscriptionData.endpoint || 'N/A'
+        })
+        // Se a assinatura expirou, remove do banco
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+          console.log(`[DEBUG] Removendo assinatura expirada: ${subItem.id}`)
+          await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('id', subItem.id)
+        }
+        errorCount++
       }
     }
 
