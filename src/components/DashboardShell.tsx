@@ -8,6 +8,7 @@ import LevelUpModal from '@/components/LevelUpModal'
 import ChatFloatingLauncher from '@/components/ChatFloatingLauncher'
 import InstallPromptModal from '@/components/InstallPromptModal'
 import { useFlashcardsPrefetch } from '@/hooks/useFlashcardsPrefetch'
+import PwaRegister from '@/components/PwaRegister'
 
 interface Workspace {
   id: string
@@ -93,6 +94,7 @@ export default function DashboardShell({
       <LevelUpModal />
       <ChatFloatingLauncher />
       <InstallPromptModal />
+      <PwaRegister />
     </div>
   )
 }

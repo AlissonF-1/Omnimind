@@ -23,6 +23,60 @@ self.addEventListener('activate', (event) => {
       return self.clients.claim();
     })
   );
+// Intercepta e faz cache de requisições de páginas HTML para navegação offline
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open('omnimind-pages-cache').then((cache) => {
+              cache.put(request, copy);
+            });
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cache = await caches.open('omnimind-pages-cache');
+          const cachedResponse = await cache.match(request);
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+
+          const fallbackRevisoes = await cache.match('/dashboard/revisoes');
+          if (fallbackRevisoes) return fallbackRevisoes;
+
+          const fallbackDash = await cache.match('/dashboard');
+          if (fallbackDash) return fallbackDash;
+
+          return new Response(
+            `<!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>OmniMind - Offline</title>
+              <style>
+                body { background: #111827; color: #fff; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 20px; box-sizing: border-box; }
+                h1 { color: #6366f1; margin-bottom: 8px; font-size: 24px; }
+                p { color: #9ca3af; max-width: 400px; margin-bottom: 24px; font-size: 14px; line-height: 1.5; }
+                a { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px; box-shadow: 0 4px 14px rgba(99,102,241,0.4); }
+              </style>
+            </head>
+            <body>
+              <h1>🧠 OmniMind Offline</h1>
+              <p>Você está sem conexão com a internet. Abra suas revisões salvas localmente:</p>
+              <a href="/dashboard/revisoes">Abrir Revisão Ativa</a>
+            </body>
+            </html>`,
+            { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+          );
+        })
+    );
+  }
 });
 
 // Gerencia Notificações Push do OmniMind

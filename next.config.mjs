@@ -6,8 +6,7 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   cacheOnFrontEndNav: true,
-  // Desabilita no desenvolvimento para não atrapalhar seu fluxo
-  disable: process.env.NODE_ENV === 'development',
+  disable: process.env.DISABLE_PWA === 'true',
   importScripts: ['/sw-custom.js']
 });
 
