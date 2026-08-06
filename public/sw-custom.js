@@ -1,19 +1,25 @@
 // Service Worker Customizado — OmniMind PWA
 
-// Ao ativar um novo SW, limpa todos os caches antigos
-// Isso resolve o "page couldn't load" quando o sw.js é regenerado no build
+const CACHE_NAME = 'omnimind-static-v1';
+
+// Pre-cache básico e ativação imediata
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Remove caches que não pertencem ao SW atual
-          console.log('[SW] Limpando cache antigo:', cacheName);
-          return caches.delete(cacheName);
+          // Remove apenas caches muito antigos especificamente marcados
+          if (cacheName.startsWith('omnimind-old-')) {
+            console.log('[SW] Limpando cache antigo:', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
     }).then(() => {
-      // Assume controle de todos os clientes imediatamente
       return self.clients.claim();
     })
   );

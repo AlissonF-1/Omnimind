@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useSettings } from '@/contexts/SettingsContext'
 import { getBestVoice } from '@/utils/audio'
+import OfflineFallback from '@/components/OfflineFallback'
 
 interface Source {
   id: string
@@ -229,6 +230,20 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
   const pathname = usePathname()
   const isWorkspaceValid = true
   const storageKey = workspaceId ? `omnimind_chat_${workspaceId}` : 'omnimind_chat_global'
+
+  const [isOnline, setIsOnline] = useState(true)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setIsOnline(navigator.onLine)
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -688,6 +703,10 @@ export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceCha
         handleAsk()
       }
     }
+  }
+
+  if (!isOnline && !isFloatingMode) {
+    return <OfflineFallback featureName="Tutor IA" />
   }
 
   return (

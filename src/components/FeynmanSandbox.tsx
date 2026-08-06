@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { useSettings } from '@/contexts/SettingsContext'
 import ReactMarkdown from 'react-markdown'
 import confetti from 'canvas-confetti' // Upgrade 2
+import OfflineFallback from '@/components/OfflineFallback'
 
 interface Workspace {
   id: string
@@ -38,6 +39,24 @@ interface HistoryItem {
 
 export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
   const { settings } = useSettings()
+
+  const [isOnline, setIsOnline] = useState(true)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setIsOnline(navigator.onLine)
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  if (!isOnline) {
+    return <OfflineFallback featureName="Feynman Sandbox IA" />
+  }
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>('all')
   const [mode, setMode] = useState<'voice' | 'text'>('voice')
   const [textInput, setTextInput] = useState('')

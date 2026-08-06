@@ -6,6 +6,8 @@ import MobileTopbar from '@/components/MobileTopbar'
 import AchievementToast from '@/components/AchievementToast'
 import LevelUpModal from '@/components/LevelUpModal'
 import ChatFloatingLauncher from '@/components/ChatFloatingLauncher'
+import InstallPromptModal from '@/components/InstallPromptModal'
+import { useFlashcardsPrefetch } from '@/hooks/useFlashcardsPrefetch'
 
 interface Workspace {
   id: string
@@ -34,6 +36,9 @@ export default function DashboardShell({
   overdueCards,
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Dispara o prefetch automático dos flashcards em background quando online
+  useFlashcardsPrefetch()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,6 +92,7 @@ export default function DashboardShell({
       <AchievementToast />
       <LevelUpModal />
       <ChatFloatingLauncher />
+      <InstallPromptModal />
     </div>
   )
 }

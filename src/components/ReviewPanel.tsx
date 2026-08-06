@@ -43,6 +43,9 @@ import { useSettings } from '@/contexts/SettingsContext'
 import { getBestVoice, playButtonClick, playEvaluationSound } from '@/utils/audio'
 import { evaluateAnswerWithGroq, generateDistractorsWithGroq } from '@/actions/groq'
 import { searchYoutubeExplanation } from '@/actions/externalContent' // NOVA IMPORT
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import OfflineBanner from '@/components/OfflineBanner'
+import { saveCardsToCache, getCachedCards, savePendingReview } from '@/utils/offlineStore'
 
 interface ReviewCard {
   id: string
@@ -74,6 +77,25 @@ interface ReviewPanelProps {
 
 export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPanelProps) {
   const { settings } = useSettings()
+  const { isOnline, pendingCount, isSyncing, syncStatusMessage, refreshPendingCount, syncPendingReviews } = useOfflineSync()
+
+  // Efeito para salvar initialCards no cache offline quando online, ou recuperar se offline
+  useEffect(() => {
+    async function initOfflineCards() {
+      if (initialCards && initialCards.length > 0) {
+        if (typeof window !== 'undefined' && navigator.onLine) {
+          await saveCardsToCache(initialCards)
+        }
+      } else {
+        const cached = await getCachedCards()
+        if (cached && cached.length > 0) {
+          setCards(cached)
+        }
+      }
+    }
+    initOfflineCards()
+  }, [initialCards])
+
   const [cards, setCards] = useState<ReviewCard[]>(initialCards)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
@@ -962,41 +984,54 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
 
     setCurrentIndex(prev => prev + 1)
 
-    // 3. Salva a revisão no banco em background sem bloquear a interface do usuário
-    submitReview(activeCard.id, activeCard, grade, newCombo)
-      .then((res) => {
-        if (isCrammingMode) return // Sem barulho ou toasts de conquistas no Cramming!
+    // 3. Salva a revisão no banco em background (ou na fila offline se falhar ou estiver offline)
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      savePendingReview({
+        cardId: activeCard.id,
+        currentFsrsState: activeCard,
+        grade,
+      }).then(() => refreshPendingCount())
+    } else {
+      submitReview(activeCard.id, activeCard, grade, newCombo)
+        .then((res) => {
+          if (isCrammingMode) return // Sem barulho ou toasts de conquistas no Cramming!
 
-        // Dispara conquistas em background se houver alguma desbloqueada
-        if (res && 'newlyUnlocked' in res && Array.isArray(res.newlyUnlocked)) {
-          res.newlyUnlocked.forEach((achievement: any) => {
-            window.dispatchEvent(new CustomEvent('achievement-unlocked', {
-              detail: achievement
+          // Dispara conquistas em background se houver alguma desbloqueada
+          if (res && 'newlyUnlocked' in res && Array.isArray(res.newlyUnlocked)) {
+            res.newlyUnlocked.forEach((achievement: any) => {
+              window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+                detail: achievement
+              }))
+            })
+          }
+          // Dispara subida de nível em background
+          if (res && res.leveledUp) {
+            window.dispatchEvent(new CustomEvent('level-up', {
+              detail: { oldLevel: res.leveledUp.oldLevel, newLevel: res.leveledUp.newLevel }
             }))
-          })
-        }
-        // Dispara subida de nível em background
-        if (res && res.leveledUp) {
-          window.dispatchEvent(new CustomEvent('level-up', {
-            detail: { oldLevel: res.leveledUp.oldLevel, newLevel: res.leveledUp.newLevel }
-          }))
-        }
-        // Dispara subida de nível de domínio (Maestria) do workspace
-        if (res && res.masteryLevelUp) {
-          window.dispatchEvent(new CustomEvent('achievement-unlocked', {
-            detail: {
-              id: `mastery_${res.masteryLevelUp.workspaceName}`,
-              title: res.masteryLevelUp.newLevel === 10 ? '👑 Patriarca da Matéria!' : '🏆 Domínio Evoluiu!',
-              description: res.masteryLevelUp.newLevel === 10 
-                ? `Você se tornou o Patriarca de ${res.masteryLevelUp.workspaceName}!`
-                : `Seu domínio em ${res.masteryLevelUp.workspaceName} subiu para o Nível ${res.masteryLevelUp.newLevel}!`
-            }
-          }))
-        }
-      })
-      .catch((error) => {
-        console.error('Erro ao salvar revisão em background:', error)
-      })
+          }
+          // Dispara subida de nível de domínio (Maestria) do workspace
+          if (res && res.masteryLevelUp) {
+            window.dispatchEvent(new CustomEvent('achievement-unlocked', {
+              detail: {
+                id: `mastery_${res.masteryLevelUp.workspaceName}`,
+                title: res.masteryLevelUp.newLevel === 10 ? '👑 Patriarca da Matéria!' : '🏆 Domínio Evoluiu!',
+                description: res.masteryLevelUp.newLevel === 10 
+                  ? `Você se tornou o Patriarca de ${res.masteryLevelUp.workspaceName}!`
+                  : `Seu domínio em ${res.masteryLevelUp.workspaceName} subiu para o Nível ${res.masteryLevelUp.newLevel}!`
+              }
+            }))
+          }
+        })
+        .catch((error) => {
+          console.error('Erro ao salvar revisão em background (salvando offline):', error)
+          savePendingReview({
+            cardId: activeCard.id,
+            currentFsrsState: activeCard,
+            grade,
+          }).then(() => refreshPendingCount())
+        })
+    }
   }
 
   const handleDeleteCard = async () => {
@@ -1107,6 +1142,14 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
         ? "fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300"
         : "w-full max-w-2xl mx-auto flex flex-col items-center justify-center h-[calc(100vh-140px)] relative"
     }>
+      {/* Banner de Status Offline & Sincronização */}
+      <OfflineBanner
+        isOnline={isOnline}
+        pendingCount={pendingCount}
+        isSyncing={isSyncing}
+        syncStatusMessage={syncStatusMessage}
+        onManualSync={syncPendingReviews}
+      />
       {/* Botão de Fechar do Modo Zen */}
       {isZenMode && (
         <button
