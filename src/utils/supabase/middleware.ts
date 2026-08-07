@@ -27,7 +27,23 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    if (!error && data?.user) {
+      user = data.user
+    } else if (error && (error.status === 400 || error.message?.includes('Refresh Token'))) {
+      // Limpa cookies corrompidos de autenticação para parar o loop no console
+      const allCookies = request.cookies.getAll()
+      allCookies.forEach(cookie => {
+        if (cookie.name.startsWith('sb-')) {
+          supabaseResponse.cookies.delete(cookie.name)
+        }
+      })
+    }
+  } catch (e) {
+    user = null
+  }
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/auth')
   
