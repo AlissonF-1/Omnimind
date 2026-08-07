@@ -52,15 +52,23 @@ export default async function ReviewsPage({
     )
   }
 
-  // Busca os cards pendentes e dados do workspace em paralelo
-  const cardsPromise = isUltimatum
-    ? getUltimatumCards({ workspaceId })
-    : getDueFlashcards({ workspaceId, noteId })
+  // Busca os cards pendentes e dados do workspace em paralelo de forma defensiva
+  let cards: any[] = []
+  let workspace: any = null
+  try {
+    const cardsPromise = isUltimatum
+      ? getUltimatumCards({ workspaceId }).catch(() => [])
+      : getDueFlashcards({ workspaceId, noteId }).catch(() => [])
 
-  const [cards, workspace] = await Promise.all([
-    cardsPromise,
-    workspaceId ? getWorkspaceById(workspaceId).catch(() => null) : Promise.resolve(null)
-  ])
+    const [fetchedCards, fetchedWorkspace] = await Promise.all([
+      cardsPromise,
+      workspaceId ? getWorkspaceById(workspaceId).catch(() => null) : Promise.resolve(null)
+    ])
+    cards = fetchedCards || []
+    workspace = fetchedWorkspace
+  } catch (err) {
+    cards = []
+  }
   const cardCount = cards.length
 
   const pageTitle = isUltimatum 
