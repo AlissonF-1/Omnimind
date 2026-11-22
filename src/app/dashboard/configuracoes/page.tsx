@@ -1,42 +1,31 @@
-import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { Settings } from 'lucide-react'
+import { SlidersHorizontal } from 'lucide-react'
 import SettingsTabs from '@/components/settings/SettingsTabs'
+import { createClient } from '@/utils/supabase/server'
+import './settings.css'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Configurações | OmniMind',
-  description: 'Ajuste o comportamento da Inteligência Artificial, Gamificação e Privacidade.',
+  description: 'Ajuste suas preferências de estudo, aparência, áudio, assistente e dados.',
 }
 
 export default async function ConfiguracoesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   return (
-    <div className="page-container animate-in fade-in duration-300 px-4 sm:px-6 py-4 sm:py-6" id="configuracoes-page">
-      <header className="mb-6 flex items-center gap-3">
-        <div className="p-2.5 bg-amber-500/10 text-amber-500 rounded-xl ring-1 ring-amber-500/25">
-          <Settings className="size-6" />
-        </div>
+    <div className="settings-page">
+      <header className="st-hero">
+        <span className="st-hero-icon"><SlidersHorizontal size={27} aria-hidden="true" /></span>
         <div>
-          <h1 className="page-title text-2xl sm:text-3xl font-extrabold text-text-strong" id="page-main-title">
-            Central de Configurações
-          </h1>
-          <p className="page-subtitle text-xs text-text-muted mt-0.5">
-            Personalize seu espaço de estudos e o comportamento do assistente.
-          </p>
+          <h1>Configurações</h1>
+          <p>Personalize como você estuda, usa o assistente e recebe avisos.</p>
         </div>
       </header>
-
-      <main>
-        <SettingsTabs />
-      </main>
+      <SettingsTabs />
     </div>
   )
 }

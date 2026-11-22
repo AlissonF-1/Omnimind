@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { DEFAULT_PREFERENCES, isValidDailyGoal } from '@/types/settings'
 
 // Helper para obter a data local (Brasil) no formato YYYY-MM-DD
 function getLocalISODate(date: Date = new Date()): string {
@@ -164,7 +165,10 @@ export async function getDynamicDailyGoal(userId?: string): Promise<{ goal: numb
     .maybeSingle()
 
   if (!targetGoal) {
-    return { goal: 10, activeGoal: null }
+    const { data: preferences } = await supabase.from('user_preferences')
+      .select('daily_goal_default').eq('user_id', targetUserId).maybeSingle()
+    const goal = preferences?.daily_goal_default
+    return { goal: isValidDailyGoal(goal) ? goal : DEFAULT_PREFERENCES.daily_goal_default, activeGoal: null }
   }
 
   const today = new Date()

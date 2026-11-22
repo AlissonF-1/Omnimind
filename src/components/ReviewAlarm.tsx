@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bell, BellOff, Loader2, Sparkles, MoonStar } from 'lucide-react'
+import { Bell, BellOff, MoonStar } from 'lucide-react'
 import { useSettings } from '@/contexts/SettingsContext'
 
 // Helper para converter a chave pública VAPID
@@ -122,33 +122,12 @@ export default function ReviewAlarm() {
         setIsEnabled(true)
         setStatusMessage('Alarme ativado com sucesso! 🔥')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setStatusMessage(err.message || 'Ocorreu um erro ao configurar o alarme.')
+      setStatusMessage(err instanceof Error ? err.message : 'Ocorreu um erro ao configurar o alarme.')
     } finally {
       setIsLoading(false)
     }
-  }
-
-  if (!supported) {
-    return (
-      <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface-muted/50 text-xs text-text-muted">
-        <BellOff className="size-4 shrink-0 text-text-muted" />
-        <span>Notificações Push não suportadas pelo seu navegador ou dispositivo.</span>
-      </div>
-    )
-  }
-
-  // Modo Não Perturbe ativo: exibe aviso e desabilita o alarme
-  if (settings.do_not_disturb) {
-    return (
-      <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-500">
-        <MoonStar className="size-4 shrink-0" />
-        <span>
-          <strong>Modo Não Perturbe ativado.</strong> Desative-o acima para poder ativar o alarme de revisão.
-        </span>
-      </div>
-    )
   }
 
   const handleTestNotification = async () => {
@@ -164,7 +143,7 @@ export default function ReviewAlarm() {
             body: 'Seu alarme está ativo e funcionando no seu sistema! 🎯',
             icon: '/icons/icon-192.png',
             tag: 'test-notification'
-          } as any)
+          })
           setStatusMessage('Disparada! Verifique a central de notificações do seu computador/celular. 🚀')
           setIsLoading(false)
           return
@@ -181,82 +160,45 @@ export default function ReviewAlarm() {
       } else {
         setStatusMessage('Permissão de notificação ainda não concedida no navegador.')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Erro ao testar notificação:', err)
-      setStatusMessage('Erro ao disparar teste: ' + (err.message || 'Erro desconhecido.'))
+      setStatusMessage(err instanceof Error ? err.message : 'Não foi possível enviar o lembrete de teste.')
     } finally {
       setIsLoading(false)
     }
   }
 
+  if (!supported || settings.do_not_disturb) {
+    const Icon = supported ? MoonStar : BellOff
+    return (
+      <section className="st-row st-alarm" aria-labelledby="settings-alarm-title">
+        <div>
+          <h3 id="settings-alarm-title"><Icon size={17} aria-hidden="true" /> Alarme de revisão</h3>
+          <p>{supported ? 'Lembretes pausados pelo modo Não perturbe.' : 'Notificações indisponíveis neste navegador.'}</p>
+        </div>
+      </section>
+    )
+  }
+
+  const Icon = isEnabled ? Bell : BellOff
   return (
-    <div className="relative group overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-sm transition-all hover:shadow-md">
-      {/* Glow decorativo se ativo */}
-      {isEnabled && (
-        <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 opacity-100 transition-opacity duration-300 pointer-events-none" />
-      )}
-
-      <div className="flex items-start justify-between gap-4 z-10 relative">
-        <div className="flex items-center gap-3">
-          <div className={`p-2.5 rounded-xl transition-colors ${isEnabled ? 'bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/25' : 'bg-surface-muted text-text-muted'}`}>
-            {isEnabled ? <Bell className="size-5 animate-swing" /> : <BellOff className="size-5" />}
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h3 className="font-bold text-sm text-text-strong">Alarme de Revisão</h3>
-              {isEnabled && (
-                <span className="flex items-center gap-0.5 text-[9px] bg-emerald-500/10 text-emerald-500 font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full">
-                  <Sparkles className="size-2" /> Ativo
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-text-muted mt-0.5 leading-snug">
-              {isEnabled 
-                ? 'Você será alertado quando cards estiverem para vencer.' 
-                : 'Receba alertas de urgência direto no seu dispositivo.'}
-            </p>
-          </div>
-        </div>
-
-        {/* Toggle Switch */}
-        <button
-          onClick={handleToggle}
-          disabled={isLoading}
-          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${isEnabled ? 'bg-emerald-500' : 'bg-slate-700'} disabled:opacity-50`}
-        >
-          <span
-            className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-          />
-        </button>
+    <section className="st-row st-alarm" aria-labelledby="settings-alarm-title">
+      <div>
+        <h3 id="settings-alarm-title"><Icon size={17} aria-hidden="true" /> Alarme de revisão</h3>
+        <p id="settings-alarm-info">{isEnabled ? 'Notificações ativadas neste navegador.' : 'Receba lembretes de revisão neste dispositivo.'}</p>
       </div>
-
-      {/* Botão de Teste Instantâneo quando Ativo */}
+      <button type="button" role="switch" className="st-switch-button" aria-checked={isEnabled}
+        aria-labelledby="settings-alarm-title" aria-describedby="settings-alarm-info" onClick={handleToggle} disabled={isLoading}
+      >
+        <span aria-hidden="true" />
+      </button>
       {isEnabled && !isLoading && (
-        <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between gap-2 z-10 relative">
-          <span className="text-xs text-text-muted">Quer ver como a notificação aparece no seu sistema?</span>
-          <button
-            type="button"
-            onClick={handleTestNotification}
-            className="btn-secondary py-1 px-3 text-xs font-bold flex items-center gap-1.5 text-emerald-500 border-emerald-500/20 hover:border-emerald-500/40 hover:bg-emerald-500/10 transition-all shrink-0"
-          >
-            <Bell className="size-3.5" />
-            Testar Agora
-          </button>
+        <div className="st-alarm-actions">
+          <button type="button" className="st-button" onClick={handleTestNotification}>Testar notificação</button>
         </div>
       )}
-
-      {isLoading && (
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-text-muted animate-pulse">
-          <Loader2 className="size-3 animate-spin text-primary" />
-          <span>Configurando serviço...</span>
-        </div>
-      )}
-
-      {statusMessage && !isLoading && (
-        <div className={`mt-3 text-[11px] font-medium ${isEnabled ? 'text-emerald-500' : 'text-amber-500'}`}>
-          {statusMessage}
-        </div>
-      )}
-    </div>
+      {isLoading && <p role="status" className="st-alarm-feedback">Verificando notificações…</p>}
+      {statusMessage && !isLoading && <p role="status" className="st-alarm-feedback">{statusMessage}</p>}
+    </section>
   )
 }

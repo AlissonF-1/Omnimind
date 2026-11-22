@@ -28,6 +28,12 @@ export interface UserPreferences {
   updated_at?: string
 }
 
+export const DELETE_STUDY_DATA_CONFIRMATION = 'CONCORDO EM APAGAR TUDO'
+
+export function isValidDailyGoal(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 100
+}
+
 export const DEFAULT_PREFERENCES: Omit<UserPreferences, 'user_id' | 'updated_at'> = {
   theme: 'dark',
   clipper_default_workspace_id: null,

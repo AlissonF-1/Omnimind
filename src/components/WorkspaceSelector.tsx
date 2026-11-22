@@ -1,98 +1,96 @@
-import { createClient } from '@/utils/supabase/server'
+import Image from 'next/image'
 import Link from 'next/link'
-import { Brain } from 'lucide-react'
+import { ArrowUpRight, Check, FolderOpen, Layers3, Timer } from 'lucide-react'
+import { createClient } from '@/utils/supabase/server'
+
+type WorkspaceJoin = { workspace_id: string | null }
 
 export default async function WorkspaceSelector() {
   const supabase = await createClient()
-  
-  // 1. Busca todos os workspaces ativos (ignorando arquivados de forma robusta)
-  const { data: workspaces } = await supabase.from('workspaces').select('id, name, is_archived')
-  
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || !workspaces) return null
+  if (!user) return null
 
-  const activeWorkspaces = (workspaces ?? []).filter((ws: any) => !ws.is_archived)
+  const now = new Date()
+  const [workspacesResult, cardsResult, sprintResult] = await Promise.all([
+    supabase.from('workspaces').select('id, name, description, is_archived'),
+    supabase.from('flashcards').select('id, due, state, notes!inner(workspace_id)').eq('notes.user_id', user.id),
+    supabase.from('workspaces').select('id').eq('is_sprint_mode', true).gte('sprint_date', now.toISOString()).eq('user_id', user.id),
+  ])
 
-  // 2. Busca todos os flashcards do usuário com o workspace_id
-  const { data: cards } = await supabase
-    .from('flashcards')
-    .select('id, due, state, notes!inner(workspace_id)')
-    .eq('notes.user_id', user.id)
+  const activeWorkspaces = (workspacesResult.data ?? []).filter((workspace) => !workspace.is_archived)
+  const sprintIds = new Set(sprintResult.data?.map((workspace) => workspace.id))
+  const dueCounts = new Map<string, number>()
 
-  // 3. Busca workspaces em Sprint ativa
-  const { data: sprintWs } = await supabase
-    .from('workspaces')
-    .select('id')
-    .eq('is_sprint_mode', true)
-    .gte('sprint_date', new Date().toISOString())
-    .eq('user_id', user.id)
+  for (const card of cardsResult.data ?? []) {
+    const note = card.notes as WorkspaceJoin | WorkspaceJoin[] | null
+    const id = Array.isArray(note) ? note[0]?.workspace_id : note?.workspace_id
+    if (!id) continue
 
-  const sprintWsIds = new Set(sprintWs?.map(ws => ws.id) || [])
-  const now = new Date().getTime()
-  
-  // Mapeia o contador de cards pendentes por workspace_id
-  const dueCountsMap: Record<string, number> = {}
-
-  if (cards) {
-    for (const card of cards) {
-      const noteData = card.notes as any
-      const cardWorkspaceId = Array.isArray(noteData)
-        ? noteData[0]?.workspace_id
-        : noteData?.workspace_id
-
-      if (!cardWorkspaceId) continue
-
-      const isNew = !card.due || card.state === 0 || card.state === null
-      const isDue = card.due ? new Date(card.due).getTime() <= now : false
-      const isSprint = sprintWsIds.has(cardWorkspaceId)
-
-      if (isNew || isDue || isSprint) {
-        dueCountsMap[cardWorkspaceId] = (dueCountsMap[cardWorkspaceId] || 0) + 1
-      }
-    }
+    const needsReview = !card.due || card.state === 0 || card.state === null || Date.parse(card.due) <= now.getTime() || sprintIds.has(id)
+    if (needsReview) dueCounts.set(id, (dueCounts.get(id) ?? 0) + 1)
   }
 
+  const pendingCount = activeWorkspaces.reduce((sum, workspace) => sum + (dueCounts.get(workspace.id) ?? 0), 0)
+  const countsAvailable = !cardsResult.error && !sprintResult.error
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full mt-4">
-      {activeWorkspaces.map((ws, index) => {
-        const dueCount = dueCountsMap[ws.id] || 0
-        return (
-          <div 
-            key={ws.id}
-            className="animate-in fade-in zoom-in-95 duration-500"
-            style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
-          >
-            <Link 
-              href={`/dashboard/revisoes?workspaceId=${ws.id}`}
-              className="group relative flex flex-col items-start gap-4 rounded-2xl border border-border/50 bg-surface/60 p-6 backdrop-blur-sm transition-all hover:border-primary/50 hover:bg-primary/[0.05] hover:shadow-lg hover:-translate-y-1 active:scale-95 duration-200 cursor-pointer text-left overflow-hidden h-full"
-            >
-              {/* Brilho de gradiente no fundo (hover) */}
-              <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-primary/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+    <section className="rv-queue" aria-labelledby="fila-titulo">
+      <div className="rv-between">
+        <div>
+          <h2 id="fila-titulo">Fila de revisão</h2>
+          {!workspacesResult.error && <p>{activeWorkspaces.length === 1 ? '1 workspace ativo' : activeWorkspaces.length + ' workspaces ativos'}</p>}
+        </div>
+        {activeWorkspaces.length > 0 && countsAvailable && (
+          <span className={'rv-pill ' + (pendingCount > 0 ? 'rv-orange' : 'rv-green')}>
+            <Layers3 size={15} aria-hidden="true" /> {pendingCount} {pendingCount === 1 ? 'card na fila' : 'cards na fila'}
+          </span>
+        )}
+      </div>
 
-              <div className="flex items-center justify-between w-full z-10">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-black/40 ring-1 ring-primary/25 overflow-hidden shrink-0 shadow-sm group-hover:shadow-primary/20 transition-all">
-                  <img src="/images/brain_workspace_3d.jpg" alt="Workspace" className="w-full h-full object-cover" />
-                </div>
-                <span className="text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">→</span>
-              </div>
-
-              <div className="z-10 mt-2 w-full flex-1 flex flex-col justify-between">
-                <span className="block font-semibold text-text-strong text-base break-words leading-tight">{ws.name}</span>
-                
-                <div className="mt-3">
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-muted px-2.5 py-1 text-[11px] font-bold text-text-medium border border-border/30">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${dueCount > 0 ? 'animate-ping bg-amber-500' : 'bg-success'}`}></span>
-                      <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dueCount > 0 ? 'bg-amber-500' : 'bg-success'}`}></span>
-                    </span>
-                    {dueCount > 0 ? `${dueCount} pendente${dueCount !== 1 ? 's' : ''}` : 'tudo em dia'}
-                  </span>
-                </div>
-              </div>
-            </Link>
+      {workspacesResult.error ? (
+        <div className="rv-panel rv-loading" role="alert">
+          <span>Não foi possível carregar os workspaces.</span>
+          <form method="get" action="/dashboard/revisoes">
+            <button className="rv-button" type="submit">Tentar novamente</button>
+          </form>
+        </div>
+      ) : activeWorkspaces.length === 0 ? (
+        <div className="rv-panel rv-empty-queue">
+          <span className="rv-icon"><FolderOpen size={23} aria-hidden="true" /></span>
+          <div>
+            <h3>Crie seu primeiro workspace</h3>
+            <p>Use o menu lateral para criar uma matéria. Depois, gere flashcards a partir de uma nota para começar a revisar.</p>
           </div>
-        )
-      })}
-    </div>
+        </div>
+      ) : (
+        <ul className="rv-grid">
+          {activeWorkspaces.map((workspace) => {
+            const count = dueCounts.get(workspace.id) ?? 0
+            const Status = count > 0 ? Timer : Check
+            return (
+              <li key={workspace.id}>
+                <Link href={'/dashboard/revisoes?workspaceId=' + encodeURIComponent(workspace.id)}
+                  className="rv-panel rv-workspace" data-pending={countsAvailable && count > 0}
+                >
+                  <div className="rv-between" aria-hidden="true">
+                    <Image className="rv-workspace-art" src="/images/brain_workspace_3d.jpg" alt="" width={52} height={52} />
+                    <span className="rv-workspace-arrow"><ArrowUpRight size={20} /></span>
+                  </div>
+                  <h3>{workspace.name}</h3>
+                  {workspace.description && <p>{workspace.description}</p>}
+                  {countsAvailable ? (
+                    <span className={'rv-pill ' + (count > 0 ? 'rv-orange' : 'rv-green')}>
+                      <Status size={14} aria-hidden="true" /> {count > 0 ? count + (count === 1 ? ' pendente' : ' pendentes') : 'Em dia'}
+                    </span>
+                  ) : (
+                    <span className="rv-pill">Contagem indisponível</span>
+                  )}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }

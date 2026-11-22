@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { BellDot, Bell, Menu, Sparkles } from 'lucide-react'
-import { AVATAR_ICONS } from '@/utils/avatars'
+import AvatarFace from '@/components/AvatarFace'
 
 interface MobileTopbarProps {
   userName: string
@@ -12,15 +12,6 @@ interface MobileTopbarProps {
   currentLevel: number
   overdueCards: number
   onMenuOpen: () => void
-}
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
 }
 
 function getAvatarRingClass(level: number) {
@@ -97,24 +88,9 @@ export default function MobileTopbar({
         <Link
           href="/dashboard/perfil"
           aria-label="Meu perfil"
-          className={`relative flex size-11 items-center justify-center rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 transition-all ${getAvatarRingClass(currentLevel)}`}
+          className={`relative flex size-11 items-center justify-center rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 text-xs font-black text-text-strong transition-all ${getAvatarRingClass(currentLevel)}`}
         >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={userName}
-              className="size-full object-cover rounded-full"
-            />
-          ) : avatarIcon && AVATAR_ICONS[avatarIcon as keyof typeof AVATAR_ICONS] ? (
-            (() => {
-              const Icon = AVATAR_ICONS[avatarIcon as keyof typeof AVATAR_ICONS]
-              return <Icon className="size-6 text-text-strong" />
-            })()
-          ) : (
-            <span className="text-[12px] font-black text-text-strong leading-none select-none">
-              {getInitials(userName)}
-            </span>
-          )}
+          <AvatarFace name={userName} avatarIcon={avatarIcon} avatarUrl={avatarUrl} size={44} />
         </Link>
 
       </div>

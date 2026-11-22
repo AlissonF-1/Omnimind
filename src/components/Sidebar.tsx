@@ -5,8 +5,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createWorkspace, updateWorkspace, deleteWorkspace, signOut, archiveWorkspace } from '@/actions/workspaces'
-import { BrainCircuit, Folder, Home, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy, User, CalendarDays, Mic, Settings } from 'lucide-react'
-import ThemeToggle from '@/components/ThemeToggle'
+import { BrainCircuit, Folder, Home, ListChecks, Loader2, LogOut, Menu, Plus, Search, MessageSquare, X, MoreHorizontal, Pencil, Trash2, Network, Archive, Trophy, User, CalendarDays, Mic, Settings } from 'lucide-react'
+import { SavedThemeToggle } from '@/components/ThemeToggle'
 
 interface Workspace {
   id: string
@@ -114,6 +114,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
 
   const MAIN_LINKS = [
     { href: '/dashboard', icon: Home, label: 'Início' },
+    { href: '/dashboard/questoes', icon: ListChecks, label: 'Questões', documentNavigation: true },
     { href: '/dashboard/revisoes', icon: BrainCircuit, label: 'Revisão ativa' },
     { href: '/dashboard/feynman', icon: Mic, label: 'Feynman Sandbox' },
     { href: '/dashboard/busca', icon: Search, label: 'Busca semântica' },
@@ -210,17 +211,18 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
             <nav className="space-y-1">
               {MAIN_LINKS.map((link) => {
                 const Icon = link.icon
+                const NavigationLink = link.documentNavigation ? 'a' : Link
                 return (
-                  <Link 
-                    key={link.href} 
-                    href={link.href} 
-                    onClick={() => setIsOpen(false)} 
+                  <NavigationLink
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsOpen(false)}
                     className={getLinkClass(link.href)}
                     title={isCollapsed ? link.label : undefined}
                   >
                     <Icon className="size-4 shrink-0" /> 
                     {!isCollapsed && <span className="truncate">{link.label}</span>}
-                  </Link>
+                  </NavigationLink>
                 )
               })}
             </nav>
@@ -374,7 +376,7 @@ export default function Sidebar({ workspaces, isOpen: isOpenProp, onOpen, onClos
           </button>
 
           <div className={`${isCollapsed ? 'hidden' : 'block'}`}>
-            <ThemeToggle />
+            <SavedThemeToggle />
           </div>
           <form action={signOut}>
             <button type="submit" className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-medium transition-colors hover:bg-error-soft hover:text-error ${isCollapsed ? 'justify-center' : ''}`} title="Sair da conta">

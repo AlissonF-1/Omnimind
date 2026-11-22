@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useEffectEvent, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { Rating } from 'ts-fsrs'
 import { submitReview } from '@/actions/reviews'
 import { deleteFlashcard } from '@/actions/flashcards'
@@ -13,6 +14,7 @@ import remarkGfm from 'remark-gfm'
 import md5 from 'crypto-js/md5'
 // NOVOS ÍCONES ADICIONADOS
 import {
+  ArrowRight,
   Mic,
   Square,
   RotateCcw,
@@ -28,13 +30,13 @@ import {
   Sparkles,
   Loader2,
   BrainCircuit,
+  Eye,
+  Headphones,
   Volume2,
   VolumeX,
   PlayCircle,
   Flame,
-  Maximize2,
-  Minimize2,
-  Skull,
+  Swords,
   Ghost,
   Zap,
 } from 'lucide-react'
@@ -73,30 +75,52 @@ interface ReviewCard {
 interface ReviewPanelProps {
   initialCards: ReviewCard[]
   mode?: 'default' | 'ultimato'
+  workspaceId?: string
+  noteId?: string
 }
 
-export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPanelProps) {
+const reviewRatings = [
+  { grade: Rating.Again, key: '1', tone: 'again', label: 'Errei' },
+  { grade: Rating.Hard, key: '2', tone: 'hard', label: 'Difícil' },
+  { grade: Rating.Good, key: '3', tone: 'good', label: 'Bom' },
+  { grade: Rating.Easy, key: '4', tone: 'easy', label: 'Fácil' },
+] as const
+
+function discardRecording(recorder: MediaRecorder) {
+  recorder.onstop = null
+  recorder.ondataavailable = null
+  if (recorder.state !== 'inactive') recorder.stop()
+  recorder.stream.getTracks().forEach((track) => track.stop())
+}
+
+export default function ReviewPanel({ initialCards, mode = 'default', workspaceId, noteId }: ReviewPanelProps) {
   const { settings } = useSettings()
   const { isOnline, pendingCount, isSyncing, syncStatusMessage, refreshPendingCount, syncPendingReviews } = useOfflineSync()
+  const [cards, setCards] = useState<ReviewCard[]>(initialCards)
 
   // Efeito para salvar initialCards no cache offline quando online, ou recuperar se offline
   useEffect(() => {
+    let active = true
     async function initOfflineCards() {
-      if (initialCards && initialCards.length > 0) {
-        if (typeof window !== 'undefined' && navigator.onLine) {
-          await saveCardsToCache(initialCards)
-        }
-      } else {
-        const cached = await getCachedCards()
-        if (cached && cached.length > 0) {
-          setCards(cached)
-        }
+      if (navigator.onLine) {
+        if (initialCards.length > 0) await saveCardsToCache(initialCards)
+        return
       }
-    }
-    initOfflineCards()
-  }, [initialCards])
 
-  const [cards, setCards] = useState<ReviewCard[]>(initialCards)
+      if (initialCards.length > 0) return
+      const cached = await getCachedCards()
+      if (!active) return
+
+      const filtered = (cached ?? []).filter((card) => {
+        if (noteId && card.notes?.id !== noteId) return false
+        return !workspaceId || card.notes?.workspace_id === workspaceId
+      })
+      if (filtered.length > 0) setCards(filtered)
+    }
+    void initOfflineCards().catch(() => {})
+    return () => { active = false }
+  }, [initialCards, noteId, workspaceId])
+
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -104,7 +128,6 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [openAccordion, setOpenAccordion] = useState<'analogia' | 'mnemonico' | null>(null)
   const [isRecording, setIsRecording] = useState(false)
-  const [transcript, setTranscript] = useState('')
   const [responseMethod, setResponseMethod] = useState<'voice' | 'text' | null>(null)
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [aiFeedback, setAiFeedback] = useState<{ correct: boolean; feedback: string } | null>(null)
@@ -121,15 +144,10 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
     setTimeout(() => setUiError(null), 5000)
   }
 
-  const [isUsingAdvancedSpeech, setIsUsingAdvancedSpeech] = useState(false)
-
-  useEffect(() => {
-    if (settings?.transcription_mode) {
-      setIsUsingAdvancedSpeech(settings.transcription_mode === 'whisper')
-    }
-  }, [settings?.transcription_mode])
+  const isUsingAdvancedSpeech = settings?.transcription_mode === 'whisper'
   const recognitionRef = useRef<any>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const acceptsRecording = useRef(false)
   const audioChunksRef = useRef<Blob[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const contextModalRef = useRef<HTMLDivElement>(null)
@@ -278,6 +296,8 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
   }
 
   const activeCard = cards[currentIndex]
+  const canReveal = !isFlipped && !responseMethod && !isSimuladoMode && !isEvaluating
+  const canRateEasy = !isSubmitting && (aiFeedback === null || aiFeedback.correct)
   
   // Variáveis computadas para o Boss Mode
   const isEnrageMode = isBossMode && bossHp === 1
@@ -323,7 +343,22 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
         recognition.onend = () => setIsRecording(false)
         
         recognitionRef.current = recognition
+        return () => {
+          recognition.onresult = null
+          recognition.onerror = null
+          recognition.onend = null
+          recognition.abort()
+          recognitionRef.current = null
+        }
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    acceptsRecording.current = true
+    return () => {
+      acceptsRecording.current = false
+      if (mediaRecorderRef.current) discardRecording(mediaRecorderRef.current)
     }
   }, [])
 
@@ -455,44 +490,6 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
     loadQuizOptions()
   }, [currentIndex, isSimuladoMode, activeCard])
 
-  // --- Atalhos de teclado ---
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (showContext || showVideoModal) return // Impede atalhos se modais estiverem abertos
-      if (!activeCard) return
-
-      if (!isFlipped) {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault()
-          setIsFlipped(true)
-        }
-      } else {
-        switch (e.key) {
-          case '1':
-            e.preventDefault()
-            handleReview(Rating.Again)
-            break
-          case '2':
-            e.preventDefault()
-            handleReview(Rating.Hard)
-            break
-          case '3':
-            e.preventDefault()
-            handleReview(Rating.Good)
-            break
-          case '4':
-            e.preventDefault()
-            handleReview(Rating.Easy)
-            break
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isFlipped, activeCard, showContext, showVideoModal])
-
   // --- Scroll e Highlight automático (Híbrido: MD5 + Busca Textual Infalível) ---
   useEffect(() => {
     if (showContext && activeCard?.source_anchor && contextModalRef.current) {
@@ -531,7 +528,8 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
         }
 
         if (targetElement) {
-          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          targetElement.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'center' })
           targetElement.classList.add('bg-primary/10', 'ring-1', 'ring-primary/50', 'rounded-lg', 'transition-all', 'duration-300')
           setTimeout(() => {
             targetElement.classList.remove('bg-primary/10', 'ring-1', 'ring-primary/50', 'rounded-lg')
@@ -560,7 +558,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
     const deltaX = e.changedTouches[0].clientX - touchStartX.current
     const deltaY = e.changedTouches[0].clientY - touchStartY.current
 
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+    if (!isSimuladoMode && !responseMethod && !isEvaluating && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
       setIsFlipped(prev => !prev)
     }
 
@@ -672,8 +670,14 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
 
   // --- Funções de gravação avançada (Groq Whisper) ---
   const startAdvancedRecording = async () => {
+    let stream: MediaStream | undefined
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (!acceptsRecording.current) {
+        audioStream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      stream = audioStream
       
       let options = { mimeType: 'audio/webm' }
       if (!MediaRecorder.isTypeSupported('audio/webm')) {
@@ -695,7 +699,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType })
-        stream.getTracks().forEach(track => track.stop())
+        audioStream.getTracks().forEach(track => track.stop())
         
         setIsEvaluating(true)
         try {
@@ -732,6 +736,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
       setResponseMethod('voice')
       setUserAnswerText('Gravando áudio... Fale agora.')
     } catch (err) {
+      stream?.getTracks().forEach((track) => track.stop())
       console.error('Erro ao acessar microfone:', err)
       showError('Não foi possível acessar seu microfone. Verifique as permissões de áudio no seu navegador.')
       setIsRecording(false)
@@ -746,13 +751,13 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
 
   const handleCancelRecording = () => {
     if (isRecording) {
-      if (isUsingAdvancedSpeech && mediaRecorderRef.current) {
-        const stream = mediaRecorderRef.current.stream
-        stream.getTracks().forEach(track => track.stop())
-        setIsRecording(false)
+      const recorder = mediaRecorderRef.current
+      if (isUsingAdvancedSpeech && recorder) {
+        discardRecording(recorder)
       } else {
-        recognitionRef.current?.stop()
+        recognitionRef.current?.abort()
       }
+      setIsRecording(false)
     }
     setResponseMethod(null)
     setUserAnswerText('')
@@ -769,19 +774,25 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
       return
     }
 
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    const recognition = recognitionRef.current
+    if (!recognition) {
       showError('Seu navegador não suporta reconhecimento de voz nativo.')
       return
     }
 
     if (isRecording) {
-      recognitionRef.current.stop()
+      recognition.stop()
       setIsRecording(false)
     } else {
       setUserAnswerText('')
       setResponseMethod('voice')
-      recognitionRef.current.start()
-      setIsRecording(true)
+      try {
+        recognition.start()
+        setIsRecording(true)
+      } catch {
+        setResponseMethod(null)
+        showError('Não foi possível iniciar a gravação.')
+      }
     }
   }
 
@@ -968,7 +979,6 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
 
     // 2. Reseta estados visuais de resposta e avança para o próximo card instantaneamente
     setIsFlipped(false)
-    setTranscript('')
     setOpenAccordion(null)
     setIsConfirmingDelete(false)
     setResponseMethod(null)
@@ -1048,7 +1058,6 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
       }
 
       setIsFlipped(false)
-      setTranscript('')
       setOpenAccordion(null)
       setIsConfirmingDelete(false)
       setResponseMethod(null)
@@ -1067,20 +1076,79 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
     setOpenAccordion(prev => (prev === section ? null : section))
   }
 
+  // --- Atalhos de teclado ---
+  const onReviewShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    if (event.key === 'Escape') {
+      if (showVideoModal) {
+        setShowVideoModal(false)
+        setVideoUrl('')
+      } else if (showContext) {
+        setShowContext(false)
+      } else if (isZenMode) {
+        toggleZenMode()
+      }
+      return
+    }
+    if (!activeCard || showContext || showVideoModal || isSubmitting || isEvaluating || isConfirmingDelete || isBossDefeated || isPlayerDefeated) return
+    const target = event.target instanceof Element ? event.target : null
+    if (target?.closest('input, textarea, select, [contenteditable]')) return
+
+    if (canReveal && (event.key === ' ' || event.key === 'Enter')) {
+      if (target?.closest('a, button, summary')) return
+      event.preventDefault()
+      setIsFlipped(true)
+    }
+
+    if (!isFlipped) return
+    const grade = reviewRatings.find((item) => item.key === event.key)?.grade
+    if (!grade || (grade === Rating.Easy && !canRateEasy)) return
+    if (mode === 'ultimato' && (grade !== Rating.Again || ultimatumTimer > 0)) return
+    event.preventDefault()
+    void handleReview(grade)
+  })
+
+  useEffect(() => {
+    const listen = (event: KeyboardEvent) => onReviewShortcut(event)
+    window.addEventListener('keydown', listen)
+    return () => window.removeEventListener('keydown', listen)
+  }, [])
+
   // --- Renderização final ---
   if (!activeCard) {
+    const hasReviewed = sessionStats.correct + sessionStats.hard + sessionStats.wrong > 0
+
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
-        <div className="relative w-64 h-64 mb-2 drop-shadow-2xl opacity-90 hover:opacity-100 transition-opacity">
-          {/* Subtle glow behind image */}
-          <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
-          <img src="/images/empty_state_astronaut.png" alt="Tudo em dia" className="w-full h-full object-contain rounded-3xl" />
+      <>
+        <div className="mt-3">
+          <OfflineBanner
+            isOnline={isOnline}
+            pendingCount={pendingCount}
+            isSyncing={isSyncing}
+            syncStatusMessage={syncStatusMessage}
+            onManualSync={syncPendingReviews}
+          />
         </div>
-        <h2 className="text-3xl font-bold text-text-strong tracking-tight mt-4">Tudo em dia!</h2>
-        <p className="text-text-medium max-w-sm text-lg">
-          Você não tem flashcards pendentes no momento. O algoritmo FSRS avisará quando sua memória precisar ser reativada.
-        </p>
-      </div>
+        <section className="rv-panel rv-summary" aria-labelledby="resumo-revisao">
+          <div>
+            <h2 id="resumo-revisao">{hasReviewed ? 'Sessão concluída' : mode === 'ultimato' ? 'Sem cards para o Ultimato' : 'Tudo em dia'}</h2>
+            <p>{hasReviewed
+              ? 'Confira como você avaliou suas respostas nesta sessão.'
+              : mode === 'ultimato'
+                ? 'A fila dos próximos 15 dias está vazia para esta sessão.'
+                : 'Não há flashcards pendentes neste foco no momento.'}</p>
+            {hasReviewed && (
+              <dl className="rv-row gap-x-5">
+                <div><dt>Bom ou fácil</dt><dd className="rv-green">{sessionStats.correct}</dd></div>
+                <div><dt>Difícil</dt><dd className="rv-orange">{sessionStats.hard}</dd></div>
+                <div><dt>Errei</dt><dd>{sessionStats.wrong}</dd></div>
+              </dl>
+            )}
+            <Link className="rv-button rv-primary" href="/dashboard/revisoes">Escolher outro foco <ArrowRight size={15} aria-hidden="true" /></Link>
+          </div>
+          <Image className="rv-summary-art" src="/images/empty_state_astronaut.png" width={230} height={230} alt="" />
+        </section>
+      </>
     )
   }
 
@@ -1137,11 +1205,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
   }
 
   return (
-    <div className={
-      isZenMode 
-        ? "fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300"
-        : "w-full max-w-2xl mx-auto flex flex-col items-center justify-center h-[calc(100vh-140px)] relative"
-    }>
+    <div className={'rv-stage' + (isZenMode ? ' rv-zen' : '')}>
       {/* Banner de Status Offline & Sincronização */}
       <OfflineBanner
         isOnline={isOnline}
@@ -1153,11 +1217,11 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
       {/* Botão de Fechar do Modo Zen */}
       {isZenMode && (
         <button
-          onClick={() => setIsZenMode(false)}
-          className="absolute top-6 right-6 p-2 rounded-full bg-surface border border-border text-text-muted hover:text-text-strong transition-all z-50"
+          onClick={toggleZenMode}
+          className="rv-button rv-exit"
           title="Sair do Modo Imersão"
         >
-          <X className="size-5" />
+          <X className="size-4" aria-hidden="true" /> Sair da imersão
         </button>
       )}
       {/* Heartbeat Overlay */}
@@ -1240,26 +1304,18 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
         </div>
       )}
 
-      {/* Progress Bar */}
-      <div className="w-full mb-6 space-y-2 shrink-0">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium text-text-strong">{currentIndex + 1} de {cards.length}</span>
-          <span className="text-xs text-text-muted">
-            {Math.round(((currentIndex + 1) / cards.length) * 100)}%
-          </span>
+      <div className="rv-panel rv-progress">
+        <div className="rv-between">
+          <p aria-live="polite">Cartão {currentIndex + 1} de {cards.length}</p>
+          <span className="text-xs text-text-muted">{Math.round(currentIndex * 100 / cards.length)}% concluído</span>
         </div>
-        <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-300"
-            style={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }}
-          />
-        </div>
+        <progress value={currentIndex} max={cards.length} aria-label="Progresso da sessão" />
       </div>
 
       {/* Barra superior: contador + ações */}
-      <div className="w-full mb-6 flex items-center justify-between text-sm font-medium shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="text-text-muted">Cartão {currentIndex + 1} de {cards.length}</span>
+      <div className="rv-between text-sm font-medium">
+        <div className="rv-row min-w-0">
+          <span className="text-text-muted break-words min-w-0">{activeCard.notes?.title}</span>
           
           {/* Badge de Combo de Precisão */}
           {comboCount >= 5 && (
@@ -1274,7 +1330,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="rv-row">
           {isConfirmingDelete ? (
             <div className="flex items-center gap-1 rounded-lg border border-error/30 bg-error-soft px-2 py-1 animate-in fade-in slide-in-from-right-2 duration-150">
               <AlertTriangle className="w-3.5 h-3.5 text-error shrink-0" />
@@ -1288,7 +1344,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
               <button
                 onClick={() => setIsConfirmingDelete(true)}
                 disabled={isSubmitting}
-                className="p-2 text-text-muted hover:text-error hover:bg-error-soft/50 rounded-lg transition-colors disabled:opacity-50"
+                className="rv-button rv-quiet"
                 title="Excluir Flashcard"
               >
                 <Trash2 className="w-4 h-4" />
@@ -1296,7 +1352,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
 
               <button
                 onClick={() => setShowContext(true)}
-                className="btn-secondary text-primary px-3 py-1.5 h-8 text-xs flex items-center gap-1.5 rounded-lg border-border"
+                className="rv-button rv-quiet"
                 title="Ver Contexto da Nota"
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -1319,26 +1375,29 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
 
         {/* Painel principal do card */}
         <div
-          className={`w-full panel p-6 md:p-10 flex-1 min-h-0 overflow-y-auto flex flex-col relative transition-all duration-300 custom-scrollbar cursor-pointer
+          className={`rv-panel rv-card
             ${isEnrageMode ? 'shadow-[0_0_20px_rgba(239,68,68,0.6)] border-red-500/50' : ''}
             ${combatFeedback === 'miss' ? 'animate-shake border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : ''}
             ${combatFeedback === 'hit' ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''}
             ${comboCount >= 10 ? 'ring-2 ring-amber-500/80 border-amber-500/50' : comboCount >= 5 ? 'ring-2 ring-orange-500/60 border-orange-500/40' : ''}
           `}
+          data-flipped={isFlipped}
+          data-revealable={canReveal}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          onClick={() => !isFlipped && !responseMethod && !isSimuladoMode && setIsFlipped(true)}
+          onClick={() => canReveal && setIsFlipped(true)}
         >
         {isEvaluating ? (
           <div className="text-center flex flex-col h-full justify-center items-center my-auto animate-pulse">
             <BrainCircuit className="size-16 text-primary animate-bounce mb-4" />
-            <h4 className="text-xl font-medium text-text-strong mb-2">Tutor AI avaliando sua resposta...</h4>
-            <p className="text-sm text-text-muted">Analisando conceitos com Llama 3.3 70B</p>
+            <p role="status" className="text-xl font-medium text-text-strong mb-2">
+              {responseMethod === 'voice' && isRecording ? 'Transcrevendo sua resposta…' : 'Avaliando sua resposta…'}
+            </p>
           </div>
         ) : !isFlipped ? (
           <div className="text-center flex flex-col flex-1 animate-in fade-in zoom-in-95 duration-200">
-            <span className="uppercase text-xs font-bold tracking-widest text-text-muted mb-4 mt-2 block shrink-0">Pergunta</span>
-            <h3 className="text-2xl md:text-3xl font-medium text-text-strong leading-relaxed mb-6 shrink-0">
+            <span className="rv-kicker mb-1">Pergunta</span>
+            <h3 className="rv-flash-text">
               {activeCard.front}
             </h3>
 
@@ -1369,7 +1428,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
                   })}
                 </div>
               )
-            ) : responseMethod && (
+            ) : responseMethod ? (
               <div 
                 className="w-full mt-auto pt-6 border-t border-border shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-200 text-left"
                 onClick={(e) => e.stopPropagation()}
@@ -1377,6 +1436,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
                 <div className="relative">
                   <textarea
                     ref={textareaRef}
+                    aria-label="Sua resposta ao flashcard"
                     value={userAnswerText}
                     onChange={(e) => setUserAnswerText(e.target.value)}
                     placeholder={
@@ -1394,6 +1454,28 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
                     </div>
                   )}
                 </div>
+                <div className="rv-row rv-response">
+                  {responseMethod === 'voice' && (
+                    <button type="button" className="rv-button" onClick={toggleRecording}>
+                      {isRecording ? <Square size={15} aria-hidden="true" /> : <Mic size={15} aria-hidden="true" />}
+                      {isRecording ? 'Parar gravação' : 'Gravar novamente'}
+                    </button>
+                  )}
+                  <button type="button" disabled={isRecording || !userAnswerText.trim()} className="rv-button rv-primary" onClick={handleEvaluateWithAI}>Avaliar com IA</button>
+                  <button type="button" className="rv-button rv-quiet" onClick={handleCancelRecording}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <div className="rv-row rv-reveal" onClick={(event) => event.stopPropagation()}>
+                <button type="button" className="rv-button rv-primary" onClick={() => setIsFlipped(true)}>
+                  <Eye size={17} aria-hidden="true" /> Revelar resposta
+                </button>
+                <button type="button" className="rv-button" onClick={() => setResponseMethod('text')}>
+                  <Keyboard size={16} aria-hidden="true" /> Digitar
+                </button>
+                <button type="button" className="rv-button" onClick={toggleRecording}>
+                  <Mic size={16} aria-hidden="true" /> Falar
+                </button>
               </div>
             )}
           </div>
@@ -1401,8 +1483,8 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
           <div className="text-center animate-in fade-in zoom-in-95 duration-200 flex flex-col flex-1">
             {isSimuladoMode ? (
               <>
-                <span className="uppercase text-xs font-bold tracking-widest text-text-muted mb-4 mt-2 block shrink-0">Pergunta</span>
-                <h3 className="text-xl md:text-2xl font-medium text-text-strong mb-6 leading-snug shrink-0">
+                <span className="rv-kicker mb-1">Pergunta</span>
+                <h3 className="rv-flash-text">
                   {activeCard.front}
                 </h3>
                 <div className="grid grid-cols-1 gap-3 w-full mb-6 mt-auto animate-in fade-in duration-200" onClick={e => e.stopPropagation()}>
@@ -1440,8 +1522,8 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
               </>
             ) : !aiFeedback ? (
               <>
-                <span className="uppercase text-xs font-bold tracking-widest text-primary mb-6 block shrink-0">Resposta Correta</span>
-                <p className="text-xl md:text-2xl text-text-strong leading-relaxed font-light mb-8">
+                <span className="rv-kicker mb-3">Resposta do flashcard</span>
+                <p className="rv-flash-text rv-answer-copy text-lg md:text-xl text-text-strong leading-relaxed mb-5">
                   {activeCard.back}
                 </p>
               </>
@@ -1540,7 +1622,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
                     <div className="bg-surface/30 p-3.5 rounded-xl border border-border/50 flex flex-col justify-between" onClick={(e) => e.stopPropagation()}>
                       <div>
                         <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider mb-1 block">Sua Resposta:</span>
-                        <p className="text-text-medium text-xs italic">"{userAnswerText}"</p>
+                        <p className="text-text-medium text-xs italic">“{userAnswerText}”</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setShowContext(true) }}
@@ -1564,11 +1646,11 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
             {!aiFeedback && userAnswerText && (
               <div className="w-full mt-4 p-5 bg-surface-muted border border-border rounded-xl text-left shrink-0">
                 <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider mb-2 block">Sua Resposta:</span>
-                <p className="text-text-strong text-sm italic">"{userAnswerText}"</p>
+                <p className="text-text-strong text-sm italic">“{userAnswerText}”</p>
               </div>
             )}
 
-            <button onClick={e => { e.stopPropagation(); setIsFlipped(false); setAiFeedback(null) }} className="btn-ghost mt-6 mx-auto w-fit shrink-0">
+            <button onClick={e => { e.stopPropagation(); setIsFlipped(false); setAiFeedback(null) }} className="rv-button rv-quiet mt-4 mx-auto w-fit shrink-0">
               <RotateCcw className="w-4 h-4" />
               Reler Pergunta
             </button>
@@ -1577,129 +1659,114 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
       </div>
 
       {/* Barra FSRS ou botões de resposta por Voz/Texto */}
-      <div className="w-full mt-6 space-y-3 shrink-0">
+      <div className="rv-controls">
         {/* Simulado e Áudio posicionados na base antes das opções de resposta */}
         {!isFlipped && !responseMethod && mode !== 'ultimato' && (
-          <div className="flex items-center justify-between gap-3 w-full border-t border-border/40 pt-3.5 pb-1" onClick={e => e.stopPropagation()}>
-            <div className="flex flex-wrap gap-1.5 max-w-[70%]">
-              <button
-                onClick={() => {
-                  setIsSimuladoMode(!isSimuladoMode)
-                  if (isBossMode) setIsBossMode(false) // Desliga boss mode se desligar simulado
-                  if (isCrammingMode) setIsCrammingMode(false)
-                  setSelectedQuizOption(null)
-                  setQuizOptions([])
-                  setAiFeedback(null)
-                  setIsFlipped(false)
-                }}
-                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
-                  isSimuladoMode && !isBossMode
-                    ? 'bg-primary/20 text-primary border-primary/30 hover:bg-primary/30'
-                    : 'bg-surface-muted text-text-medium border-border hover:border-border-strong hover:bg-surface-elevated hover:text-text-strong'
-                }`}
-                title="Alternar para Simulado de Múltipla Escolha"
-              >
-                <Sparkles className="size-3" />
-                <span>⚖️ <span className="hidden sm:inline">Simulado {isSimuladoMode && !isBossMode ? 'ON' : 'OFF'}</span></span>
-              </button>
+          <div className="rv-panel rv-modebar" onClick={e => e.stopPropagation()}>
+            <div className="rv-between">
+              <div className="rv-row" role="group" aria-label="Modos de estudo">
+                <button
+                  onClick={() => {
+                    setIsSimuladoMode(!isSimuladoMode)
+                    if (isBossMode) setIsBossMode(false) // Desliga boss mode se desligar simulado
+                    if (isCrammingMode) setIsCrammingMode(false)
+                    setSelectedQuizOption(null)
+                    setQuizOptions([])
+                    setAiFeedback(null)
+                    setIsFlipped(false)
+                  }}
+                  className="rv-button"
+                  aria-pressed={isSimuladoMode && !isBossMode}
+                  title="Alternar para Simulado de Múltipla Escolha"
+                >
+                  <Sparkles size={15} aria-hidden="true" /> Simulado
+                </button>
+
+                <button
+                  onClick={() => {
+                    const newState = !isBossMode
+                    setIsBossMode(newState)
+                    if (newState) {
+                      setIsSimuladoMode(true)
+                      setIsCrammingMode(false)
+                      const remainingCards = cards.length - currentIndex
+                      // Define o HP como no máximo 5, ou a quantidade de cards restantes (o que for menor)
+                      const calculatedHp = Math.max(1, Math.min(5, Math.floor(remainingCards * 0.8)))
+                      setMaxBossHp(calculatedHp)
+                      setBossHp(calculatedHp)
+                      setPlayerHp(calculatedHp)
+                      setIsBossDefeated(false)
+                      setIsPlayerDefeated(false)
+
+                      // Escolhe uma música aleatória para a batalha
+                      const tracks = [
+                        '/sounds/battle.mp3',
+                        '/sounds/battle_2.mp3',
+                        '/sounds/battle_3.mp3',
+                        '/sounds/battle_4.mp3',
+                        '/sounds/battle_5.mp3'
+                      ]
+                      const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
+                      setCurrentBattleTrack(randomTrack)
+
+                      if (!isZenMode) playMKSFX('fight')
+                    }
+                    setSelectedQuizOption(null)
+                    setQuizOptions([])
+                    setAiFeedback(null)
+                    setIsFlipped(false)
+                  }}
+                  className="rv-button"
+                  aria-pressed={isBossMode}
+                  title="Modo Batalha (Boss Fight)"
+                >
+                  <Swords size={15} aria-hidden="true" /> Batalha
+                </button>
+
+                {/* Botão de Modo Sobrevivência */}
+                <button
+                  onClick={toggleCrammingMode}
+                  className="rv-button"
+                  aria-pressed={isCrammingMode}
+                  title="Modo Sobrevivência (Estudo Rápido de Véspera)"
+                >
+                  <Flame size={15} aria-hidden="true" /> Véspera
+                </button>
+
+                {/* Botão de Modo Imersão */}
+                <button
+                  onClick={toggleZenMode}
+                  className="rv-button"
+                  aria-pressed={isZenMode}
+                  title="Modo Imersão (Sons de Chuva e Layout Clean)"
+                >
+                  <Headphones size={15} aria-hidden="true" /> Imersão
+                </button>
+              </div>
 
               <button
-                onClick={() => {
-                  const newState = !isBossMode
-                  setIsBossMode(newState)
-                  if (newState) {
-                    setIsSimuladoMode(true)
-                    setIsCrammingMode(false)
-                    const remainingCards = cards.length - currentIndex
-                    // Define o HP como no máximo 5, ou a quantidade de cards restantes (o que for menor)
-                    const calculatedHp = Math.max(1, Math.min(5, Math.floor(remainingCards * 0.8))) 
-                    setMaxBossHp(calculatedHp)
-                    setBossHp(calculatedHp)
-                    setPlayerHp(calculatedHp)
-                    setIsBossDefeated(false)
-                    setIsPlayerDefeated(false)
-
-                    // Escolhe uma música aleatória para a batalha
-                    const tracks = [
-                      '/sounds/battle.mp3',
-                      '/sounds/battle_2.mp3',
-                      '/sounds/battle_3.mp3',
-                      '/sounds/battle_4.mp3',
-                      '/sounds/battle_5.mp3'
-                    ]
-                    const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
-                    setCurrentBattleTrack(randomTrack)
-                    
-                    if (!isZenMode) playMKSFX('fight')
-                  }
-                  setSelectedQuizOption(null)
-                  setQuizOptions([])
-                  setAiFeedback(null)
-                  setIsFlipped(false)
-                }}
-                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
-                  isBossMode
-                    ? 'bg-red-500/20 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.3)]'
-                    : 'bg-surface-muted text-text-medium border-border hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500'
-                }`}
-                title="Modo Batalha (Boss Fight)"
+                onClick={() => speakText(`${activeCard.front}. A resposta é: ${activeCard.back}`)}
+                className="rv-button rv-quiet"
+                title={isSpeaking ? "Parar leitura por voz" : "Ouvir o card em áudio (Podcast)"}
               >
-                <span>⚔️ <span className="hidden sm:inline">Batalha</span></span>
-              </button>
-
-              {/* Botão de Modo Sobrevivência */}
-              <button
-                onClick={toggleCrammingMode}
-                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
-                  isCrammingMode
-                    ? 'bg-orange-500/20 text-orange-500 border-orange-500/30 shadow-[0_0_10px_rgba(249,115,22,0.3)]'
-                    : 'bg-surface-muted text-text-medium border-border hover:border-orange-500/30 hover:bg-orange-500/10 hover:text-orange-500'
-                }`}
-                title="Modo Sobrevivência (Estudo Rápido de Véspera)"
-              >
-                <span>🚨 <span className="hidden sm:inline">Véspera</span></span>
-              </button>
-
-              {/* Botão de Modo Imersão */}
-              <button
-                onClick={toggleZenMode}
-                className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
-                  isZenMode
-                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.3)]'
-                    : 'bg-surface-muted text-text-medium border-border hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-400'
-                }`}
-                title="Modo Imersão (Sons de Chuva e Layout Clean)"
-              >
-                <span>🎧 <span className="hidden sm:inline">Imersão</span></span>
+                {isTtsLoading ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin" />
+                    <span>Carregando…</span>
+                  </>
+                ) : isSpeaking ? (
+                  <>
+                    <VolumeX className="size-3" />
+                    <span>Parar leitura</span>
+                  </>
+                ) : (
+                  <>
+                    <Volume2 className="size-3" />
+                    <span>Ouvir card</span>
+                  </>
+                )}
               </button>
             </div>
-
-            <button
-              onClick={() => speakText(`${activeCard.front}. A resposta é: ${activeCard.back}`)}
-              className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
-                isSpeaking 
-                  ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_10px_rgba(99,102,241,0.2)]'
-                  : 'border-border bg-surface-muted text-text-medium hover:text-text-strong hover:border-border-strong hover:bg-surface-elevated'
-              }`}
-              title={isSpeaking ? "Parar leitura por voz" : "Ouvir o card em áudio (Podcast)"}
-            >
-              {isTtsLoading ? (
-                <>
-                  <Loader2 className="size-3 animate-spin" />
-                  <span className="hidden sm:inline">Carregando...</span>
-                </>
-              ) : isSpeaking ? (
-                <>
-                  <VolumeX className="size-3" />
-                  <span className="hidden sm:inline">Parar Leitura</span>
-                </>
-              ) : (
-                <>
-                  <Volume2 className="size-3" />
-                  <span className="hidden sm:inline">Ouvir Card</span>
-                </>
-              )}
-            </button>
           </div>
         )}
 
@@ -1709,39 +1776,40 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
               {ultimatumTimer > 0 ? (
                 <button
                   disabled
-                  className="w-full h-14 bg-surface border border-border/40 text-text-muted text-xs font-semibold rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed opacity-50"
+                  className="rv-button w-full"
                 >
                   <Loader2 className="size-3.5 animate-spin" />
-                  <span>Leitura Obrigatória: {ultimatumTimer}s...</span>
+                  <span>Leia a resposta · {ultimatumTimer}s</span>
                 </button>
               ) : (
                 <button
                   onClick={() => handleReview(Rating.Again)}
-                  className="w-full h-14 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-1 shadow-[0_4px_12px_rgba(239,68,68,0.25)] active:scale-95 transition-all"
+                  className="rv-button rv-primary w-full"
                 >
-                  <span>Avançar (Marcar como Errado) ➡️</span>
+                  Marcar como errado e avançar <ArrowRight size={15} aria-hidden="true" />
                 </button>
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-2 w-full animate-in fade-in duration-200">
-              <button disabled={isSubmitting} onClick={() => handleReview(Rating.Again)} className="flex flex-col items-center justify-center bg-error-soft/50 hover:bg-error-soft border border-error/20 rounded-2xl text-error transition-all active:scale-95 disabled:opacity-50 py-3">
-                <span className="font-bold mb-1 md:text-base text-sm">Errei</span>
-                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Again)}</span>
-              </button>
-              <button disabled={isSubmitting} onClick={() => handleReview(Rating.Hard)} className="flex flex-col items-center justify-center bg-warning-soft/50 hover:bg-warning-soft border border-warning/20 rounded-2xl text-warning transition-all active:scale-95 disabled:opacity-50 py-3">
-                <span className="font-bold mb-1 md:text-base text-sm">Difícil</span>
-                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Hard)}</span>
-              </button>
-              <button disabled={isSubmitting} onClick={() => handleReview(Rating.Good)} className="flex flex-col items-center justify-center bg-primary-soft/50 hover:bg-primary-soft border border-primary/20 rounded-2xl text-primary transition-all active:scale-95 disabled:opacity-50 py-3">
-                <span className="font-bold mb-1 md:text-base text-sm">Bom</span>
-                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Good)}</span>
-              </button>
-              <button disabled={isSubmitting || (aiFeedback !== null && !aiFeedback.correct)} onClick={() => handleReview(Rating.Easy)} className={`flex flex-col items-center justify-center bg-success-soft/50 hover:bg-success-soft border border-success/20 rounded-2xl text-success transition-all active:scale-95 py-3 ${aiFeedback !== null && !aiFeedback.correct ? 'opacity-40 cursor-not-allowed hover:bg-success-soft/50 active:scale-100' : 'disabled:opacity-50'}`} title={aiFeedback !== null && !aiFeedback.correct ? "O Tutor AI avaliou que você errou a resposta, por isso a opção 'Fácil' foi desabilitada." : undefined}>
-                <span className="font-bold mb-1 md:text-base text-sm">Fácil</span>
-                <span className="text-[10px] uppercase opacity-70">{getIntervalLabel(Rating.Easy)}</span>
-              </button>
-            </div>
+            <section className="rv-panel rv-grading" aria-labelledby="classificar-flashcard">
+              <p id="classificar-flashcard">Como foi lembrar? O intervalo abaixo é uma estimativa.</p>
+              <div className="rv-ratings">
+                {reviewRatings.map(({ grade, key, tone, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={isSubmitting || (grade === Rating.Easy && !canRateEasy)}
+                    onClick={() => handleReview(grade)}
+                    className="rv-rating"
+                    data-grade={tone}
+                    aria-keyshortcuts={key}
+                    title={grade === Rating.Easy && aiFeedback?.correct === false ? 'A avaliação indicou que a resposta estava incorreta.' : undefined}
+                  >
+                    <strong>{label}</strong><span>{getIntervalLabel(grade)}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
           )
         )}
         </div>
@@ -1755,7 +1823,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
               <FileText className="w-5 h-5 text-primary" />
               {activeCard.notes.title}
             </h3>
-            <button onClick={() => setShowContext(false)} className="p-2 bg-surface-elevated rounded-full text-text-muted hover:text-text-strong transition-colors">
+            <button aria-label="Fechar contexto da nota" onClick={() => setShowContext(false)} className="p-2 bg-surface-elevated rounded-full text-text-muted hover:text-text-strong transition-colors">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -1783,7 +1851,7 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
                 <PlayCircle className="size-5 text-red-500" />
                 Vídeo Explicativo
               </h4>
-              <button onClick={() => { setShowVideoModal(false); setVideoUrl(''); }} className="text-text-muted hover:text-white transition-colors">
+              <button aria-label="Fechar vídeo" onClick={() => { setShowVideoModal(false); setVideoUrl(''); }} className="text-text-muted hover:text-white transition-colors">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1804,13 +1872,15 @@ export default function ReviewPanel({ initialCards, mode = 'default' }: ReviewPa
       )}
 
       {/* 🆕 TOAST DE ERRO */}
-      <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg shadow-lg backdrop-blur-md transition-all duration-300 z-[100] max-w-sm ${uiError ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0 pointer-events-none'}`}>
-        <AlertTriangle className="size-5 shrink-0" />
-        <span className="text-sm font-medium leading-tight">{uiError}</span>
-        <button onClick={() => setUiError(null)} className="ml-2 opacity-70 hover:opacity-100 transition-opacity">
-          <X className="size-4" />
-        </button>
-      </div>
+      {uiError && (
+        <div role="alert" className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg shadow-lg z-[100] max-w-[calc(100vw-3rem)]">
+          <AlertTriangle className="size-5 shrink-0" aria-hidden="true" />
+          <span className="text-sm font-medium leading-tight">{uiError}</span>
+          <button aria-label="Dispensar aviso" onClick={() => setUiError(null)} className="ml-2 opacity-70 hover:opacity-100 transition-opacity">
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

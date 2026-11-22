@@ -8,6 +8,7 @@ import { useSettings } from '@/contexts/SettingsContext'
 import ReactMarkdown from 'react-markdown'
 import confetti from 'canvas-confetti' // Upgrade 2
 import OfflineFallback from '@/components/OfflineFallback'
+import { ACHIEVEMENTS } from '@/types/achievements'
 
 interface Workspace {
   id: string
@@ -339,11 +340,7 @@ export default function FeynmanSandbox({ workspaces }: FeynmanSandboxProps) {
 
       if (data.unlockedNobel) {
         window.dispatchEvent(new CustomEvent('achievement-unlocked', {
-          detail: {
-            id: 'premio_nobel',
-            title: '🏅 Prêmio Nobel',
-            description: 'Atingiu precisão superior a 90% em uma explicação no Feynman Sandbox.'
-          }
+          detail: ACHIEVEMENTS.premio_nobel
         }))
       }
     } catch (err: any) {

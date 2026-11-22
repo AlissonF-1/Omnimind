@@ -148,7 +148,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDetails> = {
   premio_nobel: {
     id: 'premio_nobel',
     title: '🏅 Prêmio Nobel',
-    description: 'Atingiu precisão superior a 90% em uma explicação no Feynman Sandbox.',
+    description: 'Tirou 9 de 10 ou mais em uma explicação no Feynman Sandbox.',
     icon: 'Award',
     tier: 'diamante',
     secret: true,
