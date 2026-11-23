@@ -376,7 +376,7 @@ export async function getWeeklyLearningCycleReport() {
       .map(entry => `${entry[0]} (Lapsos: ${entry[1]})`)
       .join(', ')
 
-    // 3. IA Llama 3
+    // 3. Gera o relatório
     const systemPrompt = `Você é um tutor inteligente e motivador (Coach do OmniMind). Seu objetivo é analisar as estatísticas de estudo semanais e gerar um relatório do Ciclo de Aprendizado resumido e motivador em exatamente 2 parágrafos no formato Markdown. Seja direto e encorajador. Fale diretamente com o estudante.`
     const userPrompt = `Aqui estão meus dados acumulados:
 - Total de Cards: ${totalCards}
@@ -386,7 +386,9 @@ export async function getWeeklyLearningCycleReport() {
 
 Escreva o relatório de ciclo em português. Não use títulos grandes, apenas quebras de parágrafo.`
 
-    const result = await callAIWithFallback(systemPrompt, userPrompt, 'simple', false)
+    const result = await callAIWithFallback(systemPrompt, userPrompt, 'simple', false, {
+      groqModel: 'openai/gpt-oss-20b',
+    })
 
     if (!result.success) {
       throw new Error(result.error || 'Erro na resposta do modelo de IA')
