@@ -11,7 +11,8 @@ const modules = new Map()
 
 function load(name) {
   if (modules.has(name)) return modules.get(name)
-  const source = readFileSync(new URL(`../../src/components/${name}.tsx`, import.meta.url), 'utf8')
+  const path = name.startsWith('lib/') ? '../' + name + '.ts' : name + '.tsx'
+  const source = readFileSync(new URL('../../src/components/' + path, import.meta.url), 'utf8')
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS,
@@ -26,7 +27,12 @@ function load(name) {
     if (moduleName === 'next/image') return function ImageFixture({ src, alt, width, height, className }) {
       return createElement('img', { src, alt, width, height, className })
     }
-    if (moduleName === '@/components/StudyCompanion') return () => null
+    if (moduleName === '@/components/StudyCompanion' || moduleName === '@/components/AvatarFace') return () => null
+    if (moduleName === '@/components/DashboardAssistantTeaser') return load('DashboardAssistantTeaser').default
+    if (moduleName === '@/components/ThemeToggle') return { SavedThemeToggle: () => null }
+    if (moduleName === '@/actions/workspaces') return { signOut: async () => {} }
+    if (moduleName === 'next/navigation') return { usePathname: () => '/dashboard/questoes/historico', useRouter: () => ({}) }
+    if (moduleName.startsWith('@/lib/')) return load(moduleName.slice(2))
     return require(moduleName)
   }
   const state = { exports: {} }
@@ -49,8 +55,8 @@ test('fila de revisões em dia é independente da meta diária', () => {
   assert.doesNotMatch(focus + goal, /Meta (cumprida|concluída)/)
 })
 
-test('pendências, progresso, calendário e Ultimato refletem os dados fornecidos', () => {
-  const { DashboardReviewFocus, DashboardUltimatum } = load('DashboardOverview')
+test('pendências, progresso e calendário refletem os dados fornecidos', () => {
+  const { DashboardReviewFocus } = load('DashboardOverview')
   const { default: Progress } = load('DailyProgressCircle')
   const focus = render(DashboardReviewFocus, { overdueCards: 4, totalCards: 9 })
   const goal = render(Progress, { reviewCount: 12, dailyGoal: 10, multiplier: 1.2, activeGoalTitle: 'Prova de TI' })
@@ -59,7 +65,43 @@ test('pendências, progresso, calendário e Ultimato refletem os dados fornecido
   assert.match(goal, /aria-valuenow="10" aria-valuetext="12 de 10 revisões"/)
   assert.match(goal, /Meta concluída/)
   assert.match(goal, /href="\/dashboard\/calendario"/)
-  assert.match(render(DashboardUltimatum), /href="\/dashboard\/revisoes\?mode=ultimato"/)
+})
+
+test('Workspaces começa recolhido e o menu mantém perfil, calendário, configurações e Ultimato', () => {
+  const { default: Sidebar } = load('Sidebar')
+  const html = render(Sidebar, {
+    workspaces: [{ id: 'sql', name: 'SQL', description: null }],
+    userName: 'Estudante', avatarUrl: null, drawerOpen: false, collapsed: false,
+  })
+  assert.match(html, /aria-expanded="false" aria-controls="os-workspaces-list"/)
+  assert.match(html, /id="os-workspaces-list" hidden=""/)
+  assert.match(html, /href="\/dashboard\/revisoes\?mode=ultimato"/)
+  for (const route of ['perfil', 'calendario', 'configuracoes']) {
+    assert.ok(html.includes('href="/dashboard/' + route + '"'))
+  }
+  assert.match(html, /href="\/dashboard\/questoes" aria-current="page"/)
+})
+
+test('navegação mobile e banner apontam para as rotas existentes', () => {
+  const { MobileDock } = load('MobileTopbar')
+  const { DashboardHero } = load('DashboardOverview')
+  const nav = render(MobileDock, { menuOpen: false })
+  const hero = render(DashboardHero, { greeting: 'Boa tarde', date: '23 de novembro' })
+  assert.match(nav, /aria-label="Abrir Assistente"/)
+  assert.match(nav, /aria-controls="dashboard-sidebar"/)
+  assert.match(nav, /href="\/dashboard\/revisoes"/)
+  assert.match(hero, /href="\/dashboard\/calendario"/)
+  assert.match(hero, /brain\.webp/)
+})
+
+test('ritmo semanal mostra proporções e dias ativos a partir dos registros', () => {
+  const { profileWeek } = load('lib/profile')
+  const { default: Rhythm } = load('DashboardStudyRhythm')
+  const days = profileWeek([{ study_date: '2026-11-23', review_count: 4 }], new Date('2026-11-23T18:00:00Z'))
+  const chart = render(Rhythm, { days })
+  assert.match(chart, /1 \/ 7/)
+  assert.match(chart, /4 revisões/)
+  assert.equal((chart.match(/height:0%/g) ?? []).length, 6)
 })
 
 test('uma meta aumentada no mesmo dia reflete as revisões que ainda faltam', () => {

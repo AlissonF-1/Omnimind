@@ -10,7 +10,8 @@ import StreakRescueModal from '@/components/StreakRescueModal'
 import WorkspaceHealthGrid from '@/components/WorkspaceHealthGrid'
 import LevelProgressCard from '@/components/LevelProgressCard'
 import DailyQuestsCard from '@/components/DailyQuestsCard'
-import { DashboardEmptyActivity, DashboardHero, DashboardReviewFocus, DashboardUltimatum } from '@/components/DashboardOverview'
+import { DashboardCompanion, DashboardEmptyActivity, DashboardHero, DashboardReviewFocus } from '@/components/DashboardOverview'
+import DashboardStudyRhythm from '@/components/DashboardStudyRhythm'
 import { getDailyStudyLogs, getUserDashboardStats, getCriticalReviewAlerts, getWeeklyLearningCycleReport } from '@/actions/stats'
 import { getDynamicDailyGoal } from '@/actions/calendar'
 import { getBlindSpots } from '@/actions/blindspots'
@@ -18,12 +19,13 @@ import { getUserStudyStats, checkAndUnlockAchievements, getDailyQuests, getStrea
 import { getWorkspacesHealth } from '@/actions/workspaces'
 import { getUserPreferences } from '@/actions/settings'
 import { createClient } from '@/utils/supabase/server'
+import { profileWeek } from '@/lib/profile'
 import DashboardAchievements from './DashboardAchievements'
 import './home.css'
 
 export const dynamic = 'force-dynamic'
 
-const timeZone = 'America/Fortaleza'
+const timeZone = 'America/Sao_Paulo'
 const dateFormat = new Intl.DateTimeFormat('pt-BR', {
   timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
 })
@@ -64,7 +66,6 @@ export default async function DashboardPage() {
   const now = new Date()
   const hour = Number(hourFormat.format(now))
   const greeting = hour >= 5 && hour < 12 ? 'Bom dia' : hour >= 12 && hour < 18 ? 'Boa tarde' : 'Boa noite'
-  const dayImage = hour >= 5 && hour < 18 ? '/images/greeting_sun_3d.png' : '/images/greeting_moon_3d.png'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const streak = user ? await getUserStreak(user.id) : 0
@@ -72,16 +73,16 @@ export default async function DashboardPage() {
   return (
     <div className="dashboard-home">
       <div className="dh-area">
-        <DashboardHero greeting={greeting} date={dateFormat.format(now)} dayImage={dayImage} streak={streak} />
+        <DashboardHero greeting={greeting} date={dateFormat.format(now)} />
       </div>
       <Suspense fallback={<DashboardLoading />}>
-        <DashboardContent authenticated={!!user} today={now.toISOString().slice(0, 10)} />
+        <DashboardContent authenticated={!!user} today={now.toISOString().slice(0, 10)} streak={streak} />
       </Suspense>
     </div>
   )
 }
 
-async function DashboardContent({ authenticated, today }: { authenticated: boolean; today: string }) {
+async function DashboardContent({ authenticated, today, streak }: { authenticated: boolean; today: string; streak: number }) {
   if (!authenticated) return <DashboardError />
 
   const data = await Promise.all([
@@ -112,6 +113,8 @@ async function DashboardContent({ authenticated, today }: { authenticated: boole
   const todayReviewCount = logs.find((log) => log.study_date?.split('T')[0] === today)?.review_count ?? 0
   const totalCards = stats?.totalCards ?? 0
   const hasActivity = logs.some((log) => log.review_count > 0)
+  const week = profileWeek(logs, new Date(today + 'T00:00:00Z'))
+  const weeklyReviews = week.reduce((sum, day) => sum + day.reviews, 0)
 
   return (
     <>
@@ -119,8 +122,10 @@ async function DashboardContent({ authenticated, today }: { authenticated: boole
       <div className="dh-body dh-area dh-stack">
         {topAlert && <DashboardRelearningAlert topAlert={topAlert} />}
 
-        <section aria-labelledby="dashboard-today">
-          <h2 id="dashboard-today" className="dh-heading">Seu estudo hoje</h2>
+        <DashboardStatsCards totalCards={totalCards} streak={stats?.streak ?? 0} retentionRate={stats?.retentionRate ?? 0} weeklyReviews={weeklyReviews} />
+
+        <section className="dh-today" aria-labelledby="dashboard-today">
+          <h2 id="dashboard-today" className="sr-only">Seu estudo hoje</h2>
           <div className="dh-focus-grid">
             <DashboardReviewFocus overdueCards={stats?.overdueCards ?? 0} totalCards={totalCards} />
             <DailyProgressCircle
@@ -129,32 +134,25 @@ async function DashboardContent({ authenticated, today }: { authenticated: boole
               dailyGoal={dynamicGoalData?.goal || settings?.daily_goal_default || 10}
               activeGoalTitle={dynamicGoalData?.activeGoal?.title}
             />
+            <LevelProgressCard
+              totalXp={userStats?.total_xp ?? 0}
+              currentLevel={userStats?.current_level || 1}
+              streakShields={userStats?.streak_shields ?? 0}
+              isJeopardy={streakJeopardy?.isJeopardy}
+            />
           </div>
         </section>
 
-        <DashboardStatsCards totalCards={totalCards} streak={stats?.streak ?? 0} retentionRate={stats?.retentionRate ?? 0} />
-
-        <section aria-labelledby="dashboard-rhythm">
-          <h2 id="dashboard-rhythm" className="dh-heading mb-3">Ritmo de estudo</h2>
-          <div className="dh-rhythm-grid">
-            <div className="dh-rail">
-              {hasActivity ? <Heatmap logs={logs} today={today} /> : <DashboardEmptyActivity showOnboarding={totalCards === 0} />}
-              <DashboardUltimatum />
-            </div>
-            <div className="dh-rail">
-              <DailyQuestsCard quests={dailyQuests} />
-              <LevelProgressCard
-                totalXp={userStats?.total_xp ?? 0}
-                currentLevel={userStats?.current_level || 1}
-                streakShields={userStats?.streak_shields ?? 0}
-                isJeopardy={streakJeopardy?.isJeopardy}
-              />
-            </div>
-          </div>
-        </section>
-
-        <WorkspaceHealthGrid healths={workspacesHealth} />
+        <div className="dh-rhythm-grid">
+          <DashboardStudyRhythm days={week} />
+          <DailyQuestsCard quests={dailyQuests} />
+        </div>
         <StudyInsightsPanel logs={logs} aiReport={weeklyAiReport?.report ?? ''} />
+        <div className="dh-history-grid">
+          {hasActivity ? <Heatmap logs={logs} today={today} /> : <DashboardEmptyActivity showOnboarding={totalCards === 0} />}
+          <DashboardCompanion streak={streak} />
+        </div>
+        <WorkspaceHealthGrid healths={workspacesHealth} />
         {blindSpots && blindSpots.length > 0 && <BlindSpotsPanel blindSpots={blindSpots} />}
       </div>
       <StreakRescueModal isJeopardy={!!streakJeopardy?.isJeopardy} potentialStreak={streakJeopardy?.potentialStreak ?? 0} />

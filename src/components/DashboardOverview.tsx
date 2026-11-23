@@ -1,7 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, BrainCircuit, CalendarDays, FolderPlus, ListChecks, NotebookPen, Sparkles, Zap } from 'lucide-react'
+import { ArrowRight, BrainCircuit, CalendarDays, FolderPlus, ListChecks, NotebookPen, Sparkles } from 'lucide-react'
 import StudyCompanion from '@/components/StudyCompanion'
+import DashboardAssistantTeaser from '@/components/DashboardAssistantTeaser'
 
 const steps = [
   { title: 'Crie um workspace', description: 'Organize sua matéria no menu lateral.', icon: FolderPlus },
@@ -10,39 +11,44 @@ const steps = [
   { title: 'Faça a primeira revisão', description: 'Responda aos cartões para iniciar seu histórico.', icon: BrainCircuit },
 ]
 
-export function DashboardHero({ greeting, date, dayImage, streak }: {
+export function DashboardHero({ greeting, date }: {
   greeting: string
   date: string
-  dayImage: string
-  streak: number
 }) {
   return (
     <header className="dh-hero">
       <div className="dh-hero-art" aria-hidden="true">
-        <Image src="/images/brain_workspace_3d.jpg" alt="" fill sizes="(max-width: 640px) 75vw, 580px" preload />
+        <Image src="/images/dashboard/brain.webp" alt="" fill sizes="(max-width: 640px) 65vw, 640px" preload />
       </div>
       <div className="dh-hero-copy">
         <div className="dh-row">
-          <span className="dh-day-image"><Image src={dayImage} alt="" width={29} height={29} /></span>
+          <CalendarDays size={16} aria-hidden="true" />
           <span className="dh-hero-date">{date}</span>
         </div>
-        <h1>{greeting}.</h1>
+        <h1>{greeting}, estudioso! <span aria-hidden="true">👋</span></h1>
         <p className="dh-caption">Revise seus flashcards, pratique questões e acompanhe seu ritmo de estudo.</p>
         <nav aria-label="Atalhos do painel" className="dh-row dh-hero-actions">
-          <Link href="/dashboard/questoes" prefetch={false} className="dh-button dh-button-primary">
+          {/* A rota de Questões exige navegação de documento para respeitar o cache offline. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/dashboard/questoes" className="dh-button dh-button-primary">
             <ListChecks size={16} aria-hidden="true" /> Praticar questões <ArrowRight size={15} aria-hidden="true" />
-          </Link>
-          <Link href="/dashboard/calendario" className="dh-button"><CalendarDays size={16} aria-hidden="true" /> Calendário</Link>
+          </a>
+          <Link href="/dashboard/calendario" className="dh-button"><CalendarDays size={16} aria-hidden="true" /> Planejar estudo</Link>
         </nav>
       </div>
-      <div className="dh-companion">
-        <span>Companheiro de estudo</span>
-        <StudyCompanion streak={streak} />
-      </div>
+      <DashboardAssistantTeaser />
     </header>
   )
 }
 
+export function DashboardCompanion({ streak }: { streak: number }) {
+  return (
+    <article className="dh-panel dh-pad dh-companion-card">
+      <div><h3 className="dh-title">Companheiro de estudo</h3><p className="dh-caption">O Golem evolui conforme sua sequência de revisões.</p></div>
+      <StudyCompanion streak={streak} />
+    </article>
+  )
+}
 function estimatedReviewTime(count: number) {
   const minutes = Math.round((count * 45) / 60)
   return minutes < 1 ? 'menos de 1 min' : minutes + ' min'
@@ -57,7 +63,7 @@ export function DashboardReviewFocus({ overdueCards, totalCards }: { overdueCard
   return (
     <article className="dh-panel dh-pad dh-review">
       <div className="dh-review-image" aria-hidden="true">
-        <Image src="/images/review_target_3d.jpg" alt="" fill sizes="(max-width: 640px) 48vw, 300px" />
+        <Image src="/images/dashboard/review-cards.webp" alt="" fill sizes="(max-width: 640px) 48vw, 300px" />
       </div>
       <p className="dh-eyebrow">Revisão ativa</p>
       <h3>{headline}</h3>
@@ -101,21 +107,6 @@ export function DashboardEmptyActivity({ showOnboarding }: { showOnboarding: boo
           </ol>
         </>
       )}
-    </article>
-  )
-}
-
-export function DashboardUltimatum() {
-  return (
-    <article className="dh-panel dh-pad dh-ultimatum">
-      <div className="dh-row">
-        <span className="dh-icon dh-danger"><Zap size={17} aria-hidden="true" /></span>
-        <h3 className="dh-title">Modo Ultimato</h3>
-      </div>
-      <p className="dh-caption mt-2">Quiz com cards dos próximos 15 dias, a partir dos menos estáveis.</p>
-      <Link href="/dashboard/revisoes?mode=ultimato" className="dh-button">
-        Iniciar Ultimato <ArrowRight size={15} aria-hidden="true" />
-      </Link>
     </article>
   )
 }

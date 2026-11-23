@@ -1,4 +1,6 @@
+import Image from 'next/image'
 import { AlertTriangle, Shield, Sparkles } from 'lucide-react'
+import { profileLevelProgress } from '@/lib/profile'
 
 interface LevelProgressCardProps {
   totalXp: number
@@ -8,19 +10,20 @@ interface LevelProgressCardProps {
 }
 
 export default function LevelProgressCard({ totalXp, currentLevel, streakShields, isJeopardy }: LevelProgressCardProps) {
-  const currentThreshold = Math.pow(currentLevel - 1, 2) * 5
-  const nextThreshold = Math.pow(currentLevel, 2) * 5
-  const range = nextThreshold - currentThreshold
-  const progress = Math.min(Math.max(totalXp - currentThreshold, 0), range)
+  const { value: progress, target: range } = profileLevelProgress(currentLevel, totalXp)
 
   return (
-    <article className="dh-panel dh-pad">
+    <article className="dh-panel dh-pad dh-level-card">
       <div className="dh-row dh-between">
         <div className="dh-row">
           <span className="dh-icon"><Sparkles size={16} aria-hidden="true" /></span>
-          <h3 className="dh-title">Nível {currentLevel}</h3>
+          <h3 className="dh-title">Seu progresso</h3>
         </div>
         <span className="dh-caption tabular-nums">{totalXp} XP total</span>
+      </div>
+      <div className="dh-row dh-between dh-level-number">
+        <strong>Nível {currentLevel}</strong>
+        <Image src="/images/streak_shield_3d.png" width={40} height={40} alt="" />
       </div>
       <progress className="dh-progress mt-3" value={progress} max={range} aria-label="Progresso para o próximo nível" />
       <div className="dh-row dh-between dh-caption !text-xs mt-1">

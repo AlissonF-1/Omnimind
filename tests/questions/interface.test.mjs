@@ -152,7 +152,7 @@ test('carregamento e erro têm estados próprios com instrução para continuar'
   assert.match(html, /Tentar novamente/)
 })
 
-test('service worker não responde nem reserva cache para navegações de Questões', () => {
+test('service worker mantém Questões, Trilhas e Assistente fora do cache de navegação', () => {
   const handlers = new Map()
   const worker = readFileSync(resolve(root, 'public/sw-custom.js'), 'utf8')
   runInNewContext(worker, {
@@ -161,8 +161,10 @@ test('service worker não responde nem reserva cache para navegações de Quest�
   })
   const handleFetch = handlers.get('fetch')
   assert.equal(typeof handleFetch, 'function')
-  for (const path of ['/dashboard/questoes', '/dashboard/questoes/resolver?versao=1', '/dashboard/questoes/historico?filtro=erros', '/dashboard/%71uest%6fes']) {
-    handleFetch({ request: { url: `https://example.test${path}`, mode: 'navigate' }, respondWith: () => assert.fail('Worker interceptou Questões.') })
+  for (const path of ['/dashboard/questoes', '/dashboard/questoes/resolver?versao=1', '/dashboard/questoes/historico?filtro=erros', '/dashboard/%71uest%6fes',
+    '/dashboard/trilhas', '/dashboard/trilhas/sql-concursos-e-mercado?etapa=1', '/dashboard/%74rilhas/sql?revisao=1',
+    '/dashboard/assistente', '/dashboard/%61ssistente?_rsc=1']) {
+    handleFetch({ request: { url: `https://example.test${path}`, mode: 'navigate' }, respondWith: () => assert.fail('Worker interceptou uma rota privada.') })
   }
 })
 
@@ -182,5 +184,14 @@ test('Workbox e cabeçalhos excluem as rotas privadas do cache de navegação', 
   assert.equal(matches('/dashboard/questoes', false), false)
   assert.equal(matches('/dashboard/revisoes'), false)
   assert.equal(matches('/dashboard/questoes-nova'), false)
+  assert.equal(matches('/dashboard/trilhas/sql-concursos-e-mercado?_rsc=123'), true)
+  assert.equal(matches('/dashboard/%74rilhas/sql?revisao=1'), true)
+  assert.equal(matches('/dashboard/trilhas', false), false)
+  assert.equal(matches('/dashboard/trilhas-arquivadas'), false)
+  assert.equal(matches('/dashboard/assistente?_rsc=123'), true)
+  assert.equal(matches('/dashboard/%61ssistente'), true)
+  assert.equal(matches('/dashboard/assistente-teste'), false)
   assert.match((await config.headers()).find(({ source }) => source === '/dashboard/questoes/:path*').headers[0].value, /private, no-store/)
+  assert.match((await config.headers()).find(({ source }) => source === '/dashboard/trilhas/:path*').headers[0].value, /private, no-store/)
+  assert.match((await config.headers()).find(({ source }) => source === '/dashboard/assistente/:path*').headers[0].value, /private, no-store/)
 })

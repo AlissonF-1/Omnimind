@@ -19,7 +19,7 @@ export default function DailyQuestsCard({ quests }: { quests: Quest[] }) {
   const uniqueQuests = [...new Map(quests.map((quest) => [quest.quest_id, quest])).values()]
 
   return (
-    <article className="dh-panel dh-pad">
+    <article className="dh-panel dh-pad dh-missions">
       <div className="dh-row dh-between">
         <h3 className="dh-title">Missões de hoje</h3>
         <ListChecks size={18} className="dh-accent" aria-hidden="true" />

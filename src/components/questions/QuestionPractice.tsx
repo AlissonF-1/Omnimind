@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Check, CircleCheck, CircleX, Loader2 } from 'luc
 import ReactMarkdown from 'react-markdown'
 import { submitQuestionAnswer } from '@/actions/questions'
 import { answerSubmission } from '@/lib/questions/practice'
-import type { QuestionActionError, QuestionAnswerInput, QuestionAttemptFeedback } from '@/lib/questions/contracts'
+import type { QuestionActionError, QuestionActionResult, QuestionAnswerInput, QuestionAttemptFeedback } from '@/lib/questions/contracts'
 import type { PracticeOption, PracticeQuestion } from '@/lib/questions/server'
 import SqlCode from './SqlCode'
 
@@ -53,7 +53,10 @@ export function QuestionFeedback({ feedback }: { feedback: QuestionAttemptFeedba
   )
 }
 
-export default function QuestionPractice({ question, options, topic, position, total, nextHref, backHref, finishHref }: {
+export default function QuestionPractice({
+  question, options, topic, position, total, nextHref, backHref, finishHref,
+  submitAnswerAction = submitQuestionAnswer, backLabel, finishLabel = 'Ver histórico',
+}: {
   question: PracticeQuestion
   options: PracticeOption[]
   topic: string | undefined
@@ -62,6 +65,9 @@ export default function QuestionPractice({ question, options, topic, position, t
   nextHref: string | null
   backHref: string
   finishHref: string
+  submitAnswerAction?: (input: QuestionAnswerInput) => Promise<QuestionActionResult>
+  backLabel?: string
+  finishLabel?: string
 }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -83,7 +89,7 @@ export default function QuestionPractice({ question, options, topic, position, t
       const input = answerSubmission(submission.current, question.id, selected, () => crypto.randomUUID())
       submission.current = input
       setLocked(true)
-      const result = await submitQuestionAnswer(input)
+      const result = await submitAnswerAction(input)
       if (result.ok) setFeedback(result.feedback)
       else setError(result.error)
     } catch {
@@ -101,7 +107,7 @@ export default function QuestionPractice({ question, options, topic, position, t
 
   return (
     <div className="q-shell q-stack q-practice">
-      <Link href={backHref} prefetch={false} className="q-button q-back"><ArrowLeft size={16} aria-hidden="true" /> {backHref.includes('/historico') ? 'Histórico' : 'Questões'}</Link>
+      <Link href={backHref} prefetch={false} className="q-button q-back"><ArrowLeft size={16} aria-hidden="true" /> {backLabel ?? (backHref.includes('/historico') ? 'Histórico' : 'Questões')}</Link>
 
       <div className="q-practice-layout">
         <header className="q-panel q-sequence">
@@ -161,7 +167,7 @@ export default function QuestionPractice({ question, options, topic, position, t
               <QuestionFeedback feedback={feedback} />
               <div className="q-answer-footer !mt-0">
                 <Link href={nextHref ?? finishHref} prefetch={false} className="q-button q-button-primary">
-                  {nextHref ? 'Próxima questão' : 'Ver histórico'}<ArrowRight size={16} aria-hidden="true" />
+                  {nextHref ? 'Próxima questão' : finishLabel}<ArrowRight size={16} aria-hidden="true" />
                 </Link>
               </div>
             </>

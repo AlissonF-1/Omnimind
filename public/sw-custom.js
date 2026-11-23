@@ -28,9 +28,9 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Questões exige sessão online, inclusive quando este worker roda sem Workbox.
+  // As rotas privadas exigem sessão online, inclusive sem Workbox.
   try {
-    if (url.origin === self.location.origin && /^\/dashboard\/questoes(?:\/|$)/.test(decodeURI(url.pathname))) return;
+    if (url.origin === self.location.origin && /^\/dashboard\/(?:questoes|trilhas|assistente)(?:\/|$)/.test(decodeURI(url.pathname))) return;
   } catch {
     // Deixe a própria rede tratar uma URL malformada.
     return;

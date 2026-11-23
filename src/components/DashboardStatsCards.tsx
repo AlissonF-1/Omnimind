@@ -1,17 +1,18 @@
 import Image from 'next/image'
-import { TrendingDown, TrendingUp } from 'lucide-react'
+import { Clock3, TrendingDown, TrendingUp } from 'lucide-react'
 
 interface DashboardStatsCardsProps {
   totalCards: number
   streak: number
   retentionRate: number
+  weeklyReviews: number
   trends?: {
     retention?: { value: number; isPositive: boolean }
     totalCards?: { value: number; isPositive: boolean }
   }
 }
 
-export default function DashboardStatsCards({ totalCards, streak, retentionRate, trends }: DashboardStatsCardsProps) {
+export default function DashboardStatsCards({ totalCards, streak, retentionRate, weeklyReviews, trends }: DashboardStatsCardsProps) {
   const metrics = [
     { label: 'Sequência', image: '/images/stat_streak_3d.png', number: streak, suffix: streak === 1 ? 'dia' : 'dias', color: 'dh-warning' },
     { label: 'Retenção', image: '/images/stat_retention_3d.png', number: totalCards > 0 ? retentionRate : '—', suffix: totalCards > 0 ? '%' : undefined, color: 'dh-positive', trend: trends?.retention, trendSuffix: '%' },
@@ -34,6 +35,10 @@ export default function DashboardStatsCards({ totalCards, streak, retentionRate,
           </div>
         )
       })}
+      <div className="dh-metric dh-week-metric">
+        <dt>Revisões na semana<span className="dh-metric-art dh-metric-clock"><Clock3 size={21} aria-hidden="true" /></span></dt>
+        <dd className="dh-accent">{weeklyReviews}</dd>
+      </div>
     </dl>
   )
 }

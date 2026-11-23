@@ -20,14 +20,14 @@ export async function embedText(
     throw new Error('GEMINI_API_KEY não configurada.')
   }
 
-  // SOLUÇÃO DEFINITIVA (Sua Pesquisa): 
-  // Uso do novo modelo unificado gemini-embedding-001 via Fetch API direta.
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent'
 
   const response = await fetch(url, {
     method: 'POST',
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
     },
     body: JSON.stringify({
       content: {
@@ -41,9 +41,7 @@ export async function embedText(
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => null)
-    console.error('Erro na chamada nativa do Google:', errorData)
-    throw new Error(`Falha na API (Status ${response.status}): ${errorData?.error?.message || 'Erro de conexão'}`)
+    throw new Error(`Falha ao gerar embedding (HTTP ${response.status}).`)
   }
 
   const data = await response.json()

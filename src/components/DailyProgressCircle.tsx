@@ -59,18 +59,24 @@ export default function DailyProgressCircle({
         </div>
       </div>
 
-      <div className={'dh-ring' + (completed ? ' dh-positive' : '')} role="progressbar"
+      <div className={'dh-goal-graphic' + (completed ? ' dh-positive' : '')} role="progressbar"
         aria-label="Progresso da meta diária" aria-valuemin={0} aria-valuemax={goal}
         aria-valuenow={Math.min(reviewCount, goal)} aria-valuetext={reviewCount + ' de ' + goal + ' revisões'}
       >
-        <svg viewBox="0 0 96 96" aria-hidden="true">
-          <circle className="dh-ring-track" cx={48} cy={48} r={radius} stroke="currentColor" strokeWidth={7} fill="none" />
-          <circle cx={48} cy={48} r={radius} fill="none" stroke="currentColor" strokeWidth={7}
-            transform="rotate(-90 48 48)" strokeLinecap="round" strokeDasharray={circumference}
-            strokeDashoffset={circumference * (remaining / goal)}
-          />
-        </svg>
-        <span className="dh-ring-value"><strong>{reviewCount}</strong><span>/ {goal}</span></span>
+        <div className="dh-ring">
+          <svg viewBox="0 0 96 96" aria-hidden="true">
+            <circle className="dh-ring-track" cx={48} cy={48} r={radius} stroke="currentColor" strokeWidth={7} fill="none" />
+            <circle cx={48} cy={48} r={radius} fill="none" stroke="currentColor" strokeWidth={7}
+              transform="rotate(-90 48 48)" strokeLinecap="round" strokeDasharray={circumference}
+              strokeDashoffset={circumference * (remaining / goal)}
+            />
+          </svg>
+          <span className="dh-ring-value"><strong>{reviewCount}</strong><span>/ {goal}</span></span>
+        </div>
+        <div className="dh-goal-bar" aria-hidden="true">
+          <progress className="dh-progress" value={Math.min(reviewCount, goal)} max={goal} />
+          <div className="dh-row dh-between"><span>{reviewCount} / {goal} revisões</span><span>{Math.min(100, Math.round(reviewCount * 100 / goal))}%</span></div>
+        </div>
       </div>
     </article>
   )

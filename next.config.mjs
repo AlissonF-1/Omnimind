@@ -13,7 +13,7 @@ const withPWA = withPWAInit({
       urlPattern: ({ url, sameOrigin }) => {
         if (!sameOrigin) return false;
         try {
-          return /^\/dashboard\/questoes(?:\/|$)/.test(decodeURI(url.pathname));
+          return /^\/dashboard\/(?:questoes|trilhas|assistente)(?:\/|$)/.test(decodeURI(url.pathname));
         } catch {
           return false;
         }
@@ -30,10 +30,10 @@ const nextConfig = {
   // Adicionamos um objeto vazio para silenciar o aviso do Turbopack
   turbopack: {},
   async headers() {
-    return [{
-      source: '/dashboard/questoes/:path*',
+    return ['/dashboard/questoes/:path*', '/dashboard/trilhas/:path*', '/dashboard/assistente/:path*'].map((source) => ({
+      source,
       headers: [{ key: 'Cache-Control', value: 'private, no-store, max-age=0' }],
-    }];
+    }));
   },
 };
 
