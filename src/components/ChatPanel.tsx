@@ -1,1271 +1,447 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import Link from 'next/link'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { usePathname } from 'next/navigation'
-import { Send, Bot, User, BookOpen, AlertCircle, Loader2, Copy, CheckCircle2, Sparkles, Plus, MessageSquare, ArrowLeftRight, Trash2, Menu, Volume2, Mic, Square, Brain, FileText, X, Settings, Pencil } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import Link from 'next/link'
+import { CalendarDays, ChevronDown, History, Layers, MessageSquare, Mic, Send, Settings, Square, X } from 'lucide-react'
+import { confirmAssistantExamAction } from '@/actions/chat'
 import { useSettings } from '@/contexts/SettingsContext'
+import { assistantHistoryKey, assistantPath, isAssistantPersona, type AssistantPersona } from '@/lib/assistant/contracts'
+import {
+  assistantDisplayText, assistantMessageId, assistantTitle, emptyAssistantHistory, limitAssistantMessages,
+  newAssistantConversation, newConversationTitle, parseAssistantSources, readAssistantHistory, saveAssistantHistory,
+  type AssistantConversation, type AssistantMessage as Message,
+} from '@/lib/assistant/history'
 import { getBestVoice } from '@/utils/audio'
-import OfflineFallback from '@/components/OfflineFallback'
+import AssistantHistory from './assistant/AssistantHistory'
+import AssistantMessage from './assistant/AssistantMessage'
+import AssistantWelcome, { assistantPersonas } from './assistant/AssistantWelcome'
+import { useAssistantIdentity } from './assistant/useAssistantIdentity'
+import './assistant/assistant.css'
 
-interface Source {
-  id: string
-  title: string | null
-  type: string
-  similarity: number
-  workspaceId?: string | null
-  noteId?: string | null
-}
+type Workspace = { id: string; name: string }
 
-interface Message {
-  id: string
-  role: 'user' | 'ai'
-  content: string
-  sources?: Source[]
-  error?: boolean
-  model?: string
-}
-
-interface Conversation {
-  id: string
-  title: string
-  messages: Message[]
-  createdAt: number
-  updatedAt: number
-  persona?: 'tutor' | 'grill' | 'eli5'
-}
-
-interface ChatStorageState {
-  conversations: Conversation[]
-  activeConversationId: string | null
-}
-
-const SUGGESTIONS = [
-  "🎲 Me faça uma pergunta desafiadora sobre minhas anotações",
-  "⚡ Analise minhas notas e ache contradições conceituais",
-  "📝 Resuma minhas anotações de estudo mais recentes",
-  "🧠 Explique um conceito das minhas notas de forma simples"
-]
-
-const MAX_STORED_MESSAGES = 40
-const DEFAULT_CONVERSATION_TITLE = 'Nova conversa'
-
-// 🔒 Função de fallback para compatibilidade com navegadores mobile em HTTP
-function generateUUID() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  // Fallback manual seguro caso crypto não esteja disponível (muito comum em celulares antigos ou HTTP)
-  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9)
-}
-
-function createConversation(title = DEFAULT_CONVERSATION_TITLE, messages: Message[] = [], persona: 'tutor' | 'grill' | 'eli5' = 'tutor'): Conversation {
-  return {
-    id: generateUUID(),
-    title,
-    messages: messages.slice(-MAX_STORED_MESSAGES),
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    persona,
-  }
-}
-
-function normalizeConversation(conversation: Conversation): Conversation {
-  return {
-    ...conversation,
-    messages: conversation.messages.slice(-MAX_STORED_MESSAGES),
-    persona: conversation.persona || 'tutor',
-  }
-}
-
-function deriveConversationTitle(text: string): string {
-  const cleaned = text.replace(/\s+/g, ' ').trim()
-  if (!cleaned) return DEFAULT_CONVERSATION_TITLE
-
-  const words = cleaned.split(' ')
-  const title = words.slice(0, 5).join(' ')
-  const capitalized = title.charAt(0).toUpperCase() + title.slice(1)
-
-  return capitalized.length > 32 ? `${capitalized.slice(0, 29)}...` : capitalized
-}
-
-const MemoizedMarkdown = React.memo(function MemoizedMarkdown({ content }: { content: string }) {
-  return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-      {content}
-    </ReactMarkdown>
-  )
-})
-
-function loadChatState(storageKey: string): ChatStorageState | null {
-  if (typeof window === 'undefined') return null
-
-  try {
-    const saved = sessionStorage.getItem(storageKey)
-    if (!saved) return null
-
-    const parsed = JSON.parse(saved)
-
-    if (Array.isArray(parsed)) {
-      const legacyMessages = parsed as Message[]
-      const legacyConversation = createConversation(
-        legacyMessages.find((message) => message.role === 'user')?.content
-          ? deriveConversationTitle(legacyMessages.find((message) => message.role === 'user')?.content || '')
-          : DEFAULT_CONVERSATION_TITLE,
-        legacyMessages
-      )
-
-      return {
-        conversations: [legacyConversation],
-        activeConversationId: legacyConversation.id,
-      }
-    }
-
-    if (parsed && typeof parsed === 'object' && Array.isArray((parsed as ChatStorageState).conversations)) {
-      const nextState = parsed as ChatStorageState
-      const conversations = nextState.conversations.map(normalizeConversation)
-      const activeConversationId = conversations.some((conversation) => conversation.id === nextState.activeConversationId)
-        ? nextState.activeConversationId
-        : conversations[0]?.id ?? null
-
-      return {
-        conversations,
-        activeConversationId,
-      }
-    }
-
-    return null
-  } catch {
-    sessionStorage.removeItem(storageKey)
-    return null
-  }
-}
-
-function saveChatState(storageKey: string, state: ChatStorageState) {
-  if (typeof window === 'undefined') return
-  sessionStorage.setItem(storageKey, JSON.stringify(state))
-}
-
-function buildSourceHref(src: Source): string | null {
-  if (src.workspaceId && src.noteId) {
-    return `/dashboard/${src.workspaceId}/note/${src.noteId}`
-  }
-  if (src.workspaceId) {
-    return `/dashboard/${src.workspaceId}`
-  }
-  return null
-}
-
-function buildSourceLabel(src: Source): string {
-  if (src.title) return src.title
-
-  const typeLabels: Record<string, string> = {
-    flashcard_front: 'Flashcard',
-    flashcard_back: 'Flashcard',
-    analogia: 'Analogia',
-    mnemonico: 'Mnemônico',
-    note: 'Nota',
-  }
-
-  return typeLabels[src.type] ?? 'Fonte'
-}
-
-// Filtra fontes para não repetir a mesma nota várias vezes na UI
-function getUniqueSources(sources?: Source[]) {
-  if (!sources) return []
-  
-  const seenUrls = new Set<string>()
-  const unique: Source[] = []
-
-  for (const src of sources) {
-    const href = buildSourceHref(src)
-    // Se não tiver link, ou se já vimos esse link, ignoramos para não poluir a UI
-    if (href && !seenUrls.has(href)) {
-      seenUrls.add(href)
-      unique.push(src)
-    }
-  }
-
-  return unique
-}
-
-// 🛡️ Error Boundary Simples (Com as tipagens corrigidas)
-interface ErrorBoundaryProps {
-  fallback: React.ReactNode;
-  children: React.ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-}
-
-class ChatErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props)
-    this.state = { hasError: false }
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true }
-  }
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback
-    }
-    return this.props.children
-  }
-}
-
-interface ChatPanelProps {
-  workspaceId?: string
-  workspaces?: { id: string; name: string }[]
-  onWorkspaceChange?: (newId: string) => void
-  isFloatingMode?: boolean
+type ChatPanelProps = {
+  accountId: string
+  workspaces: Workspace[]
+  initialWorkspaceId?: string
   onClose?: () => void
 }
 
-export default function ChatPanel({ workspaceId, workspaces = [], onWorkspaceChange, isFloatingMode = false, onClose }: ChatPanelProps) {
+type Dialog = { kind: 'exam' } | { kind: 'rename' | 'delete'; conversation: AssistantConversation }
+type Recognition = {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+  abort: () => void
+}
+
+function disposeSpeech(recognition: Recognition | null) {
+  if (!recognition) return
+  recognition.onresult = null
+  recognition.onerror = null
+  recognition.onend = null
+  recognition.abort()
+}
+
+function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceChange, firstName, onClose }: {
+  accountId: string
+  workspaceId: string
+  workspaces: Workspace[]
+  onWorkspaceChange: (value: string) => void
+  firstName: string
+  onClose?: () => void
+}) {
   const { settings } = useSettings()
   const pathname = usePathname()
-  const isWorkspaceValid = true
-  const storageKey = workspaceId ? `omnimind_chat_${workspaceId}` : 'omnimind_chat_global'
-
-  const [isOnline, setIsOnline] = useState(true)
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    setIsOnline(navigator.onLine)
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
-
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-  const [isMounted, setIsMounted] = useState(false)
-  const [userName, setUserName] = useState('Estudante')
-
+  const storageKey = assistantHistoryKey(accountId, workspaceId)
+  const [state, setState] = useState(() => {
+    try { return readAssistantHistory(window.sessionStorage, storageKey) }
+    catch { return emptyAssistantHistory() }
+  })
+  const [defaultPersona, setDefaultPersona] = useState<AssistantPersona>('tutor')
   const [query, setQuery] = useState('')
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { createClient } = await import('@/utils/supabase/client')
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Estudante'
-          setUserName(name)
-        }
-      } catch (err) {
-        console.error('Erro ao buscar usuário no Chat:', err)
-      }
-    }
-    fetchUser()
-  }, [])
-
-  const [isLoading, setIsLoading] = useState(false)
+  const [pendingId, setPendingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [copyError, setCopyError] = useState<string | null>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [showPersonaModal, setShowPersonaModal] = useState(false)
-  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
-  const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
-  const [editTitleValue, setEditTitleValue] = useState('')
-
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const recognitionRef = useRef<any>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-
-  const handleStopGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-    }
-    setIsLoading(false)
-  }, [])
-
-  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? conversations[0] ?? null
-  const activeMessages = activeConversation?.messages ?? []
-
-  const saveState = (nextConversations: Conversation[], nextActiveConversationId: string | null) => {
-    const normalizedConversations = nextConversations.map(normalizeConversation)
-    setConversations(normalizedConversations)
-    setActiveConversationId(nextActiveConversationId)
-    if (isMounted) {
-      saveChatState(storageKey, {
-        conversations: normalizedConversations,
-        activeConversationId: nextActiveConversationId,
-      })
-    }
-  }
+  const [recording, setRecording] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [dialog, setDialog] = useState<Dialog | null>(null)
+  const [dialogError, setDialogError] = useState('')
+  const [savingExam, setSavingExam] = useState(false)
+  const request = useRef<AbortController | null>(null)
+  const recognition = useRef<Recognition | null>(null)
+  const speaking = useRef(false)
+  const scroll = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
+  const historyDialog = useRef<HTMLDialogElement>(null)
+  const confirmDialog = useRef<HTMLDialogElement>(null)
+  const assistantConversation = state.conversations.find(({ id }) => id === state.activeConversationId)
+  const messages = assistantConversation?.messages ?? []
+  const persona = assistantConversation?.persona ?? defaultPersona
 
   useEffect(() => {
-    setIsMounted(true)
-    const loadedState = loadChatState(storageKey)
+    try { saveAssistantHistory(window.sessionStorage, storageKey, state) } catch { /* Armazenamento bloqueado no navegador. */ }
+  }, [state, storageKey])
 
-    if (loadedState && loadedState.conversations.length > 0) {
-      setConversations(loadedState.conversations)
-      setActiveConversationId(loadedState.activeConversationId ?? loadedState.conversations[0].id)
-    } else {
-      const initialConversation = createConversation()
-      setConversations([initialConversation])
-      setActiveConversationId(initialConversation.id)
-      saveChatState(storageKey, {
-        conversations: [initialConversation],
-        activeConversationId: initialConversation.id,
-      })
-    }
-
-    setCopiedId(null)
-    setCopyError(null)
-  }, [storageKey])
-
-  useEffect(() => {
-    if (!isMounted) return
-
-    if (conversations.length > 0) {
-      saveChatState(storageKey, {
-        conversations: conversations.map(normalizeConversation),
-        activeConversationId,
-      })
-    } else if (typeof window !== 'undefined') {
-      sessionStorage.removeItem(storageKey)
-    }
-  }, [conversations, storageKey, isMounted, activeConversationId])
-
-  const scrollToBottomIfNear = useCallback((force = false) => {
-    if (!scrollRef.current) return
-    const { scrollHeight, scrollTop, clientHeight } = scrollRef.current
-    const isAtBottom = scrollHeight - scrollTop - clientHeight <= 100
-
-    if (force || isAtBottom) {
-      scrollRef.current.scrollTo({ top: scrollHeight, behavior: 'smooth' })
-    }
+  useEffect(() => () => {
+    request.current?.abort()
+    disposeSpeech(recognition.current)
+    if (speaking.current) window.speechSynthesis?.cancel()
   }, [])
 
   useEffect(() => {
-    scrollToBottomIfNear(false)
-  }, [activeMessages, isLoading, scrollToBottomIfNear])
+    const timeline = scroll.current
+    if (timeline && timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 240) {
+      timeline.scrollTop = timeline.scrollHeight
+    }
+  }, [state, pendingId])
 
   useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+    const box = input.current
+    if (!box) return
+    box.style.height = 'auto'
+    box.style.height = Math.min(box.scrollHeight, 110) + 'px'
   }, [query])
 
-  // --- Inicialização do reconhecimento de voz ---
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition()
-        recognition.continuous = false
-        recognition.interimResults = true
-        recognition.lang = 'pt-BR'
+    if (dialog && !confirmDialog.current?.open) confirmDialog.current?.showModal()
+  }, [dialog])
 
-        recognition.onresult = (event: any) => {
-          let currentTranscript = ''
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            currentTranscript += event.results[i][0].transcript
-          }
-          setQuery(currentTranscript)
-        }
-
-        recognition.onerror = (event: any) => {
-          console.error('Erro no reconhecimento de voz:', event.error)
-          setIsRecording(false)
-        }
-
-        recognition.onend = () => {
-          setIsRecording(false)
-        }
-
-        recognitionRef.current = recognition
-      }
-    }
-  }, [])
-
-  const toggleRecording = () => {
-    if (!recognitionRef.current) {
-      alert('Seu navegador não suporta reconhecimento de voz nativo ou você está em HTTP sem SSL.')
-      return
-    }
-
-    if (isRecording) {
-      recognitionRef.current.stop()
-      setIsRecording(false)
-    } else {
-      setQuery('')
-      recognitionRef.current.start()
-      setIsRecording(true)
-    }
+  function updateConversation(id: string, update: (conversation: AssistantConversation) => AssistantConversation) {
+    setState((current) => ({
+      ...current,
+      conversations: current.conversations.map((conversation) => conversation.id === id ? update(conversation) : conversation),
+    }))
   }
 
-  const speakText = (text: string) => {
-    if (!('speechSynthesis' in window)) {
-      alert('Seu navegador não suporta a API de leitura de voz.')
-      return
-    }
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'pt-BR'
-    utterance.rate = 0.95
-    const selectedVoice = getBestVoice(settings.tts_voice)
-    if (selectedVoice) {
-      utterance.voice = selectedVoice
-    }
-    window.speechSynthesis.speak(utterance)
+  function changePersona(value: AssistantPersona) {
+    if (assistantConversation) updateConversation(assistantConversation.id, (entry) => ({ ...entry, persona: value }))
+    else setDefaultPersona(value)
   }
 
-
-  const handleStartNewConversation = () => {
-    const nextConversation = createConversation()
-    saveState([nextConversation, ...conversations], nextConversation.id)
+  function selectConversation(id: string) {
+    setState((current) => ({ ...current, activeConversationId: id }))
     setQuery('')
-    setCopyError(null)
     setCopiedId(null)
+    historyDialog.current?.close()
+    if (scroll.current) scroll.current.scrollTop = 0
   }
 
-  const handleSelectConversation = (conversationId: string) => {
-    setActiveConversationId(conversationId)
+  function startConversation() {
+    const entry = newAssistantConversation('tutor')
+    setState((current) => ({ conversations: [entry, ...current.conversations], activeConversationId: entry.id }))
     setQuery('')
-    setCopyError(null)
-    setCopiedId(null)
-    setIsSidebarOpen(false) // Fecha a sidebar no mobile ao trocar de chat
+    setNotice('')
+    historyDialog.current?.close()
+    input.current?.focus()
   }
 
-  const handleUpdatePersona = (newPersona: 'tutor' | 'grill' | 'eli5') => {
-    if (!activeConversation) return
-    const updatedConversations = conversations.map((conv) => {
-      if (conv.id === activeConversation.id) {
-        return { ...conv, persona: newPersona }
-      }
-      return conv
-    })
-    saveState(updatedConversations, activeConversation.id)
+  function openDialog(next: Dialog) {
+    historyDialog.current?.close()
+    setDialogError('')
+    setDialog(next)
   }
 
-  const handleDeleteConversation = (conversationId: string) => {
-    const conversation = conversations.find((item) => item.id === conversationId)
-    if (!conversation) return
-
-    const remainingConversations = conversations.filter((item) => item.id !== conversationId)
-
-    if (remainingConversations.length === 0) {
-      const nextConversation = createConversation()
-      saveState([nextConversation], nextConversation.id)
-      setQuery('')
-      setCopyError(null)
-      setCopiedId(null)
-      return
-    }
-
-    const nextActiveConversationId = activeConversationId === conversationId
-      ? remainingConversations[0].id
-      : activeConversationId
-
-    saveState(remainingConversations, nextActiveConversationId)
-
-    if (nextActiveConversationId !== activeConversationId) {
-      setQuery('')
-      setCopyError(null)
-      setCopiedId(null)
-    }
-    
-    setConversationToDelete(null)
+  function stopResponse() {
+    request.current?.abort()
+    request.current = null
+    setPendingId(null)
+    setState((current) => ({
+      ...current,
+      conversations: current.conversations.map((entry) => ({
+        ...entry,
+        messages: entry.messages.filter(({ id, content }) => id !== pendingId || content.trim()),
+      })),
+    }))
   }
 
-  const handleRenameConversation = (conversationId: string, newTitle: string) => {
-    const updatedConversations = conversations.map(conv => 
-      conv.id === conversationId ? { ...conv, title: newTitle.trim() || DEFAULT_CONVERSATION_TITLE } : conv
-    )
-    saveState(updatedConversations, activeConversationId)
-    setEditingConversationId(null)
-  }
-
-  const handleAsk = async (textOverride?: string) => {
-    const textToSubmit = typeof textOverride === 'string' ? textOverride : query
-    const trimmed = textToSubmit.trim()
-    
-    if (trimmed.length < 3 || isLoading || !isWorkspaceValid) return
-
-    let targetConversationId = activeConversationId ?? conversations[0]?.id ?? null
-    const currentPersona = activeConversation?.persona || 'tutor'
-
-    if (!targetConversationId) {
-      const nextConversation = createConversation(deriveConversationTitle(trimmed), [], currentPersona)
-      saveState([nextConversation], nextConversation.id)
-      targetConversationId = nextConversation.id
-    }
-
-    const userMsgId = generateUUID()
-    const aiMsgId = generateUUID()
-    const userMessage: Message = { id: userMsgId, role: 'user', content: trimmed }
-    const assistantMessage: Message = { id: aiMsgId, role: 'ai', content: '', sources: [], error: false }
-
-    setConversations((prev) =>
-      prev.map((conversation) => {
-        if (conversation.id !== targetConversationId) return conversation
-
-        const updatedMessages = [
-          ...conversation.messages,
-          userMessage,
-          assistantMessage,
-        ]
-
-        return normalizeConversation({
-          ...conversation,
-          title: conversation.messages.length === 0 ? deriveConversationTitle(trimmed) : conversation.title,
-          messages: updatedMessages,
-          updatedAt: Date.now(),
-        })
-      })
-    )
-    setQuery('')
-    setIsLoading(true)
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
-
-    const activeWorkspaceName = workspaces.find(w => w.id === workspaceId)?.name || 'Todo o App'
-
+  async function ask(value = query) {
+    const question = value.trim()
+    if (request.current || question.length < 3) return
+    const conversation = assistantConversation ?? newAssistantConversation(persona)
+    const messageId = assistantMessageId()
+    const userMessage: Message = { id: assistantMessageId(), role: 'user', content: question }
+    const placeholder: Message = { id: messageId, role: 'ai', content: '' }
     const controller = new AbortController()
-    abortControllerRef.current = controller
+    request.current = controller
+    setPendingId(messageId)
+    setQuery('')
+    setNotice('')
+    setState((current) => {
+      const next = {
+        ...conversation,
+        title: conversation.messages.length === 0 && conversation.title === newConversationTitle ? assistantTitle(question) : conversation.title,
+        messages: limitAssistantMessages([...conversation.messages, userMessage, placeholder]),
+        updatedAt: Date.now(),
+      }
+      return { conversations: [next, ...current.conversations.filter(({ id }) => id !== next.id)], activeConversationId: next.id }
+    })
+
+    function changeMessage(update: Partial<Message>) {
+      updateConversation(conversation.id, (entry) => ({
+        ...entry,
+        messages: entry.messages.map((message) => message.id === messageId ? { ...message, ...update } : message),
+      }))
+    }
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
+      const result = await fetch('/api/chat', {
+        method: 'POST', cache: 'no-store', signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
         body: JSON.stringify({
-          question: trimmed,
-          workspaceId,
-          persona: currentPersona,
-          contextRoute: pathname,
-          contextWorkspace: activeWorkspaceName,
-          history: activeMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          model: settings.ai_default_model,
-          ecoMode: settings.eco_mode
+          accountId, question, workspaceId: workspaceId || null, persona, contextRoute: pathname,
+          history: conversation.messages.filter((message) => message.content && !message.error)
+            .map(({ role, content }) => ({ role, content })),
+          ecoMode: settings.eco_mode, model: settings.ai_default_model,
         }),
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
-        throw new Error(errorData?.error || 'Erro na requisição')
-      }
-
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-      let aiContent = ''
-      let buffer = ''
-
-      if (!reader) {
-        throw new Error('Resposta sem stream.')
-      }
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (line.trim() === '') continue
-
-          try {
-            const parsed = JSON.parse(line)
-
-            if (parsed.type === 'sources') {
-              setConversations((prev) =>
-                prev.map((conversation) => {
-                  if (conversation.id !== targetConversationId) return conversation
-
-                  return normalizeConversation({
-                    ...conversation,
-                    messages: conversation.messages.map((message) =>
-                      message.id === aiMsgId ? { ...message, sources: parsed.data } : message
-                    ),
-                    updatedAt: Date.now(),
-                  })
-                })
-              )
-            } else if (parsed.type === 'model') {
-              setConversations((prev) =>
-                prev.map((conversation) => {
-                  if (conversation.id !== targetConversationId) return conversation
-
-                  return normalizeConversation({
-                    ...conversation,
-                    messages: conversation.messages.map((message) =>
-                      message.id === aiMsgId ? { ...message, model: parsed.data } : message
-                    ),
-                    updatedAt: Date.now(),
-                  })
-                })
-              )
-            } else if (parsed.type === 'text') {
-              aiContent += parsed.data
-              const cleanContent = aiContent.replace(/\[ACTION:CREATE_EXAM_GOAL\|title=[^|]+\|date=[^\]]+\]/g, '')
-              setConversations((prev) =>
-                prev.map((conversation) => {
-                  if (conversation.id !== targetConversationId) return conversation
-
-                  return normalizeConversation({
-                    ...conversation,
-                    messages: conversation.messages.map((message) =>
-                      message.id === aiMsgId ? { ...message, content: cleanContent } : message
-                    ),
-                    updatedAt: Date.now(),
-                  })
-                })
-              )
-            } else if (parsed.type === 'level-up') {
-              window.dispatchEvent(new CustomEvent('level-up', {
-                detail: parsed.data
-              }))
-            } else if (parsed.type === 'achievement-unlocked') {
-              window.dispatchEvent(new CustomEvent('achievement-unlocked', {
-                detail: parsed.data
-              }))
-            } else if (parsed.type === 'action-complete') {
-              window.dispatchEvent(new CustomEvent('calendar-updated'))
-              window.dispatchEvent(new CustomEvent('achievement-unlocked', {
-                detail: {
-                  id: 'exam_created_agent',
-                  title: '📅 Prova Agendada!',
-                  description: `O Agente de Estudos marcou sua prova "${parsed.data.title}" para ${parsed.data.date}!`
-                }
-              }))
-            }
-          } catch (streamError) {
-            console.warn('Erro ao ler pedaço do stream:', streamError)
-          }
-        }
-      }
-    } catch (error: any) {
-      if (error?.name === 'AbortError') {
-        console.log('[ChatPanel] Geração de resposta cancelada pelo usuário.')
+      if (!result.ok) {
+        const data = await result.json().catch(() => null)
+        if (result.status === 401 || result.status === 409) window.dispatchEvent(new Event('assistant-session-invalid'))
+        changeMessage({ content: typeof data?.error === 'string' ? data.error : 'Não foi possível enviar a pergunta.', error: true })
         return
       }
-      setConversations((prev) =>
-        prev.map((conversation) => {
-          if (conversation.id !== targetConversationId) return conversation
-
-          return normalizeConversation({
-            ...conversation,
-            messages: conversation.messages.map((message) =>
-              message.id === aiMsgId
-                ? { ...message, content: 'Ocorreu um erro na comunicação com o servidor.', error: true }
-                : message
-            ),
-            updatedAt: Date.now(),
-          })
-        })
-      )
+      if (!result.body) throw new Error('Resposta vazia.')
+      const reader = result.body.pipeThrough(new TextDecoderStream()).getReader()
+      let answer = ''
+      let buffer = ''
+      function readLine(line: string) {
+        if (!line.trim()) return
+        const event = JSON.parse(line)
+        switch (event.type) {
+          case 'text':
+            if (typeof event.data === 'string') {
+              answer += event.data
+              changeMessage({ content: assistantDisplayText(answer) })
+            }
+            break
+          case 'sources':
+            changeMessage({ sources: parseAssistantSources(event.data) })
+            break
+          case 'error':
+            throw new Error(typeof event.data === 'string' ? event.data : 'Resposta interrompida.')
+          case 'level-up':
+          case 'achievement-unlocked':
+            window.dispatchEvent(new CustomEvent(event.type, { detail: event.data }))
+        }
+      }
+      try {
+        while (request.current === controller && !controller.signal.aborted) {
+          const { value: chunk, done } = await reader.read()
+          if (controller.signal.aborted || request.current !== controller) break
+          if (done) {
+            readLine(buffer)
+            if (!assistantDisplayText(answer)) throw new Error('O Assistente retornou uma resposta vazia.')
+            break
+          }
+          const lines = (buffer + chunk).split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) readLine(line)
+        }
+      } finally {
+        await reader.cancel().catch(() => null)
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        changeMessage({ content: error instanceof Error && error.message === 'O Assistente retornou uma resposta vazia.'
+          ? error.message : 'A resposta foi interrompida. Envie a pergunta novamente.', error: true })
+      }
     } finally {
-      abortControllerRef.current = null
-      setIsLoading(false)
-    }
-  }
-
-  const handleCopy = (id: string, content: string) => {
-    navigator.clipboard.writeText(content)
-      .then(() => {
-        setCopyError(null)
-        setCopiedId(id)
-        setTimeout(() => setCopiedId(null), 2000)
-      })
-      .catch(() => {
-        setCopyError('Não foi possível copiar a resposta.')
-      })
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      const isMobile = typeof window !== 'undefined' && navigator.maxTouchPoints > 0
-      if (!isMobile) {
-        e.preventDefault()
-        handleAsk()
+      if (request.current === controller) {
+        request.current = null
+        setPendingId(null)
       }
     }
   }
 
-  if (!isOnline && !isFloatingMode) {
-    return <OfflineFallback featureName="Tutor IA" />
+  function toggleRecording() {
+    if (recording) {
+      recognition.current?.stop()
+      setRecording(false)
+      return
+    }
+    const browser = window as Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }
+    const VoiceRecognition = browser.SpeechRecognition ?? browser.webkitSpeechRecognition
+    if (!VoiceRecognition) return setNotice('Este navegador não oferece ditado para o Assistente.')
+    disposeSpeech(recognition.current)
+    const recorder = new VoiceRecognition()
+    recorder.lang = 'pt-BR'
+    recorder.continuous = false
+    recorder.interimResults = true
+    recorder.onresult = ({ results }) => setQuery(Array.from(results, (result) => result[0]?.transcript ?? '').join(' '))
+    recorder.onend = () => setRecording(false)
+    recorder.onerror = () => {
+      setRecording(false)
+      setNotice('Não foi possível usar o microfone.')
+    }
+    recognition.current = recorder
+    try {
+      recorder.start()
+      setRecording(true)
+      setNotice('')
+    } catch {
+      setNotice('Não foi possível usar o microfone.')
+    }
   }
 
+  async function copy(message: Message) {
+    try {
+      await navigator.clipboard.writeText(message.content)
+      setCopiedId(message.id)
+      setNotice('Resposta copiada.')
+    } catch {
+      setNotice('Não foi possível copiar a resposta.')
+    }
+  }
+
+  function speak(text: string) {
+    if (!window.speechSynthesis) return setNotice('Este navegador não oferece leitura em voz alta.')
+    window.speechSynthesis.cancel()
+    const audio = new SpeechSynthesisUtterance(text)
+    audio.lang = 'pt-BR'
+    audio.rate = 0.95
+    const voice = getBestVoice(settings.tts_voice)
+    if (voice) audio.voice = voice
+    speaking.current = true
+    audio.onend = () => { speaking.current = false }
+    window.speechSynthesis.speak(audio)
+  }
+
+  function composerKey(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && navigator.maxTouchPoints === 0) {
+      event.preventDefault()
+      void ask()
+    }
+  }
+
+  async function confirm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!dialog || savingExam) return
+    const form = new FormData(event.currentTarget)
+    if (dialog.kind === 'exam') {
+      setSavingExam(true)
+      setDialogError('')
+      try {
+        const outcome = await confirmAssistantExamAction(accountId, form)
+        if (!outcome.success) {
+          setDialogError(outcome.error ?? 'Não foi possível agendar a prova.')
+          return
+        }
+        window.dispatchEvent(new Event('calendar-updated'))
+        setNotice('Prova agendada no calendário.')
+      } catch {
+        setDialogError('Não foi possível agendar a prova.')
+        return
+      } finally {
+        setSavingExam(false)
+      }
+    } else if (dialog.kind === 'rename') {
+      const title = String(form.get('title') ?? '').trim()
+      if (!title) return setDialogError('Informe um título para a conversa.')
+      updateConversation(dialog.conversation.id, (entry) => ({ ...entry, title: title.slice(0, 80) }))
+    } else {
+      const id = dialog.conversation.id
+      setState((current) => {
+        const conversations = current.conversations.filter((entry) => entry.id !== id)
+        return { conversations, activeConversationId: current.activeConversationId === id ? conversations[0]?.id ?? null : current.activeConversationId }
+      })
+    }
+    confirmDialog.current?.close()
+  }
+
+  const historyProps = {
+    conversations: state.conversations, activeId: assistantConversation?.id, create: startConversation, select: selectConversation,
+    rename: (conversation: AssistantConversation) => openDialog({ kind: 'rename', conversation }),
+    remove: (conversation: AssistantConversation) => openDialog({ kind: 'delete', conversation }),
+  }
+  const dialogTitle = dialog?.kind === 'exam' ? 'Agendar prova' : dialog?.kind === 'rename' ? 'Renomear conversa' : 'Excluir conversa'
+
   return (
-    <div className={`flex ${isFloatingMode ? 'h-full w-full' : 'h-[calc(100dvh-115px)] md:h-[calc(100vh-125px)] w-[calc(100%+2.5rem)] md:w-[calc(100%+4rem)] -mx-5 -mb-6 md:-mx-8 md:-mb-8'} relative overflow-hidden flex-col ${isFloatingMode ? '' : 'lg:flex-row'} gap-0 bg-surface`}>
-      {/* Overlay para fechar a sidebar no mobile */}
-      {isSidebarOpen && (
-        <div 
-          onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity"
-        />
-      )}
+    <div className="oa-shell">
+      <header className="oa-header">
+        <span className="oa-header-logo"><MessageSquare size={21} aria-hidden="true" /></span>
+        <h1>Conversar com a IA</h1>
+        <button className="oa-icon oa-history-toggle" type="button" aria-label="Abrir histórico" onClick={() => historyDialog.current?.showModal()}><History size={20} aria-hidden="true" /></button>
+        <Link href="/dashboard/configuracoes" prefetch={false} className="oa-icon" aria-label="Configurações do OmniMind" title="Configurações" onClick={onClose}><Settings size={19} aria-hidden="true" /></Link>
+        {onClose && <button className="oa-icon" type="button" aria-label="Fechar Assistente" onClick={onClose}><X size={21} aria-hidden="true" /></button>}
+      </header>
 
-      {/* Sidebar de Histórico (Slide-in mobile/flutuante + Fixo desktop normal) */}
-      {(!isFloatingMode || isSidebarOpen) && (
-        <aside className={`
-          fixed inset-y-0 left-0 z-40 flex w-72 max-w-[80vw] flex-col border-r border-border bg-slate-50 dark:bg-slate-950/20 transition-transform duration-300 ease-in-out lg:static lg:z-0 lg:w-72 lg:min-w-72 lg:translate-x-0
-          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${isFloatingMode ? 'absolute lg:absolute lg:translate-x-0 lg:w-full max-w-full shadow-2xl bg-surface' : ''}
-        `}>
-        <div className="border-b border-border p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-text-muted">Conversas</p>
-              <h2 className="mt-1 text-sm font-semibold text-text-strong">Histórico do chat</h2>
-            </div>
-            <button
-              type="button"
-              onClick={handleStartNewConversation}
-              className="icon-button shrink-0"
-              aria-label="Iniciar nova conversa"
-              title="Nova conversa"
-            >
-              <Plus className="size-4" />
-            </button>
-          </div>
-          <p className="mt-3 text-xs leading-5 text-text-muted">
-            Alterne entre tópicos, retome conversas antigas ou comece um novo fio.
-          </p>
+      <aside className="oa-history" aria-label="Histórico do Assistente"><AssistantHistory {...historyProps} /></aside>
+      <section className="oa-chat" aria-label="Conversa">
+        <div className="oa-controls">
+          <label className="oa-control"><span className="sr-only">Estilo da resposta</span>
+            <select value={persona} onChange={(event) => { if (isAssistantPersona(event.target.value)) changePersona(event.target.value) }}>
+              {assistantPersonas.map(({ id, title }) => <option key={id} value={id}>{title}</option>)}
+            </select><ChevronDown size={15} aria-hidden="true" />
+          </label>
+          <label className="oa-control oa-workspace"><Layers size={17} aria-hidden="true" /><span className="sr-only">Workspace das fontes</span>
+            <select value={workspaceId} onChange={(event) => onWorkspaceChange(event.target.value)}>
+              <option value="">Todas as anotações</option>
+              {workspaces.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
+            </select><ChevronDown size={15} aria-hidden="true" />
+          </label>
+          {onClose && <Link href={assistantPath} className="oa-open-page" prefetch={false} onClick={onClose}>Abrir página</Link>}
         </div>
-
-        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-          {conversations.length > 0 ? (
-            conversations.map((conversation) => {
-              const isActive = conversation.id === activeConversation?.id
-
-              return (
-                <div
-                  key={conversation.id}
-                  className={`mb-1 flex items-start gap-3 rounded-xl border px-3 py-3 transition-colors ${
-                    isActive
-                      ? 'border-primary bg-primary-soft text-text-strong'
-                      : 'border-transparent bg-surface hover:border-border hover:bg-surface-muted'
-                  }`}
-                >
-                  <div
-                    onClick={() => handleSelectConversation(conversation.id)}
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left cursor-pointer"
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-primary text-white' : 'bg-surface-muted text-text-medium'}`}>
-                      <MessageSquare className="size-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        {editingConversationId === conversation.id ? (
-                          <input
-                            type="text"
-                            value={editTitleValue}
-                            onChange={(e) => setEditTitleValue(e.target.value)}
-                            onBlur={() => handleRenameConversation(conversation.id, editTitleValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleRenameConversation(conversation.id, editTitleValue)
-                              if (e.key === 'Escape') setEditingConversationId(null)
-                            }}
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full truncate text-sm font-medium bg-surface border-b border-primary outline-none px-1 py-0.5 rounded-sm"
-                          />
-                        ) : (
-                          <span className="truncate text-sm font-medium">
-                            {conversation.title || DEFAULT_CONVERSATION_TITLE}
-                          </span>
-                        )}
-                        <ArrowLeftRight className="size-3 shrink-0 text-text-muted" />
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-text-muted">
-                        {conversation.messages[0]?.content || 'Conversa vazia'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditingConversationId(conversation.id)
-                        setEditTitleValue(conversation.title || DEFAULT_CONVERSATION_TITLE)
-                      }}
-                      aria-label={`Renomear conversa ${conversation.title || DEFAULT_CONVERSATION_TITLE}`}
-                      title="Renomear conversa"
-                      className="rounded-md p-1 text-text-muted transition-colors hover:bg-surface-muted hover:text-text-strong"
-                    >
-                      <Pencil className="size-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setConversationToDelete(conversation.id)
-                      }}
-                      aria-label={`Apagar conversa ${conversation.title || DEFAULT_CONVERSATION_TITLE}`}
-                      title="Apagar conversa"
-                      className="rounded-md p-1 text-text-muted transition-colors hover:bg-error-soft hover:text-error"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </div>
-                </div>
-              )
-            })
-          ) : (
-            <div className="flex h-full items-center justify-center p-4 text-center text-sm text-text-muted">
-              Nenhuma conversa ainda.
+        <div className="oa-scroll" ref={scroll}>
+          {messages.length ? (
+            <div className="oa-messages">
+              {messages.map((message) => <AssistantMessage key={message.id} message={message} pending={pendingId === message.id}
+                copied={copiedId === message.id} copy={() => { void copy(message) }} speak={() => speak(message.content)} />)}
             </div>
-          )}
+          ) : <AssistantWelcome name={firstName} persona={persona} setPersona={changePersona} ask={(text) => { void ask(text) }} />}
         </div>
-      </aside>
-      )}
-
-      {/* Área Principal de Chat */}
-      <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden bg-surface relative h-full">
-
-        {/* Top Header do Chat com trigger para sidebar mobile */}
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 shrink-0 bg-surface z-10">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            {!isFloatingMode ? (
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="lg:hidden p-2 -ml-2 text-text-muted hover:text-text-strong rounded-lg hover:bg-surface-muted transition-colors shrink-0"
-                aria-label="Abrir menu"
-              >
-                <Menu className="size-5" />
-              </button>
-            ) : (
-              <button
-                onClick={onClose}
-                className="p-1.5 -ml-1 text-text-muted hover:text-text-strong hover:bg-surface-muted rounded-md transition-colors"
-                aria-label="Fechar chat"
-              >
-                <X className="size-5" />
-              </button>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-text-muted">
-                {isFloatingMode ? 'OmniMind' : 'Conversa ativa'}
-              </p>
-              <h3 className="mt-0.5 truncate text-sm font-semibold text-text-strong flex items-center gap-2">
-                {isFloatingMode && <Sparkles className="size-3.5 text-primary" />}
-                {isFloatingMode ? 'Assistente' : (activeConversation?.title || DEFAULT_CONVERSATION_TITLE)}
-              </h3>
-            </div>
-          </div>
-
-          {/* Seletor de Workspace em formato de Badge compacta e discreta */}
-          {workspaces.length > 0 && onWorkspaceChange && !isFloatingMode && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <select
-                value={workspaceId || ''}
-                onChange={(e) => onWorkspaceChange(e.target.value)}
-                className={`h-7 rounded-full border px-2.5 text-[10px] font-bold outline-none cursor-pointer transition-all shadow-sm max-w-[130px] sm:max-w-[200px] truncate ${
-                  workspaceId
-                    ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
-                    : 'border-dashed border-border bg-surface text-text-muted hover:text-text-strong hover:border-primary/50'
-                }`}
-              >
-                <option value="" className="bg-surface text-text-strong text-xs">🔍 Todo o App (Sem filtro)</option>
-                {workspaces.map((ws) => (
-                  <option key={ws.id} value={ws.id} className="bg-surface text-text-strong text-xs">
-                    🧠 {ws.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="flex items-center gap-1 shrink-0">
-            {isFloatingMode && (
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-surface-muted transition-colors"
-                title="Histórico"
-              >
-                <MessageSquare className="size-4" />
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowPersonaModal(true)}
-              className="p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-surface-muted transition-colors"
-              title="Mudar personalidade da IA"
-            >
-              <Settings className="size-4" />
-            </button>
-          </div>
-
-          {isFloatingMode ? (
-            <button
-              type="button"
-              onClick={() => setConversationToDelete(activeConversationId)}
-              className="shrink-0 p-2 text-text-muted hover:text-text-strong rounded-full hover:bg-error-soft hover:text-error transition-colors"
-              title="Apagar conversa atual"
-            >
-              <Trash2 className="size-4" />
-            </button>
-          ) : (
-            <button 
-              type="button" 
-              onClick={handleStartNewConversation} 
-              className="btn-secondary h-9 shrink-0 px-2.5 sm:px-4 text-xs flex items-center gap-1.5 border border-border"
-              title="Nova conversa"
-            >
-              <Plus className="size-4" />
-              <span className="hidden sm:inline">Nova conversa</span>
-            </button>
-          )}
-        </div>
-
-        {/* Modal de Exclusão de Conversa */}
-        {conversationToDelete && (
-          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="panel max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2 text-error">
-                  <AlertCircle className="size-5" />
-                  <h3 className="text-lg font-bold">Excluir Conversa</h3>
-                </div>
-                <button onClick={() => setConversationToDelete(null)} className="icon-button">
-                  <X className="size-4" />
-                </button>
-              </div>
-
-              <p className="text-sm text-text-medium mb-6">
-                Tem certeza que deseja apagar esta conversa? Esta ação não pode ser desfeita e todo o histórico será perdido.
-              </p>
-
-              <div className="flex justify-end gap-3">
-                <button 
-                  onClick={() => setConversationToDelete(null)} 
-                  className="px-4 py-2 text-sm font-medium text-text-medium hover:text-text-strong hover:bg-surface-muted rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={() => handleDeleteConversation(conversationToDelete)} 
-                  className="px-4 py-2 text-sm font-bold text-white bg-error hover:bg-error/90 rounded-xl transition-colors"
-                >
-                  Sim, Excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal de Personas */}
-        {showPersonaModal && activeConversation && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="panel max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-text-strong">Modo da IA</h3>
-                <button onClick={() => setShowPersonaModal(false)} className="icon-button">
-                  <X className="size-4" />
-                </button>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { id: 'tutor', label: '📚 Tutor Socrático', desc: 'Explica com analogias e faz perguntas de fixação.' },
-                  { id: 'grill', label: '🔥 Examinador (Grill)', desc: 'Banca rígida, faz perguntas difíceis e testa seus limites.' },
-                  { id: 'eli5', label: '👶 Simplificado (ELI5)', desc: 'Explica tudo em termos infantis bem simples.' }
-                ].map((p) => {
-                  const isSel = (activeConversation.persona || 'tutor') === p.id
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => { handleUpdatePersona(p.id as any); setShowPersonaModal(false); }}
-                      className={`w-full flex flex-col text-left p-3 rounded-xl border transition-all ${
-                        isSel ? 'bg-primary/10 border-primary shadow-sm' : 'bg-surface border-border hover:bg-surface-hover'
-                      }`}
-                    >
-                      <span className={`font-bold text-sm ${isSel ? 'text-primary' : 'text-text-strong'}`}>{p.label}</span>
-                      <span className="text-xs text-text-muted mt-1">{p.desc}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Mensagens protegidas pelo ErrorBoundary */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto bg-surface p-4 pb-16 custom-scrollbar">
-          <ChatErrorBoundary fallback={
-            <div className="flex h-full flex-col items-center justify-center px-4 text-center">
-              <AlertCircle className="size-10 text-error mb-4" />
-              <p className="text-sm font-medium text-text-strong">Ops, algo deu errado ao carregar as mensagens.</p>
-              <p className="text-xs text-text-muted mt-1">Recarregue a página ou inicie uma nova conversa.</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="mt-4 btn-primary px-4 py-2 text-xs"
-              >
-                Recarregar página
-              </button>
-            </div>
-          }>
-            {!isMounted ? (
-              <div className="flex h-full items-center justify-center text-sm text-text-muted">
-                Carregando chat...
-              </div>
-            ) : activeMessages.length === 0 ? (
-              <div className={`mx-auto flex flex-col justify-center w-full max-w-2xl px-4 animate-in fade-in duration-500 ${isFloatingMode ? 'min-h-[60dvh] py-4' : 'min-h-[80dvh] py-4 md:py-12'}`}>
-                <h1 className={`${isFloatingMode ? 'text-2xl md:text-3xl' : 'text-3xl md:text-5xl'} font-bold tracking-tight`}>
-                  <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                    Olá, {userName}
-                  </span>
-                </h1>
-                <h2 className={`${isFloatingMode ? 'text-xl md:text-2xl mt-1 mb-4' : 'text-2xl md:text-4xl mt-2 mb-6 md:mb-8'} font-semibold text-text-muted`}>
-                  Como posso ajudar você hoje?
-                </h2>
-
-                <div className={`gap-3 w-full ${isFloatingMode ? 'flex flex-col' : 'flex sm:grid sm:grid-cols-2 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
-                  {SUGGESTIONS.map((sug, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleAsk(sug)}
-                      disabled={!isWorkspaceValid}
-                      aria-label={`Enviar sugestão: ${sug}`}
-                      className={`group flex rounded-2xl border border-border bg-surface p-3 text-left transition-all hover:border-primary/50 hover:bg-surface-muted/20 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm hover:shadow-md ${
-                        isFloatingMode 
-                          ? 'flex-row items-center justify-between min-h-[60px]' 
-                          : 'flex-col justify-between p-4 md:p-5 min-h-[100px] md:min-h-[120px] w-[240px] sm:w-auto shrink-0 sm:shrink snap-align-start'
-                      }`}
-                    >
-                      <span className={`font-semibold text-text-strong leading-relaxed ${isFloatingMode ? 'text-xs' : 'text-xs md:text-sm'}`}>{sug}</span>
-                      <div className={`flex justify-end ${isFloatingMode ? 'ml-2 shrink-0' : 'w-full mt-2 md:mt-4'}`}>
-                        <span className={`flex items-center justify-center rounded-full bg-primary-soft text-primary opacity-0 group-hover:opacity-100 transition-opacity ${isFloatingMode ? 'size-6' : 'size-7 md:size-8'}`}>
-                          <Sparkles className={isFloatingMode ? 'size-3' : 'size-3.5 md:size-4'} />
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-8 max-w-3xl mx-auto w-full px-4 py-6">
-                {activeMessages.map((msg) => {
-                  const uniqueSources = getUniqueSources(msg.sources)
-
-                  return (
-                    <div key={msg.id} className="flex gap-4">
-                      {msg.role === 'ai' && (
-                        <div className="shrink-0 mt-1">
-                          <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-indigo-600 text-white shadow-sm">
-                            <Sparkles className="size-4" />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className={`flex-1 space-y-2 min-w-0 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                        {msg.role === 'user' ? (
-                          <div className="inline-block text-left rounded-3xl bg-surface-muted/60 text-text-strong px-5 py-3 text-sm shadow-sm border border-border/20 max-w-[85%] sm:max-w-[70%] ml-auto break-words">
-                            <div className="whitespace-pre-wrap">{msg.content}</div>
-                          </div>
-                        ) : (
-                          <div className="w-full">
-                            {msg.role === 'ai' && (
-                              <div className="mb-2 flex items-center gap-2 flex-wrap">
-                                {msg.model && (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase bg-primary-soft/30 border border-primary/10 px-2.5 py-0.5 rounded-full">
-                                    ⚡ {msg.model}
-                                  </span>
-                                )}
-                                <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase border px-2.5 py-0.5 rounded-full ${
-                                  activeConversation?.persona === 'grill' ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' :
-                                  activeConversation?.persona === 'eli5' ? 'bg-sky-500/10 text-sky-600 border-sky-500/20' :
-                                  'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                }`}>
-                                  {activeConversation?.persona === 'grill' ? '🔥 Grill' : activeConversation?.persona === 'eli5' ? '👶 Simplificado' : '📚 Tutor Socrático'}
-                                </span>
-                              </div>
-                            )}
-
-                            {msg.error ? (
-                              <div className="inline-block rounded-2xl border border-error/20 bg-error-soft text-error p-4 text-sm">
-                                <AlertCircle className="mr-2 inline-block size-4 align-[-2px]" />
-                                {msg.content}
-                              </div>
-                            ) : (
-                              <div className="flex-1 min-w-0 pb-1 w-full max-w-full overflow-hidden text-left">
-                                <div className={`prose ${settings.ai_font_size === 'small' ? 'prose-sm text-xs' : settings.ai_font_size === 'large' ? 'prose-base' : 'prose-sm'} max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:border prose-pre:border-border prose-pre:bg-surface-muted prose-p:text-text-strong prose-li:text-text-strong`}>
-                                  <MemoizedMarkdown content={msg.content} />
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Actions under the AI message */}
-                            {!msg.error && (
-                              <div className="flex items-center gap-2 mt-3 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopy(msg.id, msg.content)}
-                                  aria-label="Copiar resposta"
-                                  className="rounded-lg p-1.5 text-text-muted hover:bg-surface-muted hover:text-text-strong transition-all"
-                                  title="Copiar"
-                                >
-                                  {copiedId === msg.id ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => speakText(msg.content)}
-                                  aria-label="Ouvir resposta"
-                                  className="rounded-lg p-1.5 text-text-muted hover:bg-surface-muted hover:text-text-strong transition-all"
-                                  title="Ouvir"
-                                >
-                                  <Volume2 className="size-4" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Sources displayed directly under the AI bubble */}
-                        {msg.role === 'ai' && !msg.error && uniqueSources.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {uniqueSources.map((src, idx) => {
-                              const href = buildSourceHref(src)
-                              const label = buildSourceLabel(src)
-                              
-                              let Icon = BookOpen
-                              let pillColor = 'border-border bg-surface text-text-medium hover:border-primary hover:text-primary'
-
-                              if (src.type.includes('flashcard')) {
-                                Icon = Brain
-                                pillColor = 'border-indigo-500/10 bg-indigo-500/5 text-indigo-500 hover:border-indigo-500/30'
-                              } else if (src.type.includes('note')) {
-                                Icon = FileText
-                                pillColor = 'border-primary/10 bg-primary/5 text-primary hover:border-primary/30'
-                              }
-
-                              const sharedClasses = `inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-medium shadow-sm transition-colors ${pillColor}`
-
-                              return href ? (
-                                <Link
-                                  key={src.id + idx}
-                                  href={href}
-                                  className={sharedClasses}
-                                >
-                                  <Icon className="size-3 shrink-0" />
-                                  <span className="max-w-[140px] truncate">{label}</span>
-                                </Link>
-                              ) : null
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {isLoading && (
-              <div className="flex gap-4 max-w-3xl mx-auto w-full px-4 mt-4">
-                <div className="shrink-0 mt-1">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-indigo-600 text-white shadow-sm">
-                    <Loader2 className="size-4 animate-spin shrink-0" />
-                  </div>
-                </div>
-                <div className="flex-1 space-y-2 min-w-0">
-                  <div className="flex items-center gap-2 rounded-2xl p-4 text-sm text-text-medium animate-pulse bg-surface-muted/30 border border-border/30 shadow-sm">
-                    <div className="flex gap-1 mr-2">
-                      <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '0ms' }} />
-                      <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '150ms' }} />
-                      <div className="size-1.5 animate-bounce rounded-full bg-primary/40" style={{ animationDelay: '300ms' }} />
-                    </div>
-                    Vasculhando anotações...
-                  </div>
-                </div>
-              </div>
-            )}
-          </ChatErrorBoundary>
-        </div>
-
-        {/* Input e botões rápidos */}
-        <div className="bg-surface px-4 py-4 md:py-6 shrink-0 w-full max-w-3xl mx-auto z-10">
-          <form onSubmit={(e) => { e.preventDefault(); handleAsk(); }}>
-            <div className="relative flex items-end gap-2 bg-surface-muted/40 border border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 rounded-3xl pl-3 pr-12 py-2 shadow-sm transition-all focus-within:shadow-md">
-              {/* Botão de gravação de voz */}
-              <button
-                type="button"
-                onClick={toggleRecording}
-                disabled={isLoading || !isWorkspaceValid}
-                className={`flex size-9 items-center justify-center rounded-full transition-all shrink-0 ${
-                  isRecording 
-                    ? 'bg-error text-white animate-pulse' 
-                    : 'text-text-muted hover:bg-surface-muted hover:text-primary'
-                }`}
-                title={isRecording ? 'Parar gravação' : 'Falar pergunta'}
-              >
-                {isRecording ? <Square className="size-4 fill-current" /> : <Mic className="size-5" />}
-              </button>
-
-              <textarea
-                ref={textareaRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isWorkspaceValid ? 'Escreva sua pergunta...' : 'Workspace inválido'}
-                disabled={isLoading || !isWorkspaceValid}
-                className="w-full bg-transparent border-0 outline-none focus:ring-0 resize-none py-1.5 px-2 text-sm text-text-strong min-h-[36px] max-h-[140px] overflow-y-auto placeholder:text-text-muted/70"
-                rows={1}
-              />
-              
-              {isLoading ? (
-                <button
-                  type="button"
-                  onClick={handleStopGeneration}
-                  title="Parar geração de resposta"
-                  aria-label="Parar geração de resposta"
-                  className="absolute right-2.5 bottom-2 flex size-9 items-center justify-center rounded-full bg-error/10 text-error border border-error/30 shadow-sm transition-all hover:bg-error/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error"
-                >
-                  <Square className="size-4 fill-error" />
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={query.trim().length < 3 || !isWorkspaceValid}
-                  className="absolute right-2.5 bottom-2 flex size-9 items-center justify-center rounded-full bg-primary text-white shadow-sm transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-muted"
-                >
-                  <Send className="size-4" />
-                </button>
-              )}
-            </div>
-
-            {activeMessages.some((message) => message.role === 'ai') && (
-              <p className="mt-3 text-center text-[10px] font-medium text-text-muted">
-                A IA pode apresentar informações imprecisas. Verifique as fontes citadas para confirmar.
-              </p>
-            )}
-            {copyError && (
-              <p className="mt-2 text-center text-[10px] font-medium text-error">
-                {copyError}
-              </p>
-            )}
+        <footer className="oa-footer">
+          {notice && <p className="oa-notice" role="status">{notice}</p>}
+          <form className="oa-composer" onSubmit={(event) => { event.preventDefault(); void ask() }}>
+            <button className="oa-icon" type="button" aria-label="Agendar prova" title="Agendar prova" onClick={() => openDialog({ kind: 'exam' })}><CalendarDays size={20} aria-hidden="true" /></button>
+            <button className="oa-icon" type="button" aria-label={recording ? 'Parar ditado' : 'Ditar pergunta'} aria-pressed={recording} title="Ditar pergunta" onClick={toggleRecording}><Mic size={20} aria-hidden="true" /></button>
+            <textarea ref={input} aria-label="Sua pergunta" placeholder="Escreva sua pergunta…" rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={composerKey} />
+            {pendingId ? <button className="oa-icon oa-primary" type="button" aria-label="Parar resposta" onClick={stopResponse}><Square size={18} aria-hidden="true" /></button> :
+              <button className="oa-icon oa-primary" type="submit" aria-label="Enviar pergunta" disabled={query.trim().length < 3}><Send size={19} aria-hidden="true" /></button>}
           </form>
-        </div>
-      </div>
+        </footer>
+      </section>
+
+      <dialog ref={historyDialog} className="oa-native-dialog oa-history-dialog" aria-label="Histórico do Assistente">
+        <AssistantHistory {...historyProps} close={() => historyDialog.current?.close()} />
+      </dialog>
+      <dialog ref={confirmDialog} className="oa-native-dialog" aria-labelledby="oa-dialog-title" onClose={() => setDialog(null)}
+        onCancel={(event) => { if (savingExam) event.preventDefault() }}>
+        {dialog && <form className="oa-confirm" onSubmit={confirm} aria-busy={savingExam}>
+          <h2 id="oa-dialog-title">{dialogTitle}</h2>
+          {dialog.kind === 'exam' ? <>
+            <label>Título da prova<input name="title" required maxLength={120} /></label>
+            <label>Data<input name="date" type="date" required /></label>
+          </> : dialog.kind === 'rename' ? <label>Título<input name="title" required maxLength={80} defaultValue={dialog.conversation.title} /></label> :
+            <p className="oa-muted">Excluir “{dialog.conversation.title}” deste navegador?</p>}
+          {dialogError && <p role="alert" className="oa-error">{dialogError}</p>}
+          <div className="oa-dialog-actions">
+            <button className="oa-button" type="button" disabled={savingExam} onClick={() => confirmDialog.current?.close()}>Cancelar</button>
+            <button className="oa-button oa-primary" type="submit" disabled={savingExam}>{savingExam ? 'Salvando…' : dialog.kind === 'exam' ? 'Confirmar agendamento' : dialog.kind === 'rename' ? 'Salvar título' : 'Excluir conversa'}</button>
+          </div>
+        </form>}
+      </dialog>
     </div>
   )
+}
+
+export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, onClose }: ChatPanelProps) {
+  const { identity, checked } = useAssistantIdentity(accountId)
+  const [selectedWorkspace, setSelectedWorkspace] = useState(initialWorkspaceId ?? '')
+  const workspaceId = workspaces.some((workspace) => workspace.id === selectedWorkspace) ? selectedWorkspace : ''
+
+  if (!identity) return (
+    <div className="oa-session" role="status">
+      <div><h1>Conversar com a IA</h1><p>{checked ? 'Entre com sua conta para acessar o Assistente.' : 'Verificando a sessão…'}</p></div>
+      {checked && <Link href="/login" className="oa-button oa-primary">Entrar</Link>}
+      {onClose && <button type="button" className="oa-button" onClick={onClose}>Fechar Assistente</button>}
+    </div>
+  )
+  return <AssistantWorkspace key={assistantHistoryKey(identity.id, workspaceId)} accountId={identity.id}
+    firstName={identity.firstName} workspaceId={workspaceId} workspaces={workspaces} onWorkspaceChange={setSelectedWorkspace} onClose={onClose} />
 }

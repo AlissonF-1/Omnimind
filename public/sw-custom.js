@@ -1,9 +1,7 @@
 // Service Worker Customizado — OmniMind PWA
 
-const CACHE_NAME = 'omnimind-static-v1';
-
 // Pre-cache básico e ativação imediata
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
@@ -23,9 +21,20 @@ self.addEventListener('activate', (event) => {
       return self.clients.claim();
     })
   );
+});
+
 // Intercepta e faz cache de requisições de páginas HTML para navegação offline
 self.addEventListener('fetch', (event) => {
   const request = event.request;
+  const url = new URL(request.url);
+
+  // As rotas privadas exigem sessão online, inclusive sem Workbox.
+  try {
+    if (url.origin === self.location.origin && /^\/dashboard\/(?:questoes|trilhas|assistente)(?:\/|$)/.test(decodeURI(url.pathname))) return;
+  } catch {
+    // Deixe a própria rede tratar uma URL malformada.
+    return;
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(

@@ -623,11 +623,11 @@ export async function generatePlayerTitle(force = false): Promise<string> {
 
   // 2. Chama a API do Groq para gerar um tÃ­tulo criativo de 3 palavras em portuguÃªs
   const groqApiKey = process.env.GROQ_API_KEY
-  if (!groqApiKey) return `Especialista NÃ­vel ${level}`
+  if (!groqApiKey) return `Especialista Nível ${level}`
 
   try {
     const prompt = `VocÃª Ã© um gerador de tÃ­tulos honorÃ­ficos de RPG para um aplicativo de estudos gamificado chamado OmniMind.
-O usuÃ¡rio estuda os seguintes temas: "${workspaceNames}" e estÃ¡ no NÃ­vel ${level}.
+O usuÃ¡rio estuda os seguintes temas: "${workspaceNames}" e estÃ¡ no Nível ${level}.
 Gere um tÃ­tulo honorÃ­fico curto de 2 a 4 palavras em portuguÃªs que descreva essa jornada de forma Ã©pica ou divertida.
 Exemplos:
 - Se estuda Direito: "O IntÃ©rprete da Lei" ou "Defensor da JustiÃ§a"
@@ -653,7 +653,7 @@ Retorne APENAS o tÃ­tulo gerado, sem explicaÃ§Ãµes, sem aspas, sem introdu
 
     if (!res.ok) throw new Error('Falha na chamada do Groq')
     const json = await res.json()
-    const title = json.choices?.[0]?.message?.content?.trim() || `Conquistador NÃ­vel ${level}`
+    const title = json.choices?.[0]?.message?.content?.trim() || `Conquistador Nível ${level}`
 
     // 3. Salva o tÃ­tulo gerado e o timestamp de geraÃ§Ã£o no metadata do usuÃ¡rio
     await supabase.auth.updateUser({
@@ -668,10 +668,10 @@ Retorne APENAS o tÃ­tulo gerado, sem explicaÃ§Ãµes, sem aspas, sem introdu
     console.warn('Groq falhou ao gerar tÃ­tulo, tentando fallback com Gemini...', err)
     try {
       const geminiApiKey = process.env.GEMINI_API_KEY
-      if (!geminiApiKey) return `Explorador NÃ­vel ${level}`
+      if (!geminiApiKey) return `Explorador Nível ${level}`
 
       const prompt = `VocÃª Ã© um gerador de tÃ­tulos honorÃ­ficos de RPG para um aplicativo de estudos gamificado.
-O usuÃ¡rio estuda: "${workspaceNames}" e estÃ¡ no NÃ­vel ${level}.
+O usuÃ¡rio estuda: "${workspaceNames}" e estÃ¡ no Nível ${level}.
 Gere um tÃ­tulo honorÃ­fico curto de 2 a 4 palavras em portuguÃªs. APENAS o tÃ­tulo gerado, sem introduÃ§Ãµes.`
 
       const genAI = new GoogleGenerativeAI(geminiApiKey)
@@ -686,7 +686,7 @@ Gere um tÃ­tulo honorÃ­fico curto de 2 a 4 palavras em portuguÃªs. APENAS 
       return title
     } catch (fallbackErr) {
       console.error('Erro no fallback do Gemini ao gerar tÃ­tulo:', fallbackErr)
-      return `Explorador NÃ­vel ${level}`
+      return `Explorador Nível ${level}`
     }
   }
 }

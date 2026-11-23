@@ -2,8 +2,35 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Moon, Sun, Monitor } from 'lucide-react'
+import { useSettings } from '@/contexts/SettingsContext'
 
 type Theme = 'light' | 'dark' | 'system'
+const themes: Theme[] = ['system', 'light', 'dark']
+const themeLabels = { dark: 'Tema escuro', light: 'Tema claro', system: 'Seguir sistema' }
+
+export function SavedThemeToggle() {
+  const { settings, updateSetting, isUpdating } = useSettings()
+  const [saveError, setSaveError] = useState(false)
+  const theme = settings.theme
+  const Icon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor
+
+  return (
+    <>
+      <button type="button" className="btn-secondary w-full justify-start gap-2 disabled:opacity-60"
+        aria-label={'Alternar tema (atual: ' + themeLabels[theme] + ')'}
+        disabled={isUpdating}
+        onClick={async () => {
+          const nextTheme = themes[(themes.indexOf(theme) + 1) % themes.length]
+          setSaveError(!(await updateSetting('theme', nextTheme)))
+        }}
+      >
+        <Icon className="size-4" aria-hidden="true" />
+        <span>{themeLabels[theme]}</span>
+      </button>
+      {saveError && <p className="text-xs text-error mt-1" role="alert">Não foi possível salvar o tema.</p>}
+    </>
+  )
+}
 
 export default function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const [theme, setTheme] = useState<Theme>('system')
@@ -44,10 +71,9 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
   }, [theme, systemTheme, mounted])
 
   const cycleTheme = useCallback(() => {
-    const order: Theme[] = ['system', 'light', 'dark']
-    const currentIndex = order.indexOf(theme)
-    const nextIndex = (currentIndex + 1) % order.length
-    setTheme(order[nextIndex])
+    const currentIndex = themes.indexOf(theme)
+    const nextIndex = (currentIndex + 1) % themes.length
+    setTheme(themes[nextIndex])
   }, [theme])
 
   // Labels para acessibilidade

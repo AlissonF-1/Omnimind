@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { getUserStudyStats, getUserStreak } from '@/actions/achievements'
 import { callAIWithFallback } from '@/lib/ai-fallback'
+import { profileWeek } from '@/lib/profile'
 
 export async function getDailyStudyLogs() {
   const supabase = await createClient()
@@ -307,24 +308,9 @@ export async function getProfileStats() {
     .select('id, workspaces!inner(user_id)', { count: 'exact', head: true })
     .eq('workspaces.user_id', user.id)
 
-  // 4. Gera a atividade recente dos últimos 7 dias
-  const last7Days = []
-  const today = new Date()
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(today.getDate() - i)
-    const dateStr = d.toISOString().split('T')[0]
-    const matchingLog = logs?.find((log: any) => (log.study_date?.split('T')[0] || log.study_date) === dateStr)
-    last7Days.push({
-      date: new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric' }).format(d),
-      reviews: matchingLog?.review_count || 0
-    })
-  }
-
   return {
     user: {
       name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Estudante',
-      email: user.email,
       avatarUrl: user.user_metadata?.avatar_url || null,
       avatarIcon: user.user_metadata?.avatar_icon || null,
       playerTitle: user.user_metadata?.player_title || 'Estudante Dedicado'
@@ -338,7 +324,7 @@ export async function getProfileStats() {
     notesCreated: notesCount || 0,
     perfectExams: userStats?.perfect_exams_count || 0,
     unlockedAchievements: userStats?.unlocked_achievements || [],
-    recentActivity: last7Days
+    recentActivity: profileWeek(logs ?? [])
   }
 }
 
@@ -390,7 +376,7 @@ export async function getWeeklyLearningCycleReport() {
       .map(entry => `${entry[0]} (Lapsos: ${entry[1]})`)
       .join(', ')
 
-    // 3. IA Llama 3
+    // 3. Gera o relatório
     const systemPrompt = `Você é um tutor inteligente e motivador (Coach do OmniMind). Seu objetivo é analisar as estatísticas de estudo semanais e gerar um relatório do Ciclo de Aprendizado resumido e motivador em exatamente 2 parágrafos no formato Markdown. Seja direto e encorajador. Fale diretamente com o estudante.`
     const userPrompt = `Aqui estão meus dados acumulados:
 - Total de Cards: ${totalCards}
@@ -400,7 +386,9 @@ export async function getWeeklyLearningCycleReport() {
 
 Escreva o relatório de ciclo em português. Não use títulos grandes, apenas quebras de parágrafo.`
 
-    const result = await callAIWithFallback(systemPrompt, userPrompt, 'simple', false)
+    const result = await callAIWithFallback(systemPrompt, userPrompt, 'simple', false, {
+      groqModel: 'openai/gpt-oss-20b',
+    })
 
     if (!result.success) {
       throw new Error(result.error || 'Erro na resposta do modelo de IA')

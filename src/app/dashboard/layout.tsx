@@ -5,7 +5,9 @@ import { getUserPreferences } from '@/actions/settings'
 import { createClient } from '@/utils/supabase/server'
 import DashboardShell from '@/components/DashboardShell'
 import { SettingsProvider } from '@/contexts/SettingsContext'
-import { DEFAULT_PREFERENCES } from '@/types/settings'
+import { DEFAULT_PREFERENCES, type UserPreferences } from '@/types/settings'
+import type { User } from '@supabase/supabase-js'
+import './shell.css'
 
 export default async function DashboardLayout({
   children,
@@ -13,11 +15,11 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   // Fetches com fallback defensivo — nenhum erro aqui pode derrubar o layout inteiro
-  let workspaces: any[] = []
-  let userStats: any = null
-  let dashStats: any = null
-  let settings: any = { ...DEFAULT_PREFERENCES, user_id: 'default' }
-  let user: any = null
+  let workspaces: NonNullable<Awaited<ReturnType<typeof getWorkspaces>>> = []
+  let userStats: Awaited<ReturnType<typeof getUserStudyStats>> = null
+  let dashStats: Awaited<ReturnType<typeof getUserDashboardStats>> | null = null
+  let settings: UserPreferences = { ...DEFAULT_PREFERENCES, user_id: 'default' }
+  let user: User | null = null
 
   try {
     const supabase = await createClient()
@@ -52,10 +54,12 @@ export default async function DashboardLayout({
     <SettingsProvider initialSettings={settings}>
       <DashboardShell
         workspaces={workspaces}
+        accountId={user?.id ?? null}
         userName={userName}
         avatarUrl={avatarUrl}
         avatarIcon={avatarIcon}
         currentLevel={currentLevel}
+        totalXp={userStats?.total_xp ?? 0}
         overdueCards={overdueCards}
       >
         {children}

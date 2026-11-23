@@ -1,7 +1,7 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
-import { UserPreferences, DEFAULT_PREFERENCES } from '@/types/settings'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import type { UserPreferences } from '@/types/settings'
 import { updateUserPreferences } from '@/actions/settings'
 
 interface SettingsContextType {
@@ -9,7 +9,7 @@ interface SettingsContextType {
   updateSetting: <K extends keyof Omit<UserPreferences, 'user_id' | 'updated_at'>>(
     key: K,
     value: UserPreferences[K]
-  ) => Promise<void>
+  ) => Promise<boolean>
   isUpdating: boolean
 }
 
@@ -24,10 +24,16 @@ export function SettingsProvider({
 }) {
   const [settings, setSettings] = useState<UserPreferences>(initialSettings)
   const [isUpdating, setIsUpdating] = useState(false)
+  const inFlight = useRef(false)
 
   // Atualiza a classe de tema no documento se o tema mudar ou sistema mudar
   useEffect(() => {
     const root = document.documentElement
+    try {
+      window.localStorage.setItem('omnimind-theme', settings.theme)
+    } catch {
+      // O tema ainda pode ser aplicado sem armazenamento local.
+    }
     
     const applyTheme = (isDark: boolean) => {
       if (isDark) {
@@ -57,7 +63,11 @@ export function SettingsProvider({
     key: K,
     value: UserPreferences[K]
   ) => {
-    const prevSettings = { ...settings }
+    if (inFlight.current) return false
+    if (settings[key] === value) return true
+
+    inFlight.current = true
+    const previous = settings[key]
     try {
       setIsUpdating(true)
       // Optimistic update
@@ -65,11 +75,14 @@ export function SettingsProvider({
       
       // Server update
       await updateUserPreferences({ [key]: value })
+      return true
     } catch (error) {
       console.error('Failed to update setting:', error)
       // Revert in case of error
-      setSettings(prevSettings)
+      setSettings((current) => ({ ...current, [key]: previous }))
+      return false
     } finally {
+      inFlight.current = false
       setIsUpdating(false)
     }
   }

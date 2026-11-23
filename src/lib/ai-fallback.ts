@@ -2,14 +2,15 @@ export async function callAIWithFallback(
   systemPrompt: string,
   userMessage: string,
   modelPreference: 'critical' | 'simple' = 'simple',
-  jsonMode: boolean = false
+  jsonMode: boolean = false,
+  options?: { groqModel: string },
 ) {
   const groqApiKey = process.env.GROQ_API_KEY
   const openRouterApiKey = process.env.OPENROUTER_API_KEY
 
-  const groqModel = modelPreference === 'critical' 
-    ? 'llama-3.3-70b-versatile' 
-    : 'llama-3.1-8b-instant'
+  const groqModel = options?.groqModel ?? (
+    modelPreference === 'critical' ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant'
+  )
 
   // Modelos gratuitos estáveis e de alta performance no OpenRouter
   const openRouterModel = modelPreference === 'critical'

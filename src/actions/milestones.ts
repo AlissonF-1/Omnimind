@@ -53,7 +53,11 @@ export async function getMilestones(typeFilter?: string): Promise<JourneyMilesto
       .eq('user_id', user.id)
       .order('milestone_date', { ascending: false })
 
-    if (typeFilter && typeFilter !== 'all') {
+    if (typeFilter === 'exam') {
+      query = query.in('type', ['exam', 'exam_created'])
+    } else if (typeFilter === 'review') {
+      query = query.in('type', ['review', 'perfect_review', 'session_complete'])
+    } else if (typeFilter && typeFilter !== 'all') {
       query = query.eq('type', typeFilter)
     }
 

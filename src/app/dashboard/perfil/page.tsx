@@ -1,32 +1,31 @@
+import { Suspense } from 'react'
 import ProfilePanel from '@/components/ProfilePanel'
 import { getProfileStats } from '@/actions/stats'
-import { Suspense } from 'react'
-import { Loader2 } from 'lucide-react'
+import './profile.css'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Meu Perfil | OmniMind' }
 
-function ProfileLoading() {
+async function ProfileContent() {
+  const profile = await getProfileStats().catch(() => null)
+  if (profile) return <ProfilePanel initialData={profile} />
+
   return (
-    <div className="flex h-[50vh] items-center justify-center">
-      <Loader2 className="size-8 animate-spin text-primary" />
-    </div>
+    <section className="pf-panel pf-state">
+      <h1>Meu perfil</h1>
+      <p role="status">Não foi possível carregar o perfil.</p>
+      <form action="/dashboard/perfil" method="get">
+        <button type="submit" className="pf-button">Tentar novamente</button>
+      </form>
+    </section>
   )
 }
 
-export default async function ProfilePage() {
-  const profileStats = await getProfileStats()
-
+export default function ProfilePage() {
   return (
-    <div className="page-container px-4 sm:px-6 py-4 sm:py-6">
-      <header className="mb-6 border-b border-border/50 pb-4 sm:pb-5">
-        <div className="flex items-center gap-2 mb-1">
-          <p className="text-sm font-medium text-primary">Meu Perfil</p>
-        </div>
-        <h1 className="page-title text-2xl sm:text-3xl">Estatísticas & Progresso</h1>
-      </header>
-
-      <Suspense fallback={<ProfileLoading />}>
-        <ProfilePanel initialData={profileStats} />
+    <div className="profile-page">
+      <Suspense fallback={<p className="pf-panel pf-state" role="status">Carregando perfil…</p>}>
+        <ProfileContent />
       </Suspense>
     </div>
   )
