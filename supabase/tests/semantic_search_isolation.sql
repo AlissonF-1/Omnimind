@@ -1,8 +1,9 @@
 -- Execute em um Supabase descartável após aplicar as migrations de busca.
 BEGIN;
 
-INSERT INTO auth.users (id) VALUES
-  ('00000000-0000-4000-8000-000000005001'), ('00000000-0000-4000-8000-000000005002');
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-4000-8000-000000005001', 'semantic-a@example.test'),
+  ('00000000-0000-4000-8000-000000005002', 'semantic-b@example.test');
 INSERT INTO public.workspaces (id, user_id, name) VALUES
   ('00000000-0000-4000-8000-000000005011', '00000000-0000-4000-8000-000000005001', 'Workspace A'),
   ('00000000-0000-4000-8000-000000005012', '00000000-0000-4000-8000-000000005002', 'Workspace B');

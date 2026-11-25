@@ -1,11 +1,12 @@
 import { getNoteById } from '@/actions/notes'
 import MarkdownEditor from '@/components/MarkdownEditor'
 import CollapsiblePdfImporter from '@/components/CollapsiblePdfImporter'
-import EditableNoteTitle from '@/components/EditableNoteTitle' // Importamos o novo componente
+import EditableNoteTitle from '@/components/EditableNoteTitle'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Calendar, FileText, Layers } from 'lucide-react'
+import { ArrowLeft, CalendarDays, FileText, Layers, Play } from 'lucide-react'
 import { Suspense } from 'react'
+import './note.css'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,76 +44,55 @@ export default async function NotePage({
   const timeAgoText = updatedAt ? timeAgo(updatedAt) : null
 
   return (
-    <div className="flex h-full w-full flex-col px-4 sm:px-6 py-4 sm:py-6">
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link
-            href={`/dashboard/${resolvedParams.workspaceId}`}
-            className="btn-ghost shrink-0 p-2 sm:p-3"
-            aria-label="Voltar para o workspace"
-          >
-            <ArrowLeft className="size-4 sm:size-5" />
-            <span className="hidden sm:inline ml-1">Voltar</span>
-          </Link>
-
-          <span className="h-6 w-px bg-border shrink-0" aria-hidden="true" />
-
-          <div className="min-w-0 flex-1 flex flex-col">
-            {/* O h1 estático foi substituído pelo componente interativo */}
+    <article className="nt-page" aria-label="Anotação">
+      <nav aria-label="Navegação da anotação">
+        <Link href={`/dashboard/${resolvedParams.workspaceId}`} className="nt-back">
+          <ArrowLeft size={16} aria-hidden="true" /> Voltar ao workspace
+        </Link>
+      </nav>
+      <header className="nt-hero">
+        <div className="nt-heading">
+          <span className="nt-hero-icon"><FileText size={25} aria-hidden="true" /></span>
+          <div className="nt-heading-content">
+            <h1 className="sr-only">Editor da anotação</h1>
             <EditableNoteTitle noteId={note.id} initialTitle={note.title} />
-            
             {timeAgoText && (
-              <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
-                <Calendar className="size-3" />
-                <span>Atualizado {timeAgoText}</span>
+              <p className="nt-date">
+                <CalendarDays size={14} aria-hidden="true" /> Atualizado {timeAgoText}
               </p>
             )}
           </div>
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-success bg-success-soft/30 px-3 py-1.5 rounded-full border border-success/20">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
-            </span>
-            Salvo automaticamente
-          </span>
-
+        <div className="nt-actions">
           <Link
             href={`/dashboard/${resolvedParams.workspaceId}/note/${resolvedParams.noteId}/flashcards`}
-            className="btn-primary text-sm px-3 py-2"
+            className="nt-button"
           >
-            <Layers className="size-4" />
-            <span className="hidden sm:inline">Gerenciar Flashcards</span>
-            <span className="sm:hidden">Cards</span>
+            <Layers size={16} aria-hidden="true" /> Gerenciar flashcards
           </Link>
-
           <Link
             href={`/dashboard/revisoes?workspaceId=${resolvedParams.workspaceId}&noteId=${resolvedParams.noteId}`}
-            className="btn-primary text-sm px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="nt-button nt-primary"
           >
-            Estudar Agora
+            <Play size={16} aria-hidden="true" /> Estudar agora
           </Link>
         </div>
       </header>
 
       <CollapsiblePdfImporter workspaceId={resolvedParams.workspaceId} />
 
-      <section className="flex-1 min-h-0">
+      <section className="nt-writing" aria-label="Área de escrita">
         <Suspense
           fallback={
-            <div className="panel h-full min-h-[400px] flex items-center justify-center">
-              <div className="text-center">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p className="mt-4 text-sm text-text-muted">Carregando editor...</p>
-              </div>
+            <div className="nt-editor-loading" role="status">
+              <FileText size={22} aria-hidden="true" />
+              <p>Carregando editor…</p>
             </div>
           }
         >
           <MarkdownEditor initialNote={note} />
         </Suspense>
       </section>
-    </div>
+    </article>
   )
 }

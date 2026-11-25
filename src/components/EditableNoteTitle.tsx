@@ -33,24 +33,22 @@ export default function EditableNoteTitle({ noteId, initialTitle }: EditableNote
   }, [title, initialTitle, noteId])
 
   return (
-    <div className="relative flex-1 min-w-0 flex items-center group">
+    <div className="nt-title-field">
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Título da anotação..."
-        className="text-base sm:text-lg font-semibold text-text-strong bg-transparent outline-none w-full truncate border-b border-transparent hover:border-border focus:border-primary/50 transition-colors py-0.5 pr-16"
+        aria-label="Título da anotação"
+        placeholder="Título da anotação"
+        className="nt-title-input"
         title={title}
       />
       
-      {/* Indicador visual de salvamento e edição */}
-      <div className="absolute right-0 flex items-center gap-2 pointer-events-none">
+      <div className="nt-title-indicator" role="status">
         {isSaving ? (
-          <span className="text-[10px] font-medium text-text-muted animate-pulse">
-            Salvando...
-          </span>
+          <span>Salvando título…</span>
         ) : (
-          <Edit3 className="size-3.5 text-text-muted opacity-0 group-hover:opacity-50 transition-opacity" />
+          <Edit3 size={16} aria-hidden="true" />
         )}
       </div>
     </div>

@@ -1,20 +1,31 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { usePathname } from 'next/navigation'
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CalendarDays, ChevronDown, History, Layers, MessageSquare, Mic, Send, Settings, Square, X } from 'lucide-react'
 import { confirmAssistantExamAction } from '@/actions/chat'
 import { useSettings } from '@/contexts/SettingsContext'
-import { assistantHistoryKey, assistantPath, isAssistantPersona, type AssistantPersona } from '@/lib/assistant/contracts'
+import { assistantHistoryKey, assistantPath, isAssistantPersona, parseAssistantHistory, type AssistantPersona } from '@/lib/assistant/contracts'
 import {
   assistantDisplayText, assistantMessageId, assistantTitle, emptyAssistantHistory, limitAssistantMessages,
   newAssistantConversation, newConversationTitle, parseAssistantSources, readAssistantHistory, saveAssistantHistory,
   type AssistantConversation, type AssistantMessage as Message,
 } from '@/lib/assistant/history'
+import {
+  assistantOutputLimits, assistantProviderIds, assistantProviders, assistantQuestionLimit, isAssistantProvider,
+  parseGenerationMetadata, type AssistantProvider,
+} from '@/lib/assistant/providers'
+import { AssistantReplyError, readAssistantReply, type AssistantRequest } from '@/lib/assistant/reply'
+import {
+  learningConsentMessage, learningTutorHistoryScope, learningTutorModes, learningTutorQuestion, openAssessmentTutorMessage, parseLearningTutorLabel,
+  writeLearningTutorSearch, type LearningTutorContext, type LearningTutorHint, type LearningTutorLabel,
+} from '@/lib/assistant/learning-tutor'
+import { learningHref, learningPath } from '@/lib/learning/progress'
 import { getBestVoice } from '@/utils/audio'
 import AssistantHistory from './assistant/AssistantHistory'
 import AssistantMessage from './assistant/AssistantMessage'
+import AssistantTraining from './assistant/AssistantTraining'
 import AssistantWelcome, { assistantPersonas } from './assistant/AssistantWelcome'
 import { useAssistantIdentity } from './assistant/useAssistantIdentity'
 import './assistant/assistant.css'
@@ -25,10 +36,13 @@ type ChatPanelProps = {
   accountId: string
   workspaces: Workspace[]
   initialWorkspaceId?: string
+  learning?: LearningTutorContext
+  initialLearningLabel?: LearningTutorLabel
   onClose?: () => void
 }
 
 type Dialog = { kind: 'exam' } | { kind: 'rename' | 'delete'; conversation: AssistantConversation }
+type PendingReply = { conversationId: string; messageId: string; input: AssistantRequest }
 type Recognition = {
   lang: string
   continuous: boolean
@@ -49,24 +63,36 @@ function disposeSpeech(recognition: Recognition | null) {
   recognition.abort()
 }
 
-function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceChange, firstName, onClose }: {
+function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceChange, firstName, onClose, learning, initialLearningLabel }: {
   accountId: string
   workspaceId: string
   workspaces: Workspace[]
   onWorkspaceChange: (value: string) => void
   firstName: string
   onClose?: () => void
+  learning?: LearningTutorContext
+  initialLearningLabel?: LearningTutorLabel
 }) {
   const { settings } = useSettings()
   const pathname = usePathname()
-  const storageKey = assistantHistoryKey(accountId, workspaceId)
+  const search = useSearchParams()
+  const storageKey = assistantHistoryKey(accountId, workspaceId) + (learning ? ':' + learningTutorHistoryScope(learning) : '')
   const [state, setState] = useState(() => {
     try { return readAssistantHistory(window.sessionStorage, storageKey) }
     catch { return emptyAssistantHistory() }
   })
   const [defaultPersona, setDefaultPersona] = useState<AssistantPersona>('tutor')
   const [query, setQuery] = useState('')
+  const [floatingTrainingOpen, setFloatingTrainingOpen] = useState(false)
+  const trainingOpen = !learning && (pathname === assistantPath ? search.get('treino') === '1' : floatingTrainingOpen)
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [pendingProvider, setPendingProvider] = useState<AssistantProvider | null>(null)
+  const [providerOverride, setProviderOverride] = useState<AssistantProvider | null>(learning ? state.learningProvider ?? null : null)
+  const [contextChoice, setContextChoice] = useState<{ provider: AssistantProvider; allowed: boolean } | null>(null)
+  const [learningConsent, setLearningConsent] = useState<AssistantProvider | null>(null)
+  const [outputLimit, setOutputLimit] = useState<number>()
+  const [retry, setRetry] = useState<PendingReply | null>(null)
+  const [alternate, setAlternate] = useState<AssistantProvider>('gemini')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
   const [notice, setNotice] = useState('')
@@ -80,9 +106,20 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
   const input = useRef<HTMLTextAreaElement>(null)
   const historyDialog = useRef<HTMLDialogElement>(null)
   const confirmDialog = useRef<HTMLDialogElement>(null)
+  const contextDescriptionId = useId()
+  const learningDescriptionId = useId()
   const assistantConversation = state.conversations.find(({ id }) => id === state.activeConversationId)
   const messages = assistantConversation?.messages ?? []
   const persona = assistantConversation?.persona ?? defaultPersona
+  const configuredProvider = isAssistantProvider(settings.ai_default_model) ? settings.ai_default_model : 'gemini'
+  const provider = providerOverride ?? configuredProvider
+  const includeContext = contextChoice?.provider === provider ? contextChoice.allowed
+    : !learning && provider === 'gemini' && !messages.some(({ generation }) => generation && generation.provider !== provider)
+  const retryForConversation = retry?.conversationId === assistantConversation?.id ? retry : null
+  const label = state.learningLabel ?? initialLearningLabel
+  const completedHints = Math.max(0, ...messages.map((message) => message.learningHint ?? 0))
+  const nextHint = completedHints < 3 ? (completedHints + 1) as LearningTutorHint : null
+  const fullPageHref = learning ? assistantPath + '?' + writeLearningTutorSearch(new URLSearchParams(), learning, workspaceId) : assistantPath
 
   useEffect(() => {
     try { saveAssistantHistory(window.sessionStorage, storageKey, state) } catch { /* Armazenamento bloqueado no navegador. */ }
@@ -124,19 +161,38 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
     else setDefaultPersona(value)
   }
 
+  function showTraining(open: boolean) {
+    if (pathname !== assistantPath) {
+      setFloatingTrainingOpen(open)
+      return
+    }
+    const params = new URLSearchParams(window.location.search)
+    if (open) params.set('treino', '1')
+    else params.delete('treino')
+    window.history.replaceState(null, '', pathname + (params.size ? '?' + params : ''))
+  }
+
   function selectConversation(id: string) {
+    if (trainingOpen) showTraining(false)
     setState((current) => ({ ...current, activeConversationId: id }))
     setQuery('')
     setCopiedId(null)
+    setContextChoice(null)
+    setLearningConsent(null)
+    setRetry(null)
     historyDialog.current?.close()
     if (scroll.current) scroll.current.scrollTop = 0
   }
 
   function startConversation() {
+    if (trainingOpen) showTraining(false)
     const entry = newAssistantConversation('tutor')
-    setState((current) => ({ conversations: [entry, ...current.conversations], activeConversationId: entry.id }))
+    setState((current) => ({ ...current, conversations: [entry, ...current.conversations], activeConversationId: entry.id }))
     setQuery('')
     setNotice('')
+    setContextChoice(null)
+    setLearningConsent(null)
+    setRetry(null)
     historyDialog.current?.close()
     input.current?.focus()
   }
@@ -151,27 +207,27 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
     request.current?.abort()
     request.current = null
     setPendingId(null)
+    setPendingProvider(null)
     setState((current) => ({
       ...current,
       conversations: current.conversations.map((entry) => ({
         ...entry,
-        messages: entry.messages.filter(({ id, content }) => id !== pendingId || content.trim()),
+        messages: entry.messages.filter(({ id, content }) => id !== pendingId || content.trim())
+          .map((message) => message.id === pendingId ? { ...message, interruption: 'Geração cancelada.' } : message),
       })),
     }))
+    setNotice('Geração cancelada.')
   }
 
-  async function ask(value = query) {
+  async function ask(value = query, hintLevel?: LearningTutorHint) {
     const question = value.trim()
-    if (request.current || question.length < 3) return
+    if (request.current || question.length < 3 || question.length > assistantQuestionLimit) return
+    if (learning?.mode === 'explain-error' && learningConsent !== provider) return setNotice(learningConsentMessage)
     const conversation = assistantConversation ?? newAssistantConversation(persona)
     const messageId = assistantMessageId()
-    const userMessage: Message = { id: assistantMessageId(), role: 'user', content: question }
+    const userMessage: Message = { id: assistantMessageId(), role: 'user', content: question, generation: { provider } }
     const placeholder: Message = { id: messageId, role: 'ai', content: '' }
-    const controller = new AbortController()
-    request.current = controller
-    setPendingId(messageId)
     setQuery('')
-    setNotice('')
     setState((current) => {
       const next = {
         ...conversation,
@@ -179,84 +235,112 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
         messages: limitAssistantMessages([...conversation.messages, userMessage, placeholder]),
         updatedAt: Date.now(),
       }
-      return { conversations: [next, ...current.conversations.filter(({ id }) => id !== next.id)], activeConversationId: next.id }
+      return { ...current, conversations: [next, ...current.conversations.filter(({ id }) => id !== next.id)], activeConversationId: next.id }
     })
+    await runReply({
+      conversationId: conversation.id,
+      messageId,
+      input: {
+        accountId, question, workspaceId: workspaceId || null, persona, contextRoute: pathname,
+        history: includeContext && (!learning || (learning.mode === 'explain' && learningConsent === provider))
+          ? parseAssistantHistory(conversation.messages.filter((message) => !message.error && !message.interruption)) : [],
+        ecoMode: settings.eco_mode, model: provider, maxOutputTokens: outputLimit,
+        contextConsent: includeContext ? provider : null,
+        learning: learning ? { ...learning, hintLevel } : undefined,
+        learningConsent: learningConsent === provider ? provider : null,
+      },
+    })
+  }
 
+  async function runReply(attempt: PendingReply) {
+    if (request.current) return
+    const { conversationId, messageId, input: payload } = attempt
+    const respondingProvider = payload.fallback?.provider ?? payload.model
+    const controller = new AbortController()
+    request.current = controller
+    setPendingId(messageId)
+    setPendingProvider(respondingProvider)
+    setNotice('')
+    setRetry(null)
     function changeMessage(update: Partial<Message>) {
-      updateConversation(conversation.id, (entry) => ({
+      updateConversation(conversationId, (entry) => ({
         ...entry,
         messages: entry.messages.map((message) => message.id === messageId ? { ...message, ...update } : message),
       }))
     }
+    changeMessage({ content: '', error: false, interruption: undefined, sources: undefined, generation: undefined, learningHint: undefined })
 
+    let answer = ''
+    let generation = parseGenerationMetadata({ provider: respondingProvider })
     try {
-      const result = await fetch('/api/chat', {
-        method: 'POST', cache: 'no-store', signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId, question, workspaceId: workspaceId || null, persona, contextRoute: pathname,
-          history: conversation.messages.filter((message) => message.content && !message.error)
-            .map(({ role, content }) => ({ role, content })),
-          ecoMode: settings.eco_mode, model: settings.ai_default_model,
-        }),
-      })
-      if (!result.ok) {
-        const data = await result.json().catch(() => null)
-        if (result.status === 401 || result.status === 409) window.dispatchEvent(new Event('assistant-session-invalid'))
-        changeMessage({ content: typeof data?.error === 'string' ? data.error : 'Não foi possível enviar a pergunta.', error: true })
-        return
-      }
-      if (!result.body) throw new Error('Resposta vazia.')
-      const reader = result.body.pipeThrough(new TextDecoderStream()).getReader()
-      let answer = ''
-      let buffer = ''
-      function readLine(line: string) {
-        if (!line.trim()) return
-        const event = JSON.parse(line)
-        switch (event.type) {
+      for await (const { type, data } of readAssistantReply(payload, controller.signal)) {
+        if (request.current !== controller) break
+        switch (type) {
           case 'text':
-            if (typeof event.data === 'string') {
-              answer += event.data
-              changeMessage({ content: assistantDisplayText(answer) })
+            if (typeof data === 'string') {
+              answer += data
+              changeMessage({ content: assistantDisplayText(answer), generation })
             }
             break
           case 'sources':
-            changeMessage({ sources: parseAssistantSources(event.data) })
+            changeMessage({ sources: parseAssistantSources(data) })
             break
-          case 'error':
-            throw new Error(typeof event.data === 'string' ? event.data : 'Resposta interrompida.')
-          case 'level-up':
-          case 'achievement-unlocked':
-            window.dispatchEvent(new CustomEvent(event.type, { detail: event.data }))
-        }
-      }
-      try {
-        while (request.current === controller && !controller.signal.aborted) {
-          const { value: chunk, done } = await reader.read()
-          if (controller.signal.aborted || request.current !== controller) break
-          if (done) {
-            readLine(buffer)
-            if (!assistantDisplayText(answer)) throw new Error('O Assistente retornou uma resposta vazia.')
+          case 'metadata': {
+            const metadata = parseGenerationMetadata(data)
+            if (metadata?.provider === respondingProvider) {
+              generation = metadata
+              changeMessage({ generation })
+            }
             break
           }
-          const lines = (buffer + chunk).split('\n')
-          buffer = lines.pop() ?? ''
-          for (const line of lines) readLine(line)
+          case 'notice':
+            if (typeof data === 'string') setNotice(data)
+            break
+          case 'learning': {
+            const summary = parseLearningTutorLabel(data)
+            if (learning && summary) setState((current) => ({ ...current, learningLabel: summary }))
+            break
+          }
+          case 'level-up':
+          case 'achievement-unlocked':
+            window.dispatchEvent(new CustomEvent(type, { detail: data }))
         }
-      } finally {
-        await reader.cancel().catch(() => null)
       }
+      if (!controller.signal.aborted && !assistantDisplayText(answer)) throw new AssistantReplyError('O Assistente retornou uma resposta vazia.')
+      if (!controller.signal.aborted && payload.learning?.hintLevel) changeMessage({ learningHint: payload.learning.hintLevel })
     } catch (error) {
-      if (!controller.signal.aborted) {
-        changeMessage({ content: error instanceof Error && error.message === 'O Assistente retornou uma resposta vazia.'
-          ? error.message : 'A resposta foi interrompida. Envie a pergunta novamente.', error: true })
+      if (controller.signal.aborted) return
+      const failure = error instanceof AssistantReplyError ? error : new AssistantReplyError('A conexão foi interrompida. Tente novamente.')
+      if (failure.sessionChanged) window.dispatchEvent(new Event('assistant-session-invalid'))
+      if (failure.assessmentOpen) window.dispatchEvent(new Event('assistant-assessment-open'))
+      const partial = assistantDisplayText(answer)
+      changeMessage(partial ? { content: partial, interruption: failure.message }
+        : { content: failure.message, error: true, generation: undefined })
+      if (!answer && !payload.fallback && !failure.sessionChanged && failure.canRetry) {
+        setRetry(attempt)
+        setAlternate(assistantProviderIds.find((id) => id !== payload.model) ?? 'gemini')
       }
     } finally {
       if (request.current === controller) {
         request.current = null
         setPendingId(null)
+        setPendingProvider(null)
       }
     }
+  }
+
+  function retryReply() {
+    if (!retryForConversation || alternate === retryForConversation.input.model) return
+    const previous = retryForConversation.input
+    void runReply({
+      ...retryForConversation,
+      input: {
+        ...previous,
+        fallback: { provider: alternate, consent: true },
+        contextConsent: previous.contextConsent ? alternate : null,
+        learningConsent: previous.learningConsent ? alternate : null,
+      },
+    })
   }
 
   function toggleRecording() {
@@ -348,7 +432,7 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
       const id = dialog.conversation.id
       setState((current) => {
         const conversations = current.conversations.filter((entry) => entry.id !== id)
-        return { conversations, activeConversationId: current.activeConversationId === id ? conversations[0]?.id ?? null : current.activeConversationId }
+        return { ...current, conversations, activeConversationId: current.activeConversationId === id ? conversations[0]?.id ?? null : current.activeConversationId }
       })
     }
     confirmDialog.current?.close()
@@ -366,13 +450,16 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
       <header className="oa-header">
         <span className="oa-header-logo"><MessageSquare size={21} aria-hidden="true" /></span>
         <h1>Conversar com a IA</h1>
+        {!learning && <button type="button" className="oa-button oa-training-toggle" disabled={!!pendingId} aria-pressed={trainingOpen}
+          onClick={() => showTraining(!trainingOpen)}>{trainingOpen ? 'Conversas' : 'Treino interativo'}</button>}
         <button className="oa-icon oa-history-toggle" type="button" aria-label="Abrir histórico" onClick={() => historyDialog.current?.showModal()}><History size={20} aria-hidden="true" /></button>
         <Link href="/dashboard/configuracoes" prefetch={false} className="oa-icon" aria-label="Configurações do OmniMind" title="Configurações" onClick={onClose}><Settings size={19} aria-hidden="true" /></Link>
         {onClose && <button className="oa-icon" type="button" aria-label="Fechar Assistente" onClick={onClose}><X size={21} aria-hidden="true" /></button>}
       </header>
 
       <aside className="oa-history" aria-label="Histórico do Assistente"><AssistantHistory {...historyProps} /></aside>
-      <section className="oa-chat" aria-label="Conversa">
+      {trainingOpen && !learning ? <AssistantTraining accountId={accountId} defaultProvider={provider} eco={settings.eco_mode} />
+        : <section className="oa-chat" aria-label="Conversa">
         <div className="oa-controls">
           <label className="oa-control"><span className="sr-only">Estilo da resposta</span>
             <select value={persona} onChange={(event) => { if (isAssistantPersona(event.target.value)) changePersona(event.target.value) }}>
@@ -385,7 +472,46 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
               {workspaces.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
             </select><ChevronDown size={15} aria-hidden="true" />
           </label>
-          {onClose && <Link href={assistantPath} className="oa-open-page" prefetch={false} onClick={onClose}>Abrir página</Link>}
+          <label className="oa-control"><span className="sr-only">Provedor da IA</span>
+            <select value={provider} disabled={!!pendingId} onChange={(event) => {
+              const next = event.target.value
+              if (!isAssistantProvider(next)) return
+              setProviderOverride(next)
+              setContextChoice({ provider: next, allowed: false })
+              setLearningConsent(null)
+              if (learning) setState((current) => ({ ...current, learningProvider: next }))
+            }}>
+              {assistantProviderIds.map((id) => <option key={id} value={id}>{assistantProviders[id]}</option>)}
+            </select><ChevronDown size={15} aria-hidden="true" />
+          </label>
+          <label className="oa-control"><span className="sr-only">Limite de saída</span>
+            <select value={outputLimit ?? ''} disabled={!!pendingId} onChange={(event) => setOutputLimit(Number(event.target.value) || undefined)}>
+              <option value="">{settings.eco_mode ? 'Econômico · 1.024 tokens' : 'Padrão · 2.048 tokens'}</option>
+              {assistantOutputLimits.map((limit) => <option key={limit} value={limit}>{limit.toLocaleString('pt-BR')} tokens</option>)}
+            </select><ChevronDown size={15} aria-hidden="true" />
+          </label>
+          {onClose && <Link href={fullPageHref} className="oa-open-page" prefetch={false} onClick={onClose}>Abrir página</Link>}
+          <div className="oa-context-setting">
+            <label><input type="checkbox" checked={includeContext} disabled={!!pendingId} aria-describedby={contextDescriptionId}
+              onChange={(event) => setContextChoice({ provider, allowed: event.target.checked })} /> {learning ? 'Consultar minhas anotações' : 'Usar histórico e anotações'}</label>
+            <p id={contextDescriptionId}>
+              A pergunta vai para {assistantProviders[provider]}{includeContext ? ' com ' + (learning ? 'trechos das suas anotações' : 'o histórico, dados de estudo e trechos das fontes') : ''}.
+              {provider !== 'gemini' && ' Com anotações ativadas, o Gemini também recebe a pergunta para localizar fontes.'}
+              {provider === 'openrouter' && ' O OpenRouter encaminha a solicitação à hospedagem do modelo.'}
+            </p>
+          </div>
+          {learning && <div className="oa-learning">
+            <div className="oa-learning-heading">
+              <div><p>{learningTutorModes[learning.mode]}</p><strong>{label ? label.pathTitle + ' · ' + label.stepTitle : 'Atividade da trilha'}</strong></div>
+              {onClose ? <button type="button" className="oa-button" onClick={onClose}>Voltar à atividade</button> : (
+                <Link className="oa-button" prefetch={false} href={label ? learningHref(label.slug, learning.stepId) : learningPath}>Voltar à trilha</Link>
+              )}
+            </div>
+            <label><input type="checkbox" checked={learningConsent === provider} disabled={!!pendingId} aria-describedby={learningDescriptionId}
+              onChange={(event) => setLearningConsent(event.target.checked ? provider : null)} /> Incluir meu progresso e tentativas</label>
+            <p id={learningDescriptionId}>O conteúdo da etapa vai para {assistantProviders[provider]}. Seu progresso e suas tentativas só seguem com esta opção marcada.
+              {learning.mode === 'explain' && ' Para enviar o histórico desta conversa, marque as duas opções.'}</p>
+          </div>}
         </div>
         <div className="oa-scroll" ref={scroll}>
           {messages.length ? (
@@ -393,19 +519,52 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
               {messages.map((message) => <AssistantMessage key={message.id} message={message} pending={pendingId === message.id}
                 copied={copiedId === message.id} copy={() => { void copy(message) }} speak={() => speak(message.content)} />)}
             </div>
+          ) : learning ? (
+            <div className="oa-learning-intro">
+              <Layers size={28} aria-hidden="true" />
+              <h2>{learningTutorModes[learning.mode]}</h2>
+              <p>{learning.mode === 'hint' ? 'Comece pelo conceito e avance uma dica por vez.'
+                : learning.mode === 'explain-error' ? 'Autorize o uso da sua tentativa corrigida para receber uma explicação e um exercício de reforço.'
+                  : 'Peça um exemplo ou faça uma pergunta sobre o conteúdo desta etapa.'}</p>
+            </div>
           ) : <AssistantWelcome name={firstName} persona={persona} setPersona={changePersona} ask={(text) => { void ask(text) }} />}
         </div>
         <footer className="oa-footer">
           {notice && <p className="oa-notice" role="status">{notice}</p>}
-          <form className="oa-composer" onSubmit={(event) => { event.preventDefault(); void ask() }}>
+          {pendingProvider && <p className="oa-notice" role="status">Gerando com {assistantProviders[pendingProvider]}…</p>}
+          {retryForConversation && !pendingId && <div className="oa-retry">
+            <p>Tentar novamente envia a pergunta{retryForConversation.input.learning ? ' e o conteúdo da etapa' : ''}{retryForConversation.input.learningConsent ? ', junto ao seu progresso e tentativas' : ''}{retryForConversation.input.contextConsent ? ', com ' + (retryForConversation.input.learning ? 'trechos das suas anotações' : 'dados de estudo e trechos das fontes') : ''}{retryForConversation.input.history.length ? ' e o histórico desta conversa' : ''} para {assistantProviders[alternate]}.
+              {retryForConversation.input.contextConsent && alternate !== 'gemini' && ' O Gemini recebe a pergunta para localizar fontes.'}
+              {alternate === 'openrouter' && ' O OpenRouter encaminha a solicitação à hospedagem do modelo.'}
+            </p>
+            <label className="oa-control"><span className="sr-only">Provedor para nova tentativa</span>
+              <select value={alternate} onChange={(event) => { if (isAssistantProvider(event.target.value)) setAlternate(event.target.value) }}>
+                {assistantProviderIds.filter((id) => id !== retryForConversation.input.model)
+                  .map((id) => <option key={id} value={id}>{assistantProviders[id]}</option>)}
+              </select><ChevronDown size={15} aria-hidden="true" />
+            </label>
+            <button type="button" className="oa-button" onClick={() => setRetry(null)}>Dispensar</button>
+            <button type="button" className="oa-button oa-primary" onClick={retryReply}>Autorizar e tentar</button>
+          </div>}
+          {learning && <div className="oa-learning-actions">
+            {learning.mode === 'hint' && nextHint && <button type="button" className="oa-button oa-primary" disabled={!!pendingId}
+              onClick={() => { void ask(learningTutorQuestion('hint', nextHint), nextHint) }}>Pedir dica {nextHint} de 3</button>}
+            {learning.mode === 'hint' && !nextHint && <p role="status">Você recebeu as três dicas desta conversa.</p>}
+            {learning.mode === 'explain' && !messages.length && <button type="button" className="oa-button oa-primary" disabled={!!pendingId}
+              onClick={() => { void ask(learningTutorQuestion('explain')) }}>Explicar assunto</button>}
+            {learning.mode === 'explain-error' && <button type="button" className="oa-button oa-primary" disabled={!!pendingId || learningConsent !== provider}
+              onClick={() => { void ask(learningTutorQuestion('explain-error')) }}>Explicar meu erro</button>}
+            {pendingId && learning.mode !== 'explain' && <button type="button" className="oa-button" onClick={stopResponse}>Parar resposta</button>}
+          </div>}
+          {(!learning || learning.mode === 'explain') && <form className="oa-composer" onSubmit={(event) => { event.preventDefault(); void ask() }}>
             <button className="oa-icon" type="button" aria-label="Agendar prova" title="Agendar prova" onClick={() => openDialog({ kind: 'exam' })}><CalendarDays size={20} aria-hidden="true" /></button>
             <button className="oa-icon" type="button" aria-label={recording ? 'Parar ditado' : 'Ditar pergunta'} aria-pressed={recording} title="Ditar pergunta" onClick={toggleRecording}><Mic size={20} aria-hidden="true" /></button>
-            <textarea ref={input} aria-label="Sua pergunta" placeholder="Escreva sua pergunta…" rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={composerKey} />
+            <textarea ref={input} aria-label="Sua pergunta" placeholder="Escreva sua pergunta…" rows={1} maxLength={assistantQuestionLimit} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={composerKey} />
             {pendingId ? <button className="oa-icon oa-primary" type="button" aria-label="Parar resposta" onClick={stopResponse}><Square size={18} aria-hidden="true" /></button> :
               <button className="oa-icon oa-primary" type="submit" aria-label="Enviar pergunta" disabled={query.trim().length < 3}><Send size={19} aria-hidden="true" /></button>}
-          </form>
+          </form>}
         </footer>
-      </section>
+      </section>}
 
       <dialog ref={historyDialog} className="oa-native-dialog oa-history-dialog" aria-label="Histórico do Assistente">
         <AssistantHistory {...historyProps} close={() => historyDialog.current?.close()} />
@@ -430,9 +589,11 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
   )
 }
 
-export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, onClose }: ChatPanelProps) {
-  const { identity, checked } = useAssistantIdentity(accountId)
-  const [selectedWorkspace, setSelectedWorkspace] = useState(initialWorkspaceId ?? '')
+export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, onClose, learning, initialLearningLabel }: ChatPanelProps) {
+  const { identity, checked, availability } = useAssistantIdentity(accountId)
+  const search = useSearchParams()
+  const [workspaceChoice, setWorkspaceChoice] = useState<string>()
+  const selectedWorkspace = learning ? search.get('tutorWorkspace') ?? '' : workspaceChoice ?? initialWorkspaceId ?? ''
   const workspaceId = workspaces.some((workspace) => workspace.id === selectedWorkspace) ? selectedWorkspace : ''
 
   if (!identity) return (
@@ -442,6 +603,26 @@ export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, o
       {onClose && <button type="button" className="oa-button" onClick={onClose}>Fechar Assistente</button>}
     </div>
   )
-  return <AssistantWorkspace key={assistantHistoryKey(identity.id, workspaceId)} accountId={identity.id}
-    firstName={identity.firstName} workspaceId={workspaceId} workspaces={workspaces} onWorkspaceChange={setSelectedWorkspace} onClose={onClose} />
+  if (availability !== 'ready') return (
+    <div className="oa-session" role="status">
+      <div>
+        <h1>Conversar com a IA</h1>
+        <p>{availability === 'assessment' ? openAssessmentTutorMessage : 'Não foi possível verificar o acesso ao Assistente. Abra novamente para tentar.'}</p>
+      </div>
+      {onClose ? <button type="button" className="oa-button" onClick={onClose}>Fechar Assistente</button>
+        : <Link href={learningPath} className="oa-button" prefetch={false}>Voltar às trilhas</Link>}
+    </div>
+  )
+  const scope = learning ? learningTutorHistoryScope(learning) : ''
+  function changeWorkspace(value: string) {
+    if (learning) {
+      const search = writeLearningTutorSearch(new URLSearchParams(window.location.search), learning, value)
+      window.history.replaceState(null, '', window.location.pathname + '?' + search)
+    } else {
+      setWorkspaceChoice(value)
+    }
+  }
+  return <AssistantWorkspace key={assistantHistoryKey(identity.id, workspaceId) + ':' + scope} accountId={identity.id}
+    firstName={identity.firstName} workspaceId={workspaceId} workspaces={workspaces} onWorkspaceChange={changeWorkspace}
+    onClose={onClose} learning={learning} initialLearningLabel={initialLearningLabel} />
 }

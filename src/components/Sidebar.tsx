@@ -5,14 +5,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Archive, ArrowRight, CalendarDays, ChevronDown, Ellipsis, FlaskConical, Folder, Home, Layers, ListChecks, LogOut, MessageSquare,
-  Network, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, Search, Settings, Trash2, Trophy, User, X, Zap,
+  Archive, ArrowRight, CalendarDays, ChevronDown, Ellipsis, Folder, Home, Layers, ListChecks, LogOut,
+  PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, Search, Settings, Trash2, Trophy, User, X, Zap,
 } from 'lucide-react'
 import { createWorkspace, updateWorkspace, deleteWorkspace, signOut, archiveWorkspace } from '@/actions/workspaces'
 import { SavedThemeToggle } from '@/components/ThemeToggle'
 import AvatarFace from '@/components/AvatarFace'
 import { isDashboardRoute, ULTIMATUM_HREF } from '@/lib/dashboard-navigation'
-import { assistantPath } from '@/lib/assistant/contracts'
 
 interface Workspace {
   id: string
@@ -35,12 +34,9 @@ interface SidebarProps {
 const links = [
   { href: '/dashboard', icon: Home, label: 'Início' },
   { href: '/dashboard/trilhas', icon: Layers, label: 'Trilhas', documentNavigation: true },
-  { href: assistantPath, icon: MessageSquare, label: 'Conversar com a IA', documentNavigation: true },
   { href: '/dashboard/questoes', icon: ListChecks, label: 'Questões', documentNavigation: true },
   { href: '/dashboard/revisoes', icon: RefreshCw, label: 'Revisão ativa' },
-  { href: '/dashboard/feynman', icon: FlaskConical, label: 'Feynman Sandbox' },
   { href: '/dashboard/busca', icon: Search, label: 'Busca semântica' },
-  { href: '/dashboard/grafo', icon: Network, label: 'Rede de Conexões' },
   { href: '/dashboard/conquistas', icon: Trophy, label: 'Minhas Conquistas' },
 ]
 

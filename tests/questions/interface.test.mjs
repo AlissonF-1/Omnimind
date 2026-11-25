@@ -38,6 +38,7 @@ function loadComponent(path) {
     if (name === '@/actions/questions') return { submitQuestionAnswer: () => assert.fail('A renderização inicial não pode enviar uma resposta.') }
     if (name === '@/lib/questions/practice') return loadComponent(resolve(root, 'src/lib/questions/practice.ts'))
     if (name === '@/lib/questions/performance') return loadComponent(resolve(root, 'src/lib/questions/performance.ts'))
+    if (name === '@/components/learning/LearningTutorActions') return loadComponent(resolve(root, 'src/components/learning/LearningTutorActions.tsx'))
     if (name.startsWith('./')) return loadComponent(resolve(dirname(path), `${name}.tsx`))
     return nodeRequire(name)
   }
@@ -92,6 +93,20 @@ test('feedback mostra o resultado do servidor e explica as cinco alternativas', 
   assert.match(html, /Alternativa B(?:<!-- -->)? · Correta/)
   assert.equal((html.match(/Justificativa \d/g) ?? []).length, 5)
   assert.match(render(QuestionFeedback, { feedback: { ...feedback, isCorrect: true, selectedOptionId: 'option-2' } }), /Resposta correta!/)
+})
+
+test('o botão de explicar meu erro só aparece no feedback incorreto conectado à trilha', () => {
+  const { QuestionFeedback } = load('QuestionPractice')
+  const learningTutor = { pathId: 'path', stepId: 'step', label: { pathTitle: 'SQL', stepTitle: 'Filtros', slug: 'sql' } }
+  const feedback = {
+    attemptId: 'attempt-1', selectedOptionId: 'option-1', correctOptionId: 'option-2', isCorrect: false,
+    options: options.map(({ id, position }) => ({ optionId: id, position, explanation: `Justificativa ${position}` })),
+  }
+  assert.match(render(QuestionFeedback, { feedback, learningTutor }), /Explicar meu erro/)
+  assert.doesNotMatch(render(QuestionFeedback, { feedback }), /Explicar meu erro/)
+  assert.doesNotMatch(render(QuestionFeedback, {
+    feedback: { ...feedback, isCorrect: true, selectedOptionId: 'option-2' }, learningTutor,
+  }), /Explicar meu erro/)
 })
 
 test('histórico mostra o filtro, preserva a versão na revisão e trata a lista vazia', () => {
@@ -152,7 +167,7 @@ test('carregamento e erro têm estados próprios com instrução para continuar'
   assert.match(html, /Tentar novamente/)
 })
 
-test('service worker mantém Questões, Trilhas e Assistente fora do cache de navegação', () => {
+test('service worker mantém as páginas de todas as contas fora do cache de navegação', () => {
   const handlers = new Map()
   const worker = readFileSync(resolve(root, 'public/sw-custom.js'), 'utf8')
   runInNewContext(worker, {
@@ -161,9 +176,10 @@ test('service worker mantém Questões, Trilhas e Assistente fora do cache de na
   })
   const handleFetch = handlers.get('fetch')
   assert.equal(typeof handleFetch, 'function')
-  for (const path of ['/dashboard/questoes', '/dashboard/questoes/resolver?versao=1', '/dashboard/questoes/historico?filtro=erros', '/dashboard/%71uest%6fes',
+  for (const path of ['/dashboard', '/dashboard/revisoes', '/dashboard/perfil', '/dashboard/workspace/note/id',
+    '/dashboard/questoes', '/dashboard/questoes/resolver?versao=1', '/dashboard/questoes/historico?filtro=erros', '/dashboard/%71uest%6fes',
     '/dashboard/trilhas', '/dashboard/trilhas/sql-concursos-e-mercado?etapa=1', '/dashboard/%74rilhas/sql?revisao=1',
-    '/dashboard/assistente', '/dashboard/%61ssistente?_rsc=1']) {
+    '/dashboard/assistente', '/dashboard/%61ssistente?_rsc=1', '/dashboard/laboratorio-sql/join?_rsc=1']) {
     handleFetch({ request: { url: `https://example.test${path}`, mode: 'navigate' }, respondWith: () => assert.fail('Worker interceptou uma rota privada.') })
   }
 })
@@ -172,6 +188,8 @@ test('Workbox e cabeçalhos excluem as rotas privadas do cache de navegação', 
   const { default: config } = loadComponent(resolve(root, 'next.config.mjs'))
   const { pwaOptions } = config
   assert.equal(pwaOptions.cacheOnFrontEndNav, false)
+  assert.equal(pwaOptions.cacheStartUrl, false)
+  assert.equal(pwaOptions.dynamicStartUrl, false)
   assert.equal(pwaOptions.extendDefaultRuntimeCaching, true)
 
   const [rule] = pwaOptions.workboxOptions.runtimeCaching
@@ -182,16 +200,20 @@ test('Workbox e cabeçalhos excluem as rotas privadas do cache de navegação', 
   assert.equal(matches('/dashboard/questoes/historico?_rsc=123'), true)
   assert.equal(matches('/dashboard/%71uest%6fes'), true)
   assert.equal(matches('/dashboard/questoes', false), false)
-  assert.equal(matches('/dashboard/revisoes'), false)
-  assert.equal(matches('/dashboard/questoes-nova'), false)
+  assert.equal(matches('/dashboard'), true)
+  assert.equal(matches('/dashboard/revisoes'), true)
+  assert.equal(matches('/dashboard/questoes-nova'), true)
   assert.equal(matches('/dashboard/trilhas/sql-concursos-e-mercado?_rsc=123'), true)
   assert.equal(matches('/dashboard/%74rilhas/sql?revisao=1'), true)
   assert.equal(matches('/dashboard/trilhas', false), false)
-  assert.equal(matches('/dashboard/trilhas-arquivadas'), false)
+  assert.equal(matches('/dashboard/trilhas-arquivadas'), true)
   assert.equal(matches('/dashboard/assistente?_rsc=123'), true)
   assert.equal(matches('/dashboard/%61ssistente'), true)
-  assert.equal(matches('/dashboard/assistente-teste'), false)
-  assert.match((await config.headers()).find(({ source }) => source === '/dashboard/questoes/:path*').headers[0].value, /private, no-store/)
-  assert.match((await config.headers()).find(({ source }) => source === '/dashboard/trilhas/:path*').headers[0].value, /private, no-store/)
-  assert.match((await config.headers()).find(({ source }) => source === '/dashboard/assistente/:path*').headers[0].value, /private, no-store/)
+  assert.equal(matches('/dashboard/assistente-teste'), true)
+  assert.equal(matches('/dashboard/laboratorio-sql/join?_rsc=123'), true)
+  assert.equal(matches('/storage/v1/object/authenticated/note_files/doc.pdf', false), true)
+  assert.equal(matches('/storage/v1/object/public/note_images/cover.png', false), false)
+  assert.equal(matches('/rest/v1/notes', false), true)
+  assert.match((await config.headers()).find(({ source }) => source === '/dashboard/:path*').headers[0].value, /private, no-store/)
+  assert.match((await config.headers()).find(({ source }) => source === '/api/pdf/:path*').headers[0].value, /private, no-store/)
 })

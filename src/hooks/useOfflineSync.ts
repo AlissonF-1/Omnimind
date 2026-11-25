@@ -1,107 +1,71 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { getPendingReviews, removePendingReview, PendingReview } from '@/utils/offlineStore'
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react'
+import { getPendingReviews, removePendingReview } from '@/utils/offlineStore'
 import { submitReview } from '@/actions/reviews'
+import type { Rating } from 'ts-fsrs'
 
-export function useOfflineSync() {
-  const [isOnline, setIsOnline] = useState<boolean>(true)
-  const [pendingCount, setPendingCount] = useState<number>(0)
-  const [isSyncing, setIsSyncing] = useState<boolean>(false)
+function subscribeToConnection(change: () => void) {
+  window.addEventListener('online', change)
+  window.addEventListener('offline', change)
+  return () => {
+    window.removeEventListener('online', change)
+    window.removeEventListener('offline', change)
+  }
+}
+
+export function useOfflineSync(accountId: string) {
+  const isOnline = useSyncExternalStore(subscribeToConnection, () => navigator.onLine, () => true)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null)
+  const syncing = useRef(false)
 
-  // Atualiza quantidade de itens pendentes na fila
   const refreshPendingCount = useCallback(async () => {
-    if (typeof window === 'undefined') return
-    const pending = await getPendingReviews()
+    const pending = await getPendingReviews(accountId)
     setPendingCount(pending.length)
-  }, [])
+  }, [accountId])
 
-  // Função principal de sincronização da fila offline -> Supabase
   const syncPendingReviews = useCallback(async () => {
-    if (isSyncing || typeof window === 'undefined' || !navigator.onLine) return
+    if (syncing.current || !navigator.onLine) return
+    syncing.current = true
 
-    const pending = await getPendingReviews()
-    if (pending.length === 0) {
-      setPendingCount(0)
-      return
-    }
+    try {
+      const pending = await getPendingReviews(accountId)
+      if (!pending.length) {
+        setPendingCount(0)
+        return
+      }
 
-    setIsSyncing(true)
-    setSyncStatusMessage(`Sincronizando ${pending.length} revisão(ões) realizada(s) offline...`)
-
-    let successCount = 0
-    for (const item of pending) {
-      try {
-        const result = await submitReview(item.cardId, item.currentFsrsState, item.grade as any)
-        if (result && !result.error) {
-          if (item.id) {
-            await removePendingReview(item.id)
+      setIsSyncing(true)
+      setSyncStatusMessage('Sincronizando revisões feitas offline…')
+      let successCount = 0
+      for (const item of pending) {
+        try {
+          const response = await submitReview(item.cardId, item.currentFsrsState, item.grade as Rating)
+          if (item.id !== undefined && response && !response.error) {
+            await removePendingReview(accountId, item.id)
             successCount++
           }
-        } else {
-          console.error('[useOfflineSync] Erro ao enviar revisão pendente:', result?.error)
-          // Se for erro de validação ou card não encontrado, remove o item corrompido para não travar a fila em loop
-          if (item.id && result?.error) {
-            await removePendingReview(item.id)
-          }
-        }
-      } catch (err) {
-        console.error('[useOfflineSync] Exceção ao enviar item pendente:', err)
-        if (item.id) {
-          await removePendingReview(item.id)
+        } catch {
+          // Keep the owner's review pending on network or session failure.
         }
       }
-    }
 
-    const remaining = await getPendingReviews()
-    setPendingCount(remaining.length)
-    setIsSyncing(false)
-
-    if (successCount > 0) {
-      setSyncStatusMessage(`✅ ${successCount} revisão(ões) sincronizada(s) com sucesso!`)
-      setTimeout(() => setSyncStatusMessage(null), 4000)
-    } else if (remaining.length > 0) {
-      setSyncStatusMessage(`⚠️ Não foi possível sincronizar todas as revisões. Tentaremos novamente em instantes.`)
-      setTimeout(() => setSyncStatusMessage(null), 5000)
+      const remaining = await getPendingReviews(accountId)
+      setPendingCount(remaining.length)
+      setSyncStatusMessage(remaining.length
+        ? 'Algumas revisões ainda estão pendentes.'
+        : successCount + ' revisão(ões) sincronizada(s) com sucesso!')
+    } finally {
+      syncing.current = false
+      setIsSyncing(false)
     }
-  }, [isSyncing])
+  }, [accountId])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    void Promise.resolve().then(isOnline ? syncPendingReviews : refreshPendingCount)
+  }, [isOnline, refreshPendingCount, syncPendingReviews])
 
-    setIsOnline(navigator.onLine)
-    refreshPendingCount()
-
-    const handleOnline = () => {
-      setIsOnline(true)
-      syncPendingReviews()
-    }
-
-    const handleOffline = () => {
-      setIsOnline(false)
-    }
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-
-    // Se inicializou já online e há pendências, tenta sincronizar
-    if (navigator.onLine) {
-      syncPendingReviews()
-    }
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [refreshPendingCount, syncPendingReviews])
-
-  return {
-    isOnline,
-    pendingCount,
-    isSyncing,
-    syncStatusMessage,
-    refreshPendingCount,
-    syncPendingReviews,
-  }
+  return { isOnline, pendingCount, isSyncing, syncStatusMessage, refreshPendingCount, syncPendingReviews }
 }

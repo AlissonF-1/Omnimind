@@ -235,13 +235,13 @@ export default function SettingsTabs() {
 
           {activeTab === 'ai' && (
             <>
-              <SettingRow id="settings-model" title="Modelo padrão" description="Seleção usada ao conversar com o assistente.">
+              <SettingRow id="settings-model" title="Provedor padrão" description="Seleção inicial ao abrir o Assistente.">
                 <SelectSetting id="settings-model" value={settings.ai_default_model} disabled={isUpdating}
                   choices={[{ value: 'gemini', label: 'Gemini' }, { value: 'groq', label: 'Groq' }, { value: 'openrouter', label: 'OpenRouter' }]}
                   onChange={(value) => save('ai_default_model', value)}
                 />
               </SettingRow>
-              <SettingRow id="settings-eco" title="Modo de economia" description="Prioriza modelos menores nas tarefas compatíveis.">
+              <SettingRow id="settings-eco" title="Modo de economia" description="Seleciona o perfil econômico do provedor no Assistente e sugere um limite menor de saída.">
                 <Toggle id="settings-eco" checked={settings.eco_mode} disabled={isUpdating} onChange={(value) => save('eco_mode', value)} />
               </SettingRow>
               <SettingRow id="settings-font" title="Tamanho do texto" description="Altera o tamanho da fonte das respostas do assistente.">

@@ -21,15 +21,17 @@ export async function authorizeAssistantWorkspace(db: Database, userId: string, 
   return data
 }
 
-export async function gatherAssistantSources(db: Database, userId: string, workspace: Workspace | null, question: string) {
-  const embedding = await embedQuery(question)
-  const { data: matches, error: matchError } = await db.rpc('match_content_embeddings', {
+export async function gatherAssistantSources(db: Database, userId: string, workspace: Workspace | null, question: string, signal?: AbortSignal) {
+  const embedding = await embedQuery(question, signal)
+  signal?.throwIfAborted()
+  const matchesQuery = db.rpc('match_content_embeddings', {
     query_embedding: embedding,
     match_threshold: 0.65,
     match_count: 10,
     p_user_id: userId,
     p_workspace_id: workspace?.id ?? null,
   })
+  const { data: matches, error: matchError } = await (signal ? matchesQuery.abortSignal(signal) : matchesQuery)
   if (matchError || !Array.isArray(matches)) throw new Error('SEMANTIC_SEARCH_FAILED')
 
   // A RPC ordena candidatos. Somente as linhas relidas sob a sessão atual podem entrar no contexto.
@@ -42,12 +44,14 @@ export async function gatherAssistantSources(db: Database, userId: string, works
   const query = db.from('content_embeddings').select('id,workspace_id,note_id,source_type,chunk_text')
     .eq('user_id', userId).in('id', [...new Set(ranked.map(({ id }) => id))])
   const scopedQuery = workspace ? query.eq('workspace_id', workspace.id) : query
-  const { data: rows, error: rowsError } = await scopedQuery.overrideTypes<EmbeddingRow[], { merge: false }>()
+  const { data: rows, error: rowsError } = await (signal ? scopedQuery.abortSignal(signal) : scopedQuery)
+    .overrideTypes<EmbeddingRow[], { merge: false }>()
   if (rowsError) throw new Error('EMBEDDING_READ_FAILED')
 
   const noteIds = [...new Set((rows ?? []).map(({ note_id }) => note_id).filter(isAssistantId))]
-  const notes = noteIds.length ? await db.from('notes').select('id,title').eq('user_id', userId).in('id', noteIds)
-    .overrideTypes<{ id: string; title: string | null }[], { merge: false }>() : null
+  const notesQuery = noteIds.length ? db.from('notes').select('id,title').eq('user_id', userId).in('id', noteIds) : null
+  const notes = await (signal ? notesQuery?.abortSignal(signal) : notesQuery)
+    ?.overrideTypes<{ id: string; title: string | null }[], { merge: false }>()
   if (notes?.error) throw new Error('NOTE_READ_FAILED')
   const titles = new Map((notes?.data ?? []).map(({ id, title }) => [id, title]))
   const byId = new Map((rows ?? []).map((row) => [row.id, row]))

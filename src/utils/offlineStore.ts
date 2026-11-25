@@ -1,6 +1,8 @@
 'use client'
 
-const DB_NAME = 'omnimind_offline_db'
+import type { submitReview } from '@/actions/reviews'
+
+const DB_NAME = 'omnimind_offline_account'
 const DB_VERSION = 1
 const CARDS_STORE = 'cached_cards'
 const REVIEWS_STORE = 'pending_reviews'
@@ -9,17 +11,20 @@ export interface PendingReview {
   id?: number
   cardId: string
   grade: number
-  currentFsrsState: any
+  currentFsrsState: Parameters<typeof submitReview>[1]
   timestamp: number
 }
 
-function openDB(): Promise<IDBDatabase> {
+function openDB(accountId: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !('indexedDB' in window)) {
       return reject(new Error('IndexedDB não suportado neste ambiente'))
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(accountId) || accountId.length !== 36) {
+      return reject(new Error('Conta indisponível para estudos offline'))
+    }
+    const request = indexedDB.open(`${DB_NAME}:${accountId}`, DB_VERSION)
 
     request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
       const db = (event.target as IDBOpenDBRequest).result
@@ -41,9 +46,9 @@ function openDB(): Promise<IDBDatabase> {
 /**
  * Salva uma lista de cards no cache offline (substitui os existentes).
  */
-export async function saveCardsToCache(cards: any[]): Promise<void> {
+export async function saveCardsToCache(accountId: string, cards: { id: string }[]): Promise<void> {
   try {
-    const db = await openDB()
+    const db = await openDB(accountId)
     const tx = db.transaction(CARDS_STORE, 'readwrite')
     const store = tx.objectStore(CARDS_STORE)
     
@@ -71,9 +76,9 @@ export async function saveCardsToCache(cards: any[]): Promise<void> {
 /**
  * Recupera todos os cards cacheados no IndexedDB.
  */
-export async function getCachedCards(): Promise<any[]> {
+export async function getCachedCards<Card>(accountId: string): Promise<Card[]> {
   try {
-    const db = await openDB()
+    const db = await openDB(accountId)
     const tx = db.transaction(CARDS_STORE, 'readonly')
     const store = tx.objectStore(CARDS_STORE)
 
@@ -91,9 +96,9 @@ export async function getCachedCards(): Promise<any[]> {
 /**
  * Adiciona uma revisão à fila pendente para ser enviada quando voltar a internet.
  */
-export async function savePendingReview(review: Omit<PendingReview, 'id' | 'timestamp'>): Promise<void> {
+export async function savePendingReview(accountId: string, review: Omit<PendingReview, 'id' | 'timestamp'>): Promise<void> {
   try {
-    const db = await openDB()
+    const db = await openDB(accountId)
     const tx = db.transaction(REVIEWS_STORE, 'readwrite')
     const store = tx.objectStore(REVIEWS_STORE)
 
@@ -115,9 +120,9 @@ export async function savePendingReview(review: Omit<PendingReview, 'id' | 'time
 /**
  * Retorna a lista de revisões pendentes na fila.
  */
-export async function getPendingReviews(): Promise<PendingReview[]> {
+export async function getPendingReviews(accountId: string): Promise<PendingReview[]> {
   try {
-    const db = await openDB()
+    const db = await openDB(accountId)
     const tx = db.transaction(REVIEWS_STORE, 'readonly')
     const store = tx.objectStore(REVIEWS_STORE)
 
@@ -135,9 +140,9 @@ export async function getPendingReviews(): Promise<PendingReview[]> {
 /**
  * Remove um item individual da fila pendente (após envio com sucesso).
  */
-export async function removePendingReview(id: number): Promise<void> {
+export async function removePendingReview(accountId: string, id: number): Promise<void> {
   try {
-    const db = await openDB()
+    const db = await openDB(accountId)
     const tx = db.transaction(REVIEWS_STORE, 'readwrite')
     const store = tx.objectStore(REVIEWS_STORE)
 
@@ -154,9 +159,9 @@ export async function removePendingReview(id: number): Promise<void> {
 /**
  * Limpa toda a fila de revisões pendentes.
  */
-export async function clearAllPendingReviews(): Promise<void> {
+export async function clearAllPendingReviews(accountId: string): Promise<void> {
   try {
-    const db = await openDB()
+    const db = await openDB(accountId)
     const tx = db.transaction(REVIEWS_STORE, 'readwrite')
     const store = tx.objectStore(REVIEWS_STORE)
 

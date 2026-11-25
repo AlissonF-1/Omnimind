@@ -1,4 +1,6 @@
 import { isAssistantId, isAssistantPersona, type AssistantPersona, type AssistantSource } from './contracts'
+import { isAssistantProvider, parseGenerationMetadata, type AssistantProvider, type GenerationMetadata } from './providers'
+import { parseLearningTutorLabel, type LearningTutorHint, type LearningTutorLabel } from './learning-tutor'
 
 export const newConversationTitle = 'Nova conversa'
 const messageLimit = 40
@@ -9,6 +11,9 @@ export type AssistantMessage = {
   content: string
   sources?: AssistantSource[]
   error?: boolean
+  interruption?: string
+  generation?: GenerationMetadata
+  learningHint?: LearningTutorHint
 }
 
 export type AssistantConversation = {
@@ -20,7 +25,12 @@ export type AssistantConversation = {
   persona: AssistantPersona
 }
 
-export type AssistantHistory = { conversations: AssistantConversation[]; activeConversationId: string | null }
+export type AssistantHistory = {
+  conversations: AssistantConversation[]
+  activeConversationId: string | null
+  learningLabel?: LearningTutorLabel
+  learningProvider?: AssistantProvider
+}
 
 export function emptyAssistantHistory(): AssistantHistory {
   return { conversations: [], activeConversationId: null }
@@ -69,7 +79,12 @@ export function readAssistantHistory(storage: Pick<Storage, 'getItem'>, key: str
       const messages = entry.messages.flatMap((message) => {
         if (!message || typeof message.id !== 'string' || (message.role !== 'user' && message.role !== 'ai') ||
           typeof message.content !== 'string' || !message.content.trim()) return []
-        return [{ id: message.id, role: message.role, content: message.content, sources: parseAssistantSources(message.sources), error: message.error === true }]
+        return [{
+          id: message.id, role: message.role, content: message.content, sources: parseAssistantSources(message.sources), error: message.error === true,
+          interruption: typeof message.interruption === 'string' ? message.interruption : undefined,
+          generation: parseGenerationMetadata(message.generation),
+          learningHint: message.learningHint === 1 || message.learningHint === 2 || message.learningHint === 3 ? message.learningHint : undefined,
+        }]
       })
       return [{
         id: entry.id, title: entry.title, messages: limitAssistantMessages(messages),
@@ -82,6 +97,8 @@ export function readAssistantHistory(storage: Pick<Storage, 'getItem'>, key: str
       conversations,
       activeConversationId: conversations.some(({ id }) => id === data.activeConversationId)
         ? data.activeConversationId : conversations[0]?.id ?? null,
+      learningLabel: parseLearningTutorLabel(data.learningLabel),
+      learningProvider: isAssistantProvider(data.learningProvider) ? data.learningProvider : undefined,
     }
   } catch {
     return emptyAssistantHistory()

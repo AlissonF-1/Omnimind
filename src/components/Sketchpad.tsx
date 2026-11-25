@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { noteImageBucket, noteImageUrl } from '@/lib/note-image'
 import {
   X,
   Save,
@@ -668,7 +669,7 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
         // Upload da imagem no bucket note_images
         const { error: uploadError } = await supabase.storage
-          .from('note_images')
+          .from(noteImageBucket)
           .upload(path, blob, {
             contentType: 'image/png',
             cacheControl: '3600',
@@ -677,11 +678,7 @@ export default function Sketchpad({ noteId, onClose, onSave }: SketchpadProps) {
 
         if (uploadError) throw uploadError
 
-        // Obter URL pública
-        const { data } = supabase.storage.from('note_images').getPublicUrl(path)
-        if (!data?.publicUrl) throw new Error('Não foi possível obter a URL pública')
-
-        onSave(data.publicUrl)
+        onSave(noteImageUrl(path))
       } catch (err) {
         console.error('Erro ao salvar desenho:', err)
         alert('Falha ao salvar o desenho. Certifique-se de que o bucket "note_images" está configurado no Supabase.')

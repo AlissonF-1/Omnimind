@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { maxPdfBytes, pdfImportBucket, type PdfPreviewData } from '@/lib/pdf/import-contract'
 import PdfPreview from './PdfPreview'
-import { Upload, X, FileText, AlertCircle, CheckCircle, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Upload, X, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 
 interface PdfImporterProps {
   workspaceId: string
@@ -17,7 +18,7 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
   const [filePath, setFilePath] = useState<string | null>(null)
-  const [previewData, setPreviewData] = useState<any>(null)
+  const [previewData, setPreviewData] = useState<PdfPreviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isCreatingNote, setIsCreatingNote] = useState(false)
@@ -25,7 +26,7 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
   const abortControllerRef = useRef<AbortController | null>(null)
   const processingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const MAX_MB = 10
+  const MAX_MB = maxPdfBytes / (1024 * 1024)
 
   useEffect(() => {
     return () => {
@@ -63,9 +64,7 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
   }
 
   const deleteFileFromStorage = async (path: string) => {
-    try {
-      await supabase.storage.from('note_files').remove([path])
-    } catch (_) {}
+    await supabase.storage.from(pdfImportBucket).remove([path]).catch(() => undefined)
   }
 
   const handleFile = async (f: File | null) => {
@@ -76,7 +75,7 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
       setError('Apenas arquivos PDF são permitidos')
       return
     }
-    if (f.size > MAX_MB * 1024 * 1024) {
+    if (f.size > maxPdfBytes) {
       setError(`Arquivo excede ${MAX_MB} MB`)
       return
     }
@@ -85,36 +84,20 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
     setUploading(true)
     setUploadProgress(0)
 
+    const filePathLocal = `${workspaceId}/${crypto.randomUUID()}.pdf`
+    let uploaded = false
     try {
-      // Verifica bucket
-      const { error: listError } = await supabase.storage.from('note_files').list('', { limit: 1 })
-      if (listError) {
-        setError('Bucket "note_files" não encontrado no Supabase. Crie um bucket chamado "note_files" no painel do Supabase.')
-        setUploading(false)
-        return
-      }
-
-      const fileExt = f.name.split('.').pop()
-      const fileName = `${Date.now()}.${fileExt}`
-      const filePathLocal = `${workspaceId}/${fileName}`
 
       // Upload via Supabase (sem progresso nativo, mas simulamos)
-      const { error: uploadError } = await supabase.storage.from('note_files').upload(filePathLocal, f)
+      const { error: uploadError } = await supabase.storage.from(pdfImportBucket).upload(filePathLocal, f, { contentType: 'application/pdf' })
       if (uploadError) throw uploadError
+      uploaded = true
 
       // Simula progresso (já que o método upload não dá progresso)
       setUploadProgress(100)
 
       setFilePath(filePathLocal)
       setUploading(false)
-
-      // Signed URL
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from('note_files')
-        .createSignedUrl(filePathLocal, 60)
-      if (signedError || !signedData?.signedUrl) {
-        throw signedError || new Error('Falha ao criar signedUrl')
-      }
 
       // Extração com progresso simulado
       setIsProcessing(true)
@@ -129,7 +112,7 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
 
       const resp = await fetch('/api/pdf/extract', {
         method: 'POST',
-        body: JSON.stringify({ signedUrl: signedData.signedUrl, mode: 'summary' }),
+        body: JSON.stringify({ filePath: filePathLocal }),
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         signal: abortControllerRef.current.signal,
@@ -152,19 +135,19 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
       setIsProcessing(false)
       setSuccessMessage('PDF processado com sucesso! Revise os dados abaixo.')
 
-    } catch (e: any) {
+    } catch (e) {
       if (processingIntervalRef.current) {
         clearInterval(processingIntervalRef.current)
         processingIntervalRef.current = null
       }
       setUploading(false)
       setIsProcessing(false)
-      if (filePath) {
-        await deleteFileFromStorage(filePath)
+      if (uploaded) {
+        await deleteFileFromStorage(filePathLocal)
         setFilePath(null)
       }
-      const msg = e.message || 'Erro no processamento do PDF'
-      if (e.name === 'AbortError') {
+      const msg = e instanceof Error ? e.message : 'Erro no processamento do PDF'
+      if (e instanceof Error && e.name === 'AbortError') {
         setError('Processamento cancelado pelo usuário.')
       } else {
         setError(msg)
@@ -181,24 +164,19 @@ export default function PdfImporter({ workspaceId }: PdfImporterProps) {
     setSuccessMessage(null)
 
     try {
-      const session = await supabase.auth.getSession()
-      const token = session?.data?.session?.access_token
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-
       const resp = await fetch('/api/pdf/create-note', {
         method: 'POST',
         body: JSON.stringify({ workspaceId, title, content: markdownContent, doIndex }),
-        headers,
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       })
       const json = await resp.json()
-      if (json?.error) throw new Error(json.error)
+      if (!resp.ok || json?.error) throw new Error(json?.error || 'Não foi possível criar a nota.')
 
       setSuccessMessage('Nota criada com sucesso!')
       setTimeout(() => resetState(), 2000)
-    } catch (e: any) {
-      setError(e.message || 'Erro ao criar nota')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao criar nota')
     } finally {
       setIsCreatingNote(false)
     }

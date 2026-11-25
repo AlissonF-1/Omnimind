@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState, useTransition, useMemo } from 'react'
 import { flushSync } from 'react-dom' // ADICIONADO
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { updateNoteContent } from '@/actions/notes'
-import { generateFlashcardsFromNote, createFlashcard, generateAIClozeCard, previewGeneratedFlashcards, saveGeneratedFlashcards } from '@/actions/flashcards'
+import { createFlashcard, generateAIClozeCard, previewGeneratedFlashcards, saveGeneratedFlashcards } from '@/actions/flashcards'
 import { formatMarkdownWithGroq } from '@/actions/groq'
 import { useAudioRecorder } from '@/hooks/useAudioRecorder'
 import { useHistory } from '@/hooks/useHistory'
+import { noteImageBucket, noteImageUrl, replaceLegacyNoteImageUrl } from '@/lib/note-image'
 import { createClient } from '@/utils/supabase/client'
 import Sketchpad from './Sketchpad'
 import LaTeXAssist from './LaTeXAssist'
@@ -194,6 +195,10 @@ const TOOLBAR_ACTIONS = [
       applyLinePrefix(c, t, '> '),
   },
 ]
+
+function transformNoteUrl(url: string) {
+  return defaultUrlTransform(replaceLegacyNoteImageUrl(url, process.env.NEXT_PUBLIC_SUPABASE_URL))
+}
 
 export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const [content, setContent] = useState(initialNote.content || '')
@@ -645,13 +650,11 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) return
     setIsUploading(true)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Math.random()}.${fileExt}`
-    const filePath = `${initialNote.id}/${fileName}`
+    const filePath = `${initialNote.id}/${crypto.randomUUID()}`
 
     const { error } = await supabase.storage
-      .from('note_images')
-      .upload(filePath, file)
+      .from(noteImageBucket)
+      .upload(filePath, file, { contentType: file.type })
     if (error) {
       console.error('Erro no upload:', error)
       showToast('Erro ao fazer upload da imagem', 'error')
@@ -659,11 +662,8 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       return
     }
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('note_images').getPublicUrl(filePath)
     const separator = content.endsWith('\n') || content === '' ? '' : '\n'
-    commitContent(`${content}${separator}\n![${file.name}](${publicUrl})\n`)
+    commitContent(`${content}${separator}\n![${file.name}](${noteImageUrl(filePath)})\n`)
     setIsUploading(false)
   }
 
@@ -742,7 +742,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
   }, [showLatexAssist, savedSelection])
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col bg-background">
+    <div className="nt-editor relative flex min-h-0 w-full flex-col">
       {/* Toast */}
       {toast && (
         <div
@@ -761,23 +761,18 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
         </div>
       )}
 
-      {/* ── Header limpo (sem input de título) ────────────────────────── */}
       {!isFocusMode && (
-        <header className="flex flex-col shrink-0 border-b border-border bg-surface">
-          <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-bold text-text-strong truncate">
-                {initialNote.title || 'Sem título'}
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
+        <header className="nt-editor-header flex flex-col shrink-0">
+          <div className="nt-editor-top">
+            <h2 className="nt-editor-label">Editor Markdown</h2>
+            <div className="nt-editor-controls" role="group" aria-label="Controles do editor">
               <div className="hidden md:flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={undo}
                   disabled={!canUndo}
                   className="p-1.5 text-text-muted disabled:opacity-30 hover:text-text-strong transition-colors"
                   title="Desfazer"
+                  aria-label="Desfazer"
                 >
                   <Undo2 className="size-4" />
                 </button>
@@ -787,6 +782,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                   disabled={!canRedo}
                   className="p-1.5 text-text-muted disabled:opacity-30 hover:text-text-strong transition-colors"
                   title="Refazer"
+                  aria-label="Refazer"
                 >
                   <Redo2 className="size-4" />
                 </button>
@@ -795,6 +791,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                   onClick={() => setShowSketchpad(true)}
                   className="p-1.5 text-text-muted hover:text-primary transition-colors"
                   title="Quadro de Desenho"
+                  aria-label="Quadro de desenho"
                 >
                   <PenTool className="size-4" />
                 </button>
@@ -817,6 +814,8 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                     }}
                   className={`p-1.5 transition-colors ${showLatexAssist ? 'text-primary' : 'text-text-muted hover:text-primary'}`}
                   title="Símbolos Matemáticos"
+                  aria-label="Símbolos matemáticos"
+                  aria-pressed={showLatexAssist}
                 >
                   <Sigma className="size-4" />
                 </button>
@@ -826,6 +825,8 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                   disabled={isTranscribing}
                   className={`p-1.5 rounded-full transition-all ${isRecording ? 'text-red-500 animate-pulse' : 'text-text-muted hover:text-primary'}`}
                   title="Gravar áudio para transcrição"
+                  aria-label={isRecording ? 'Parar gravação' : 'Gravar áudio para transcrição'}
+                  aria-pressed={isRecording}
                 >
                   {isRecording ? <div className="size-2.5 bg-red-500 rounded-full animate-ping" /> : <Mic className="size-4" />}
                 </button>
@@ -840,6 +841,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                     : 'text-text-muted hover:bg-surface-muted'
                 }`}
                 aria-label="Buscar na nota"
+                aria-pressed={showSearch}
                 title="Buscar na nota"
               >
                 <Search className="size-4" />
@@ -860,6 +862,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                   onChange={(e) => setFontFamily(e.target.value as 'sans' | 'serif' | 'mono')}
                   className="h-8 rounded-lg border border-border bg-surface-muted px-1.5 text-[10px] sm:text-xs font-semibold text-text-strong outline-none focus:border-primary/50 cursor-pointer"
                   title="Tipografia"
+                  aria-label="Tipografia do editor"
                 >
                   <option value="sans">Aa Sans</option>
                   <option value="serif">Aa Serif</option>
@@ -867,10 +870,11 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 </select>
               </div>
 
-              <div className="flex rounded-lg border border-border bg-surface-muted p-0.5 shrink-0">
+              <div className="nt-view-switch flex rounded-lg border border-border bg-surface-muted p-0.5 shrink-0" role="group" aria-label="Modo de visualização">
                 <button
                   onClick={() => setViewMode('edit')}
                   aria-label="Editar"
+                  aria-pressed={viewMode === 'edit'}
                   title="Editar"
                   className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
                     viewMode === 'edit'
@@ -883,6 +887,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 <button
                   onClick={() => setViewMode('preview')}
                   aria-label="Visualizar"
+                  aria-pressed={viewMode === 'preview'}
                   title="Visualizar"
                   className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
                     viewMode === 'preview'
@@ -895,6 +900,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 <button
                   onClick={() => setViewMode('split')}
                   aria-label="Lado a Lado"
+                  aria-pressed={viewMode === 'split'}
                   title="Modo Dividido (Lado a Lado)"
                   className={`hidden md:flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
                     viewMode === 'split'
@@ -909,6 +915,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               <div className="hidden md:flex items-center">
                 <select
                   value={generationMode}
+                  aria-label="Modo de geração de flashcards"
                   onChange={(e) => setGenerationMode(e.target.value as 'default' | 'concurso')}
                   className="h-8 max-w-[85px] sm:max-w-none truncate rounded-lg border border-border bg-surface-muted px-1.5 text-[10px] sm:text-xs font-semibold text-text-strong outline-none focus:border-primary/50 cursor-pointer"
                 >
@@ -922,21 +929,21 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 disabled={isGenerating}
                 aria-label="Gerar flashcards"
                 title="Gerar flashcards por IA"
-                className="flex h-8 px-2.5 items-center justify-center gap-1.5 rounded-lg bg-primary text-white disabled:opacity-60 active:scale-95 transition-all text-xs font-semibold shadow-sm hover:bg-primary/95"
+                className="nt-generate nt-button nt-primary"
               >
                 {isGenerating ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <Sparkles className="size-3.5" />
                 )}
-                <span className="hidden sm:inline">Gerar Cards</span>
+                <span>Gerar cards</span>
               </button>
             </div>
           </div>
 
           {/* Barra de Ferramentas */}
           {viewMode === 'edit' && (
-            <div className="flex items-center gap-0.5 overflow-x-auto px-2 py-1.5 border-t border-border/40 bg-surface scrollbar-none">
+            <div className="nt-format-bar flex items-center overflow-x-auto" role="group" aria-label="Formatação e anexos">
               <button
                 type="button"
                 aria-label="Inserir Template de Aula"
@@ -988,6 +995,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               <button
                 type="button"
                 aria-label="Referência rápida"
+                aria-expanded={showQuickHelp}
                 onClick={() => setShowQuickHelp((v) => !v)}
                 className={`flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 transition-colors ${
                   showQuickHelp ? 'bg-primary/10 text-primary' : 'text-text-muted active:bg-surface-muted'
@@ -999,28 +1007,30 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
           )}
 
           {/* Barra de Status */}
-          <div className="flex items-center justify-between px-3 py-1 bg-surface-muted/30 border-t border-border/40 text-[10px] text-text-muted select-none">
-            <div className="flex items-center gap-1.5">
-              <span className={`inline-block size-1.5 rounded-full ${isSaving ? 'bg-amber-500 animate-pulse' : 'bg-success'}`} />
-              <span>{isSaving ? 'Salvando...' : 'Salvo na nuvem'}</span>
+          <div className="nt-editor-status">
+            <div className="flex items-center gap-1.5" role="status">
+              <span className={`inline-block size-1.5 rounded-full ${isSaving ? 'bg-warning' : 'bg-success'}`} aria-hidden="true" />
+              <span>{isSaving ? 'Salvando conteúdo…' : 'Salvamento automático'}</span>
             </div>
-            <span>{wordCount} palavras · ~{readingTime} min leitura</span>
+            <span>{wordCount} {wordCount === 1 ? 'palavra' : 'palavras'}{wordCount > 0 && ` · ~${readingTime} min de leitura`}</span>
           </div>
 
           {/* Barra de busca */}
           {showSearch && viewMode === 'edit' && (
-            <div className="flex items-center gap-2 px-3 py-2 border-t border-border bg-surface-muted/30">
+            <div className="nt-editor-search flex items-center gap-2">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearchNext()}
                 placeholder="Buscar no texto..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-text-muted"
+                aria-label="Buscar no texto da anotação"
+                className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-text-muted"
                 autoFocus
               />
               <button
                 onClick={handleSearchNext}
+                aria-label="Próxima ocorrência"
                 className="rounded-md p-1.5 text-text-medium hover:bg-border/50 active:bg-border"
               >
                 <ChevronNext className="size-4 -rotate-90" />
@@ -1030,6 +1040,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                   setShowSearch(false)
                   setSearchQuery('')
                 }}
+                aria-label="Fechar busca na anotação"
                 className="rounded-md p-1.5 text-text-medium hover:bg-border/50 active:bg-border"
               >
                 <X className="size-4" />
@@ -1051,7 +1062,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
       )}
 
       {/* ── Área de edição / preview ────────────────────────────────── */}
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="nt-editor-canvas relative min-h-0 flex-1 overflow-hidden">
         {isUploading && (
           <div className="absolute right-3 top-3 z-10 rounded-full bg-primary px-3 py-1 text-xs font-medium text-white shadow">
             Enviando imagem…
@@ -1123,6 +1134,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 onKeyUp={handleSelectionChange}
                 onMouseUp={handleSelectionChange}
                 placeholder="Comece a anotar…"
+                aria-label="Conteúdo da anotação"
                 inputMode="text"
                 enterKeyHint="enter"
                 autoCapitalize="sentences"
@@ -1154,6 +1166,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
                 }`}
               >
                 <ReactMarkdown
+                  urlTransform={transformNoteUrl}
                   remarkPlugins={[remarkGfm, remarkMath]}
                   rehypePlugins={[rehypeKatex]}
                 >
@@ -1183,6 +1196,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               onKeyUp={handleSelectionChange}
               onMouseUp={handleSelectionChange}
               placeholder="Comece a anotar…"
+              aria-label="Conteúdo da anotação"
               inputMode="text"
               enterKeyHint="enter"
               autoCapitalize="sentences"
@@ -1213,6 +1227,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
               }`}
             >
               <ReactMarkdown
+                urlTransform={transformNoteUrl}
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeKatex]}
               >
@@ -1225,7 +1240,7 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
       {/* ── Mobile Accessory Bar (com onClick, sem preventDefault) ── */}
       {viewMode === 'edit' && (
-        <div className="flex md:hidden shrink-0 items-center gap-1.5 overflow-x-auto px-3 py-2 border-t border-border/40 bg-surface scrollbar-none z-30">
+        <div className="nt-mobile-tools flex md:hidden shrink-0 items-center gap-1.5 overflow-x-auto px-3 py-2 z-30" role="group" aria-label="Ferramentas de edição no celular">
           <button
             type="button"
             onClick={() => undo()}
@@ -1354,14 +1369,12 @@ export default function MarkdownEditor({ initialNote }: { initialNote: Note }) {
 
       {/* ── Barra de ferramentas inferior (apenas modo edição) ──────── */}
       {viewMode === 'edit' && !isFocusMode && (
-        <div className="shrink-0 border-t border-border bg-surface safe-area-bottom">
+        <div className="nt-editor-footer shrink-0 safe-area-bottom">
           {selectedText.trim().length > 0 && (
             <div className="mx-4 my-2 p-3 bg-gradient-to-r from-primary/10 to-indigo-500/10 border border-primary/20 rounded-xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom-2 duration-200 shadow-sm shrink-0">
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-primary uppercase tracking-wider block mb-0.5">Seleção Ativa</span>
-                <p className="text-xs text-text-strong font-medium truncate italic">
-                  "{selectedText}"
-                </p>
+                <p className="text-xs text-text-strong font-medium truncate italic">“{selectedText}”</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button

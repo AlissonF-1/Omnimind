@@ -80,6 +80,7 @@ test('Workspaces começa recolhido e o menu mantém perfil, calendário, configu
     assert.ok(html.includes('href="/dashboard/' + route + '"'))
   }
   assert.match(html, /href="\/dashboard\/questoes" aria-current="page"/)
+  assert.doesNotMatch(html, /href="\/dashboard\/(assistente|feynman|grafo)"/)
 })
 
 test('navegação mobile e banner apontam para as rotas existentes', () => {

@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "codex/omni-quest-001a": false
+    }
+  },
   "crons": [
     {
       "path": "/api/push/send",

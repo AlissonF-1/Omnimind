@@ -8,7 +8,8 @@ export function hashContent(text: string): string {
 
 export async function embedText(
   text: string,
-  taskType: EmbeddingTask = 'RETRIEVAL_DOCUMENT'
+  taskType: EmbeddingTask = 'RETRIEVAL_DOCUMENT',
+  signal?: AbortSignal,
 ): Promise<number[]> {
   const trimmed = text.trim()
   if (trimmed.length < 3) {
@@ -25,6 +26,7 @@ export async function embedText(
   const response = await fetch(url, {
     method: 'POST',
     cache: 'no-store',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       'x-goog-api-key': apiKey,
@@ -54,6 +56,6 @@ export async function embedText(
   return values
 }
 
-export async function embedQuery(query: string): Promise<number[]> {
-  return embedText(query, 'RETRIEVAL_QUERY')
+export async function embedQuery(query: string, signal?: AbortSignal): Promise<number[]> {
+  return embedText(query, 'RETRIEVAL_QUERY', signal)
 }

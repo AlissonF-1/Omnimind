@@ -13,9 +13,15 @@ export default function WorkspaceFilterBar({ initialSearch = '', initialSort = '
   const router = useRouter()
   const [search, setSearch] = useState(initialSearch)
   const [sort, setSort] = useState(initialSort)
+  const [applied, setApplied] = useState({ search: initialSearch, sort: initialSort })
   const [isPending, startTransition] = useTransition()
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  if (!isPending && (applied.search !== initialSearch || applied.sort !== initialSort)) {
+    setApplied({ search: initialSearch, sort: initialSort })
+    setSearch(initialSearch)
+    setSort(initialSort)
+  }
 
   // Função que atualiza a URL (encapsulada)
   const updateQuery = useCallback((nextSearch: string, nextSort: string) => {
@@ -27,7 +33,7 @@ export default function WorkspaceFilterBar({ initialSearch = '', initialSort = '
         url.searchParams.delete('search')
       }
       url.searchParams.set('sort', nextSort)
-      router.push(url.toString())
+      router.push(url.pathname + url.search + url.hash, { scroll: false })
     })
   }, [router])
 
@@ -54,62 +60,58 @@ export default function WorkspaceFilterBar({ initialSearch = '', initialSort = '
   }, [])
 
   const handleClear = () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
     setSearch('')
     updateQuery('', sort)
     inputRef.current?.focus()
   }
 
   const handleSortChange = (value: string) => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
     setSort(value)
     updateQuery(search, value)
   }
 
   return (
-    <div className="mb-6 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-      <div className="relative flex-1 max-w-full sm:max-w-xs w-full">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted pointer-events-none" />
+    <div className="wp-filters">
+      <div className="wp-search">
+        <Search size={17} aria-hidden="true" />
         <input
           ref={inputRef}
           type="search"
           placeholder="Buscar notas..."
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="field pl-10 pr-10 w-full"
-          aria-label="Buscar notas por título ou conteúdo"
+          aria-label="Buscar notas por título"
           autoComplete="off"
         />
         {search && (
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-text-muted hover:text-text-strong transition-colors"
+            className="wp-search-clear"
             aria-label="Limpar busca"
           >
-            <X className="size-4" />
+            <X size={17} aria-hidden="true" />
           </button>
         )}
         {isPending && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Loader2 className="size-4 animate-spin text-primary" />
-          </div>
+          <span role="status" className="wp-filter-loading"><Loader2 size={16} className="wp-spinner" aria-hidden="true" /><span className="sr-only">Atualizando anotações</span></span>
         )}
       </div>
 
-      <div className="flex items-center gap-2 w-full sm:w-auto">
-        <label htmlFor="workspace-sort" className="sr-only">Ordenar por</label>
+      <label className="wp-sort">
+        <span>Ordenar por</span>
         <select
-          id="workspace-sort"
           value={sort}
           onChange={(e) => handleSortChange(e.target.value)}
-          className="field w-full sm:w-auto min-h-[44px]"
           disabled={isPending}
-          aria-label="Ordenar workspaces"
         >
           <option value="recent">Mais recentes</option>
           <option value="name">A-Z</option>
-          <option value="cards">Mais cards</option>
+          <option value="cards">Mais flashcards</option>
         </select>
-      </div>
+      </label>
     </div>
   )
 }

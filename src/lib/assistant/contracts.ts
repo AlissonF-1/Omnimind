@@ -35,14 +35,20 @@ export function assistantSourceHref(source: AssistantSource) {
 }
 
 export function parseAssistantHistory(input: unknown) {
-  const history: { role: 'user' | 'model'; parts: [{ text: string }] }[] = []
+  const history: { role: 'user' | 'ai'; content: string }[] = []
   if (!Array.isArray(input)) return history
-  for (const turn of input) {
+  const encoder = new TextEncoder()
+  let bytes = 0
+  for (const turn of input.slice(-24).reverse()) {
     if (!turn || (turn.role !== 'user' && turn.role !== 'ai') || typeof turn.content !== 'string') continue
-    const text = turn.content.trim()
-    if (text) history.push({ role: turn.role === 'ai' ? 'model' : 'user', parts: [{ text }] })
+    const content = turn.content.slice(0, 5000).trim()
+    if (!content) continue
+    const size = encoder.encode(JSON.stringify({ role: turn.role, content })).length
+    if (bytes + size > 16_000) break
+    bytes += size
+    history.push({ role: turn.role, content })
   }
-  return history
+  return history.reverse()
 }
 
 export function assistantScreenLabel(input: unknown) {

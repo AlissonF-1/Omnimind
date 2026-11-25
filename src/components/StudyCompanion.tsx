@@ -109,6 +109,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
             src={config.image}
             alt={config.name}
             fill
+            sizes="(min-width: 640px) 64px, 56px"
             className="object-cover transition-transform duration-500 group-hover:scale-110"
             priority
           />
