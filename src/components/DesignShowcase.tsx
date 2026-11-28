@@ -1,4 +1,4 @@
-import { Sparkles, Heart, Zap } from 'lucide-react'
+import { Sparkles, Heart, Zap } from '@/components/icons'
 
 export default function DesignShowcase() {
   return (

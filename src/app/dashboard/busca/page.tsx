@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Image from 'next/image'
-import { FolderPlus, Loader2, ScanSearch } from 'lucide-react'
+import { FolderPlus, Loader2, ScanSearch } from '@/components/icons'
 import { getWorkspaces } from '@/actions/workspaces'
 import SemanticSearch from '@/components/SemanticSearch'
 import './search.css'

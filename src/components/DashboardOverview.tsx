@@ -1,14 +1,14 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, BrainCircuit, CalendarDays, FolderPlus, ListChecks, NotebookPen, Sparkles } from 'lucide-react'
+import { ArrowRight, FlashcardsIcon, FolderPlus, NotesIcon, QuestionsIcon, ReviewsIcon, StudyPlanIcon } from '@/components/icons'
 import StudyCompanion from '@/components/StudyCompanion'
 import DashboardAssistantTeaser from '@/components/DashboardAssistantTeaser'
 
 const steps = [
   { title: 'Crie um workspace', description: 'Organize sua matéria no menu lateral.', icon: FolderPlus },
-  { title: 'Registre uma nota', description: 'Guarde conceitos e exemplos do que estudou.', icon: NotebookPen },
-  { title: 'Gere flashcards', description: 'Transforme os pontos principais em perguntas.', icon: Sparkles },
-  { title: 'Faça a primeira revisão', description: 'Responda aos cartões para iniciar seu histórico.', icon: BrainCircuit },
+  { title: 'Registre uma nota', description: 'Guarde conceitos e exemplos do que estudou.', icon: NotesIcon },
+  { title: 'Gere flashcards', description: 'Transforme os pontos principais em perguntas.', icon: FlashcardsIcon },
+  { title: 'Faça a primeira revisão', description: 'Responda aos cartões para iniciar seu histórico.', icon: ReviewsIcon },
 ]
 
 export function DashboardHero({ greeting, date }: {
@@ -22,7 +22,7 @@ export function DashboardHero({ greeting, date }: {
       </div>
       <div className="dh-hero-copy">
         <div className="dh-row">
-          <CalendarDays size={16} aria-hidden="true" />
+          <StudyPlanIcon size={16} aria-hidden="true" />
           <span className="dh-hero-date">{date}</span>
         </div>
         <h1>{greeting}, estudioso! <span aria-hidden="true">👋</span></h1>
@@ -31,9 +31,9 @@ export function DashboardHero({ greeting, date }: {
           {/* A rota de Questões exige navegação de documento para respeitar o cache offline. */}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/dashboard/questoes" className="dh-button dh-button-primary">
-            <ListChecks size={16} aria-hidden="true" /> Praticar questões <ArrowRight size={15} aria-hidden="true" />
+            <QuestionsIcon size={17} aria-hidden="true" /> Praticar questões <ArrowRight size={15} aria-hidden="true" />
           </a>
-          <Link href="/dashboard/calendario" className="dh-button"><CalendarDays size={16} aria-hidden="true" /> Planejar estudo</Link>
+          <Link href="/dashboard/calendario" className="dh-button"><StudyPlanIcon size={17} aria-hidden="true" /> Planejar estudo</Link>
         </nav>
       </div>
       <DashboardAssistantTeaser />
@@ -75,7 +75,7 @@ export function DashboardReviewFocus({ overdueCards, totalCards }: { overdueCard
             : 'Crie flashcards a partir de uma nota para começar a revisar.'}
       </p>
       <Link href="/dashboard/revisoes" className="dh-button">
-        {hasOverdue ? 'Revisar agora' : 'Abrir revisões'} <ArrowRight size={15} aria-hidden="true" />
+        <ReviewsIcon size={17} aria-hidden="true" /> {hasOverdue ? 'Revisar agora' : 'Abrir revisões'} <ArrowRight size={15} aria-hidden="true" />
       </Link>
     </article>
   )

@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { createUiRequire } from '../helpers/icon-imports.mjs'
 import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
 import * as searchTypes from '../../src/types/search.ts'
 
-const nodeRequire = createRequire(import.meta.url)
+const nodeRequire = createUiRequire(import.meta.url)
 const modules = {
   'next/link': ({ children, href, ...props }) => createElement('a', { ...props, href }, children),
   'next/image': ({ src, sizes, alt }) => createElement('img', { src, sizes, alt }),

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Award, CalendarDays, ChevronDown, ChevronRight, Flame, NotebookPen, Trophy } from 'lucide-react'
+import { Award, CalendarDays, ChevronDown, ChevronRight, Flame, NotebookPen, Trophy } from '@/components/icons'
 import { getMilestones, type JourneyMilestone } from '@/actions/milestones'
 
 const categories = [

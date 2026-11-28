@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { maxPdfBytes, pdfImportBucket, type PdfPreviewData } from '@/lib/pdf/import-contract'
 import PdfPreview from './PdfPreview'
-import { Upload, X, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Upload, X, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle } from '@/components/icons'
 
 interface PdfImporterProps {
   workspaceId: string

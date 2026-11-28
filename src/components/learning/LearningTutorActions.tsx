@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, Lightbulb, MessageCircleQuestion } from 'lucide-react'
+import { BookOpen, Lightbulb, MessageCircleQuestion } from '@/components/icons'
 
 export type LearningTutorScope = {
   pathId: string

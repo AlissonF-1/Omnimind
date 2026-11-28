@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bell, BellOff, MoonStar } from 'lucide-react'
+import { Bell, BellOff, MoonStar } from '@/components/icons'
 import { useSettings } from '@/contexts/SettingsContext'
 
 // Helper para converter a chave pública VAPID
@@ -141,7 +141,8 @@ export default function ReviewAlarm() {
         if (reg && 'showNotification' in reg) {
           await reg.showNotification('🔥 Alarme de Revisão OmniMind (Teste)', {
             body: 'Seu alarme está ativo e funcionando no seu sistema! 🎯',
-            icon: '/icons/icon-192.png',
+            icon: '/icon-transparent-192.png?v=2',
+            badge: '/notification-badge.png?v=2',
             tag: 'test-notification'
           })
           setStatusMessage('Disparada! Verifique a central de notificações do seu computador/celular. 🚀')
@@ -154,7 +155,7 @@ export default function ReviewAlarm() {
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('🔥 Alarme de Revisão OmniMind (Teste)', {
           body: 'Seu alarme está ativo e funcionando no seu sistema! 🎯',
-          icon: '/icons/icon-192.png'
+          icon: '/icon-transparent-192.png?v=2'
         })
         setStatusMessage('Disparada! Verifique as notificações do seu sistema. 🚀')
       } else {

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle } from '@/components/icons'
 import Heatmap from '@/components/Heatmap'
 import DashboardStatsCards from '@/components/DashboardStatsCards'
 import DashboardRelearningAlert from '@/components/DashboardRelearningAlert'

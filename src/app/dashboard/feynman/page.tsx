@@ -1,7 +1,7 @@
 import { getWorkspaces } from '@/actions/workspaces'
 import FeynmanSandbox from '@/components/FeynmanSandbox'
 import { Suspense } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2 } from '@/components/icons'
 
 export const dynamic = 'force-dynamic'
 

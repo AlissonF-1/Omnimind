@@ -15,25 +15,25 @@
   "categories": ["education", "productivity"],
   "icons": [
     {
-      "src": "/icon-transparent-192.png",
+      "src": "/icon-transparent-192.png?v=2",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-192x192.png",
+      "src": "/icon-192x192.png?v=2",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-transparent-512.png",
+      "src": "/icon-transparent-512.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/icon-512x512.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -45,14 +45,14 @@
       "short_name": "Revisar",
       "description": "Abrir sessão de revisão de flashcards",
       "url": "/dashboard/revisoes",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon-transparent-192.png?v=2", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Assistente IA",
       "short_name": "Assistente",
       "description": "Conversar com o Tutor IA",
-      "url": "/dashboard/chat",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "url": "/dashboard/assistente",
+      "icons": [{ "src": "/icon-transparent-192.png?v=2", "sizes": "192x192", "type": "image/png" }]
     }
   ],
   "prefer_related_applications": false

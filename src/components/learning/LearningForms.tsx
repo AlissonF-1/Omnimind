@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useState, type ReactNode } from 'react'
-import { ArrowRight, LoaderCircle } from 'lucide-react'
+import { ArrowRight, LoaderCircle } from '@/components/icons'
 import type { LearningFormState } from '@/actions/learning'
 
 type FormAction = (state: LearningFormState, form: FormData) => Promise<LearningFormState>

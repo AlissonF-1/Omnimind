@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import test from 'node:test'
 import * as geminiSdk from '@google/genai'
-import * as icons from 'lucide-react'
 import { createElement, memo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import * as jsxRuntime from 'react/jsx-runtime'
@@ -290,7 +289,8 @@ test('cliente lê o protocolo do Assistente, trata desconexão e distingue sess�
 
 test('mensagem do Assistente mostra modelo e hospedagem reais junto à resposta parcial', () => {
   const { default: AssistantMessage } = load('src/components/assistant/AssistantMessage.tsx', {
-    'react/jsx-runtime': jsxRuntime, react: { memo }, 'lucide-react': icons, 'next/link': {},
+    'react/jsx-runtime': jsxRuntime, react: { memo }, 'next/link': {},
+    '@/components/icons': { BookOpen: 'svg', Check: 'svg', Copy: 'svg', LoaderCircle: 'svg', Sparkles: 'svg', User: 'svg', Volume2: 'svg' },
     'react-markdown': { default: ({ children }) => createElement('p', null, children) }, 'remark-gfm': {},
     '@/lib/assistant/contracts': contracts, '@/lib/assistant/providers': providers,
   }, {})

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
-import { ArrowLeft, CircleAlert, ClipboardCheck, Trophy } from 'lucide-react'
+import { ArrowLeft, CircleAlert, ClipboardCheck, Trophy } from '@/components/icons'
 import {
   beginLearningStepAction, confirmLearningReadingAction, deliverLearningChallengeAction,
   gradeLearningChallengeAction, restartLearningAssessmentAction, submitLearningAnswerAction,

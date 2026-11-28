@@ -39,7 +39,7 @@ import {
   Swords,
   Ghost,
   Zap,
-} from 'lucide-react'
+} from '@/components/icons'
 import RelearningAlert from './RelearningAlert'
 import { useSettings } from '@/contexts/SettingsContext'
 import { getBestVoice, playButtonClick, playEvaluationSound } from '@/utils/audio'

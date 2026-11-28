@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { generateReinforcementPrompt, getTutorBlindSpotsDiagnostic, type BlindSpot } from '@/actions/blindspots'
-import { AlertTriangle, Brain, Target, Copy, CheckCircle2, Loader2, Sparkles } from 'lucide-react'
+import { AlertTriangle, Brain, Target, Copy, CheckCircle2, Loader2, Sparkles } from '@/components/icons'
 import Link from 'next/link'
 
 interface BlindSpotsPanelProps {

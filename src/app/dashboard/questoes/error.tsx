@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CircleAlert, RefreshCw } from 'lucide-react'
+import { CircleAlert, RefreshCw } from '@/components/icons'
 import { questionsPath } from '@/lib/questions/practice'
 
 export default function QuestionsError() {

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; worker-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Executor Python isolado</title>
+</head>
+<body>
+<script>
+'use strict';
+// This realm is always embedded with sandbox="allow-scripts" and has an opaque origin.
+// Running directly at the URL must never initialize an executor.
+if (window.parent !== window && window.origin === 'null') {
+  const appOrigin = new URL(window.location.href).origin;
+  window.addEventListener('message', (event) => {
+    const run = event.data;
+    if (event.source !== window.parent || event.origin !== appOrigin || run?.type !== 'omni-python-run') return;
+    const reply = (result) => window.parent.postMessage({ type: 'omni-python-result', nonce: run.nonce, result }, appOrigin);
+    if (typeof run.runtime !== 'string' || typeof run.worker !== 'string' || run.runtime.length > 800000
+      || run.worker.length > 10000 || typeof run.code !== 'string' || run.code.length > 12000
+      || typeof run.input !== 'string' || run.input.length > 2000) {
+      reply({ status: 'error', output: '', message: 'Execução inválida.' });
+      return;
+    }
+    let worker;
+    let watchdog;
+    let url;
+    function finish(result) {
+      clearTimeout(watchdog);
+      worker?.terminate();
+      if (url) URL.revokeObjectURL(url);
+      reply(result);
+    }
+    try {
+      url = URL.createObjectURL(new Blob([run.runtime, '\n', run.worker], { type: 'application/javascript' }));
+      worker = new Worker(url);
+      watchdog = setTimeout(() => finish({status: 'timeout', output: '', message: 'Execução interrompida por tempo limite.'}), 4000);
+      worker.onmessage = (message) => finish(message.data);
+      worker.onerror = () => finish({ status: 'error', output: '', message: 'Não foi possível inicializar o executor isolado.' });
+      worker.postMessage({ code: run.code, input: run.input });
+    } catch {
+      finish({ status: 'error', output: '', message: 'O navegador não autorizou o executor isolado.' });
+    }
+  }, { once: true });
+}
+</script>
+</body>
+</html>

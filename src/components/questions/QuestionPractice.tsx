@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, CircleCheck, CircleX, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CircleCheck, CircleX, Loader2 } from '@/components/icons'
 import ReactMarkdown from 'react-markdown'
 import { submitQuestionAnswer } from '@/actions/questions'
 import { answerSubmission } from '@/lib/questions/practice'

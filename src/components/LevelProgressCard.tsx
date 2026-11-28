@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { AlertTriangle, Shield, Sparkles } from 'lucide-react'
+import { AlertTriangle, ProgressIcon, Shield } from '@/components/icons'
 import { profileLevelProgress } from '@/lib/profile'
 
 interface LevelProgressCardProps {
@@ -16,7 +16,7 @@ export default function LevelProgressCard({ totalXp, currentLevel, streakShields
     <article className="dh-panel dh-pad dh-level-card">
       <div className="dh-row dh-between">
         <div className="dh-row">
-          <span className="dh-icon"><Sparkles size={16} aria-hidden="true" /></span>
+          <span className="dh-icon"><ProgressIcon size={22} mode="color" aria-hidden="true" /></span>
           <h3 className="dh-title">Seu progresso</h3>
         </div>
         <span className="dh-caption tabular-nums">{totalXp} XP total</span>

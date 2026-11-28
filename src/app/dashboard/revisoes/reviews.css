@@ -106,7 +106,7 @@
 .rv-workspace:hover { border-color: var(--rv-accent); }
 .rv-workspace[data-pending="true"]:not(:hover) { border-color: color-mix(in srgb, var(--rv-accent) 42%, var(--rv-border)); }
 .rv-workspace > .rv-between { width: 100%; }
-.rv-workspace-art { border-radius: 12px; object-fit: cover; border: 1px solid var(--rv-border); }
+.rv-workspace-art { border-radius: 12px; object-fit: cover; }
 .rv-workspace-arrow { color: var(--rv-accent); }
 .rv-workspace h3 { margin: 12px 0 10px; font-size: 17px; font-weight: 650; }
 .rv-workspace p { color: var(--rv-muted); font-size: 13px; line-height: 1.5; margin: -4px 0 12px; }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { createUiRequire } from '../helpers/icon-imports.mjs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
-const nodeRequire = createRequire(import.meta.url)
+const nodeRequire = createUiRequire(import.meta.url)
 const loadedModules = new Map()
 
 function loadComponent(path) {

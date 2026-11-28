@@ -44,7 +44,7 @@ function notification(target: ScheduledTarget) {
 
   return JSON.stringify({
     title: hasDueCards ? '🔥 Hora de Estudo OmniMind!' : '✨ Suas revisões estão em dia!',
-    body, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', data: { url: url.href },
+    body, icon: '/icon-transparent-192.png?v=2', badge: '/notification-badge.png?v=2', data: { url: url.href },
     actions: hasDueCards ? [
       { action: 'review-now', title: '✅ Revisar agora' },
       { action: 'snooze-1h', title: '⏰ Lembrar em 1h' },

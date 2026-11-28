@@ -4,7 +4,7 @@ import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight, BookOpen, Bot, Check, ChevronRight, Download, LockKeyhole, Monitor, Moon, Sparkles, Sun, Trash2, Trophy, Volume2, X,
-} from 'lucide-react'
+} from '@/components/icons'
 import { useSettings } from '@/contexts/SettingsContext'
 import { exportUserData, deleteAllUserData } from '@/actions/settings'
 import ReviewAlarm from '@/components/ReviewAlarm'

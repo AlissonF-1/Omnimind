@@ -47,8 +47,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
       body: payload.body,
-      icon: '/icon-192x192.png',
-      badge: '/notification-badge.png',
+      icon: '/icon-transparent-192.png?v=2',
+      badge: '/notification-badge.png?v=2',
       vibrate: [100, 50, 100],
       data: {
         url: payload.url || '/dashboard/revisoes'
@@ -74,8 +74,8 @@ self.addEventListener('notificationclick', (event) => {
         setTimeout(() => {
           self.registration.showNotification('🔥 Hora de Estudo OmniMind!', {
             body: 'Lembrete: Vamos voltar aos seus estudos acumulados?',
-            icon: '/icon-192x192.png',
-            badge: '/notification-badge.png',
+            icon: '/icon-transparent-192.png?v=2',
+            badge: '/notification-badge.png?v=2',
             sound: '/notification_sound.mp3',
             data: { url: '/dashboard/revisoes' },
             actions: [

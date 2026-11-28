@@ -19,7 +19,7 @@ import {
   Type,
   HelpCircle,
   Loader2,
-} from 'lucide-react'
+} from '@/components/icons'
 
 interface SketchpadProps {
   noteId: string

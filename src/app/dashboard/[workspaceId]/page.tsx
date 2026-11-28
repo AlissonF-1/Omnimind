@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Archive, CalendarDays, FilePlus, FileText, Folder, Layers, Search, Sparkles, Trophy } from 'lucide-react'
+import { Archive, CalendarDays, FilePlus, FileText, Folder, Layers, Search, Sparkles, Trophy } from '@/components/icons'
 import { createNote, getNotes } from '@/actions/notes'
 import { getWorkspaceById } from '@/actions/workspaces'
 import { getWorkspaceFlashcardCounts } from '@/actions/stats'

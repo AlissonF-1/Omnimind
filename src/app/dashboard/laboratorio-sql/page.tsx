@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowUpRight, Database, Braces } from 'lucide-react'
+import { ArrowUpRight, Database, Braces } from '@/components/icons'
 import { createClient } from '@/utils/supabase/server'
 import { sqlLabChallenges, sqlLabHref } from '@/lib/sql-lab/catalog'
 import { learningHref } from '@/lib/learning/progress'

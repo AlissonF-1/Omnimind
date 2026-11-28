@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react'
+import { ArrowRight, Loader2, Eye, EyeOff } from '@/components/icons'
 import ThemeToggle from '@/components/ThemeToggle'
 
 export default function LoginPage() {
@@ -80,19 +81,13 @@ export default function LoginPage() {
       <div className="mx-auto grid min-h-[calc(100vh-64px)] w-full max-w-6xl gap-10 lg:grid-cols-[0.9fr_1fr]">
         <section className="hidden flex-col justify-between rounded-lg border border-border bg-surface p-8 shadow-[var(--shadow-soft)] lg:flex">
           
-          {/* --- ÍCONE SUBSTITUÍDO AQUI (Desktop) --- */}
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="flex items-center gap-3">
-              <img 
-                src="/logo.png" 
-                alt="OmniMind Logo" 
-                className="size-9 rounded-lg object-contain shrink-0" 
-              />
+              <Image src="/logo.png?v=2" alt="" width={36} height={36} className="size-9 shrink-0 object-contain" unoptimized />
               <span className="text-lg font-semibold">OmniMind</span>
             </Link>
             <ThemeToggle compact />
           </div>
-          {/* --- FIM DA SUBSTITUIÇÃO --- */}
 
           <div>
             <p className="mb-3 text-sm font-medium text-primary">Estudo com sistema</p>
@@ -123,19 +118,13 @@ export default function LoginPage() {
         <section className="flex items-center justify-center">
           <div className="w-full max-w-md">
             
-            {/* --- ÍCONE SUBSTITUÍDO AQUI (Mobile/Header) --- */}
             <div className="mb-10 flex items-center justify-between gap-3 lg:hidden">
               <Link href="/" className="flex items-center gap-3">
-                <img 
-                  src="/logo.png" 
-                  alt="OmniMind Logo" 
-                  className="size-9 rounded-lg object-contain shrink-0" 
-                />
+                <Image src="/logo.png?v=2" alt="" width={36} height={36} className="size-9 shrink-0 object-contain" unoptimized />
                 <span className="text-lg font-semibold">OmniMind</span>
               </Link>
               <ThemeToggle compact />
             </div>
-            {/* --- FIM DA SUBSTITUIÇÃO --- */}
 
             <div className="mb-8">
               <h2 className="page-title">{isSignUp ? 'Criar conta' : 'Entrar'}</h2>

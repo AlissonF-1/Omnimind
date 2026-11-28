@@ -5,7 +5,7 @@ import {
   Edit3, Trash2, PlusCircle, Save, X, Search, 
   ChevronLeft, AlertTriangle, Eye, EyeOff, 
   Flame, CheckCircle2, ArrowUpDown, AlertCircle
-} from 'lucide-react'
+} from '@/components/icons'
 import { createFlashcard, updateFlashcard, deleteFlashcard } from '@/actions/flashcards'
 
 interface Card {

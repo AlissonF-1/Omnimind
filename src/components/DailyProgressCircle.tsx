@@ -1,7 +1,7 @@
 'use client'
 
 import { useSyncExternalStore } from 'react'
-import { Award, CheckCircle2, Target } from 'lucide-react'
+import { Award, CheckCircle2, Target } from '@/components/icons'
 import Link from 'next/link'
 
 interface DailyProgressCircleProps {

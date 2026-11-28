@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useState } from 'react'
-import { FileText, ChevronDown } from 'lucide-react'
+import { FileText, ChevronDown } from '@/components/icons'
 import PdfImporter from './PdfImporter'
 
 interface CollapsiblePdfImporterProps {

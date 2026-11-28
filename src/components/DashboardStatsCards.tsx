@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { Clock3, TrendingDown, TrendingUp } from 'lucide-react'
+import { Clock3, TrendingDown, TrendingUp } from '@/components/icons'
 
 interface DashboardStatsCardsProps {
   totalCards: number

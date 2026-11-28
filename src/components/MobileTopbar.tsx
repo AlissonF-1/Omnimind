@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Bell, Ellipsis, Home, Layers, ListChecks, Menu, RefreshCw, Search, Sparkles, ChevronRight } from 'lucide-react'
+import { Bell, ChevronRight, Ellipsis, Home, LearningPathIcon, LevelsIcon, Menu, QuestionsIcon, ReviewsIcon, Search } from '@/components/icons'
 import { isDashboardRoute } from '@/lib/dashboard-navigation'
 import { profileLevelProgress } from '@/lib/profile'
 import { assistantPath } from '@/lib/assistant/contracts'
@@ -35,7 +35,7 @@ export function DesktopTopbar({ currentLevel, totalXp, overdueCards }: { current
       <div className="os-topbar-controls">
         <ReviewNotifications overdueCards={overdueCards} />
         <Link href="/dashboard/perfil" className="os-level">
-          <Sparkles size={21} aria-hidden="true" />
+          <LevelsIcon size={21} aria-hidden="true" />
           <span><strong>Nível {currentLevel}</strong><small>{progress.value} / {progress.target} XP</small></span>
           <ChevronRight size={15} aria-hidden="true" />
         </Link>
@@ -50,7 +50,7 @@ export default function MobileTopbar({ overdueCards, onMenuOpen, menuOpen }: { o
       <button type="button" className="os-mobile-menu" onClick={onMenuOpen} aria-label="Abrir menu" aria-expanded={menuOpen} aria-controls="dashboard-sidebar">
         <Menu size={22} aria-hidden="true" />
       </button>
-      <Link href="/dashboard" className="os-mobile-brand"><Image src="/logo.png" alt="" width={29} height={29} loading="eager" />OmniMind</Link>
+      <Link href="/dashboard" className="os-mobile-brand"><Image src="/logo.png?v=2" alt="" width={29} height={29} loading="eager" unoptimized />OmniMind</Link>
       <ReviewNotifications overdueCards={overdueCards} />
     </header>
   )
@@ -65,14 +65,14 @@ export function MobileDock({ onMenuOpen, menuOpen }: { onMenuOpen: () => void; m
       <Link href="/dashboard" aria-current={current('/dashboard')}><Home size={19} aria-hidden="true" />Início</Link>
       {/* Trilhas e Questões exigem navegação de documento para respeitar o cache offline. */}
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-      <a href="/dashboard/trilhas" aria-current={current('/dashboard/trilhas')}><Layers size={19} aria-hidden="true" />Trilhas</a>
+      <a href="/dashboard/trilhas" aria-current={current('/dashboard/trilhas')}><LearningPathIcon size={19} aria-hidden="true" />Trilhas</a>
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-      <a href="/dashboard/questoes" aria-current={current('/dashboard/questoes')}><ListChecks size={19} aria-hidden="true" />Questões</a>
+      <a href="/dashboard/questoes" aria-current={current('/dashboard/questoes')}><QuestionsIcon size={19} aria-hidden="true" />Questões</a>
       <button type="button" className="os-dock-assistant" onClick={openDashboardAssistant} aria-current={current(assistantPath)} aria-label="Abrir Assistente">
         <Image src="/images/dashboard/assistant.webp" alt="" width={37} height={37} loading="eager" />
         <span>Assistente</span>
       </button>
-      <Link href="/dashboard/revisoes" aria-current={current('/dashboard/revisoes')}><RefreshCw size={19} aria-hidden="true" />Revisão</Link>
+      <Link href="/dashboard/revisoes" aria-current={current('/dashboard/revisoes')}><ReviewsIcon size={19} aria-hidden="true" />Revisão</Link>
       <button type="button" onClick={onMenuOpen} aria-expanded={menuOpen} aria-controls="dashboard-sidebar"><Ellipsis size={20} aria-hidden="true" />Mais</button>
     </nav>
   )

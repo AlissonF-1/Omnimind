@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Blocks, MessagesSquare } from 'lucide-react'
+import { Blocks, MessagesSquare } from '@/components/icons'
 import { assistantProviderIds, assistantProviders, isAssistantProvider, parseGenerationMetadata, type AssistantProvider } from '@/lib/assistant/providers'
 import { sendStudyRequest } from '@/lib/assistant/study-client'
 import {

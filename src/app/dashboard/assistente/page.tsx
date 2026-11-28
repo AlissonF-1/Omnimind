@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import ChatPanel from '@/components/ChatPanel'
 import { learningTutorFromSearch } from '@/lib/assistant/learning-tutor'
+import { getAcademyMentor } from '@/lib/academy/server'
 import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -15,5 +16,7 @@ export default async function AssistantPage({ searchParams }: { searchParams: Pr
     .overrideTypes<{ id: string; name: string }[], { merge: false }>()
   const search = await searchParams
   const learning = learningTutorFromSearch({ get: (key) => typeof search[key] === 'string' ? search[key] : null })
-  return <div className="oa-page"><ChatPanel key={user.id} accountId={user.id} workspaces={workspaces ?? []} learning={learning ?? undefined} /></div>
+  const academy = learning ? undefined : await getAcademyMentor(db, search.academyRelease, search.academyLesson)
+  return <div className="oa-page"><ChatPanel key={user.id} accountId={user.id} workspaces={workspaces ?? []}
+    learning={learning ?? undefined} academy={academy} /></div>
 }

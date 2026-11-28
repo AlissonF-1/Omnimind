@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Mic, Square, Loader2, Sparkles, AlertCircle, ArrowLeft, RefreshCw, BookOpen, Check, Copy, FileText, Trash2, Award } from 'lucide-react'
+import { Mic, Square, Loader2, Sparkles, AlertCircle, ArrowLeft, RefreshCw, BookOpen, Check, Copy, FileText, Trash2, Award } from '@/components/icons'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSettings } from '@/contexts/SettingsContext'

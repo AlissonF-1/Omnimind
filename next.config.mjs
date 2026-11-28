@@ -8,6 +8,7 @@ const withPWA = withPWAInit({
   cacheStartUrl: false,
   dynamicStartUrl: false,
   cacheOnFrontEndNav: false,
+  publicExcludes: ['!noprecache/**/*', '!academy/**/*'],
   extendDefaultRuntimeCaching: true,
   workboxOptions: {
     runtimeCaching: [{

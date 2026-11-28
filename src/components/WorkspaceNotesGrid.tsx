@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   GripVertical,
   Loader2
-} from 'lucide-react'
+} from '@/components/icons'
 import { updateNoteTitle, updateNoteTopic, deleteNote } from '@/actions/notes'
 import {
   DndContext,

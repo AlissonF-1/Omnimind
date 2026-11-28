@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { createUiRequire } from '../helpers/icon-imports.mjs'
 import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -8,7 +8,7 @@ import ts from 'typescript'
 import * as progress from '../../src/lib/learning/progress.ts'
 import * as lab from '../../src/lib/sql-lab/catalog.ts'
 
-const nodeRequire = createRequire(import.meta.url)
+const nodeRequire = createUiRequire(import.meta.url)
 const link = ({ children, prefetch, ...props }) => {
   assert.equal(prefetch, false)
   return createElement('a', props, children)

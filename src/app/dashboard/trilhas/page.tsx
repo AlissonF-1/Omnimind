@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { FlaskConical, Layers, Network, Sparkles } from 'lucide-react'
+import { ConnectionsIcon, FeynmanIcon, Layers, Sparkles } from '@/components/icons'
 import { LearningPathCard } from '@/components/learning/LearningPresentation'
 import { assistantPath } from '@/lib/assistant/contracts'
 import { getLearningCatalog, LearningSchemaUnavailableError } from '@/lib/learning/server'
@@ -15,8 +15,8 @@ function LearningTools() {
       <Link href={assistantPath} prefetch={false} className="lp-button"><Sparkles size={16} aria-hidden="true" /> Assistente completo</Link>
       <Link href={assistantPath + '?treino=1'} prefetch={false} className="lp-button">Treino interativo</Link>
       <Link href={sqlLabPath} prefetch={false} className="lp-button">Laboratório SQL</Link>
-      <Link href="/dashboard/feynman" prefetch={false} className="lp-button"><FlaskConical size={16} aria-hidden="true" /> Feynman Sandbox</Link>
-      <Link href="/dashboard/grafo" prefetch={false} className="lp-button"><Network size={16} aria-hidden="true" /> Rede de Conexões</Link>
+      <Link href="/dashboard/feynman" prefetch={false} className="lp-button"><FeynmanIcon size={16} /> Feynman Sandbox</Link>
+      <Link href="/dashboard/grafo" prefetch={false} className="lp-button"><ConnectionsIcon size={16} /> Rede de Conexões</Link>
     </nav>
   )
 }

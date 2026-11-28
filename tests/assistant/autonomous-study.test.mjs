@@ -4,7 +4,6 @@ import test from 'node:test'
 import * as react from 'react'
 import * as jsx from 'react/jsx-runtime'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { Blocks, MessagesSquare } from 'lucide-react'
 import ts from 'typescript'
 import * as training from '../../src/lib/assistant/training.ts'
 import * as catalog from '../../src/lib/sql-lab/catalog.ts'
@@ -192,7 +191,7 @@ test('pista não transmite código do navegador e é bloqueada durante avaliaç�
 
 test('treino e laboratório mostram controles e estados iniciais com rótulos acessíveis', () => {
   const modules = {
-    react, 'react/jsx-runtime': jsx, 'lucide-react': { Blocks, MessagesSquare },
+    react, 'react/jsx-runtime': jsx, '@/components/icons': { Blocks: 'svg', MessagesSquare: 'svg' },
     '@/lib/assistant/study-client': {}, '@/lib/assistant/providers': providers, '@/lib/assistant/training': training,
     '@/lib/sql-lab/catalog': catalog, '@/contexts/SettingsContext': { useSettings: () => ({ settings: { ai_default_model: 'groq' } }) },
   }

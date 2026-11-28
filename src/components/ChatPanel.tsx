@@ -3,9 +3,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CalendarDays, ChevronDown, History, Layers, MessageSquare, Mic, Send, Settings, Square, X } from 'lucide-react'
+import { CalendarDays, ChevronDown, History, Layers, MessageSquare, Mic, Send, Settings, Square, X } from '@/components/icons'
 import { confirmAssistantExamAction } from '@/actions/chat'
 import { useSettings } from '@/contexts/SettingsContext'
+import type { AcademyMentor } from '@/lib/academy/contracts'
 import { assistantHistoryKey, assistantPath, isAssistantPersona, parseAssistantHistory, type AssistantPersona } from '@/lib/assistant/contracts'
 import {
   assistantDisplayText, assistantMessageId, assistantTitle, emptyAssistantHistory, limitAssistantMessages,
@@ -38,6 +39,7 @@ type ChatPanelProps = {
   initialWorkspaceId?: string
   learning?: LearningTutorContext
   initialLearningLabel?: LearningTutorLabel
+  academy?: AcademyMentor
   onClose?: () => void
 }
 
@@ -63,7 +65,7 @@ function disposeSpeech(recognition: Recognition | null) {
   recognition.abort()
 }
 
-function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceChange, firstName, onClose, learning, initialLearningLabel }: {
+function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceChange, firstName, onClose, learning, initialLearningLabel, academy }: {
   accountId: string
   workspaceId: string
   workspaces: Workspace[]
@@ -72,17 +74,18 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
   onClose?: () => void
   learning?: LearningTutorContext
   initialLearningLabel?: LearningTutorLabel
+  academy?: AcademyMentor
 }) {
   const { settings } = useSettings()
   const pathname = usePathname()
   const search = useSearchParams()
-  const storageKey = assistantHistoryKey(accountId, workspaceId) + (learning ? ':' + learningTutorHistoryScope(learning) : '')
+  const storageKey = assistantHistoryKey(accountId, workspaceId) + (learning ? ':' + learningTutorHistoryScope(learning) : academy ? ':academy:' + academy.key : '')
   const [state, setState] = useState(() => {
     try { return readAssistantHistory(window.sessionStorage, storageKey) }
     catch { return emptyAssistantHistory() }
   })
   const [defaultPersona, setDefaultPersona] = useState<AssistantPersona>('tutor')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(academy?.question ?? '')
   const [floatingTrainingOpen, setFloatingTrainingOpen] = useState(false)
   const trainingOpen = !learning && (pathname === assistantPath ? search.get('treino') === '1' : floatingTrainingOpen)
   const [pendingId, setPendingId] = useState<string | null>(null)
@@ -114,7 +117,7 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
   const configuredProvider = isAssistantProvider(settings.ai_default_model) ? settings.ai_default_model : 'gemini'
   const provider = providerOverride ?? configuredProvider
   const includeContext = contextChoice?.provider === provider ? contextChoice.allowed
-    : !learning && provider === 'gemini' && !messages.some(({ generation }) => generation && generation.provider !== provider)
+    : !learning && !academy && provider === 'gemini' && !messages.some(({ generation }) => generation && generation.provider !== provider)
   const retryForConversation = retry?.conversationId === assistantConversation?.id ? retry : null
   const label = state.learningLabel ?? initialLearningLabel
   const completedHints = Math.max(0, ...messages.map((message) => message.learningHint ?? 0))
@@ -500,6 +503,10 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
               {provider === 'openrouter' && ' O OpenRouter encaminha a solicitação à hospedagem do modelo.'}
             </p>
           </div>
+          {academy && <div className="oa-learning"><div className="oa-learning-heading">
+            <div><p>OmniMind Academy</p><strong>{academy.title}</strong></div>
+            <Link className="oa-button" prefetch={false} href={academy.href}>Voltar à aula</Link>
+          </div></div>}
           {learning && <div className="oa-learning">
             <div className="oa-learning-heading">
               <div><p>{learningTutorModes[learning.mode]}</p><strong>{label ? label.pathTitle + ' · ' + label.stepTitle : 'Atividade da trilha'}</strong></div>
@@ -589,7 +596,7 @@ function AssistantWorkspace({ accountId, workspaceId, workspaces, onWorkspaceCha
   )
 }
 
-export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, onClose, learning, initialLearningLabel }: ChatPanelProps) {
+export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, onClose, learning, initialLearningLabel, academy }: ChatPanelProps) {
   const { identity, checked, availability } = useAssistantIdentity(accountId)
   const search = useSearchParams()
   const [workspaceChoice, setWorkspaceChoice] = useState<string>()
@@ -613,7 +620,7 @@ export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, o
         : <Link href={learningPath} className="oa-button" prefetch={false}>Voltar às trilhas</Link>}
     </div>
   )
-  const scope = learning ? learningTutorHistoryScope(learning) : ''
+  const scope = learning ? learningTutorHistoryScope(learning) : academy ? 'academy:' + academy.key : ''
   function changeWorkspace(value: string) {
     if (learning) {
       const search = writeLearningTutorSearch(new URLSearchParams(window.location.search), learning, value)
@@ -624,5 +631,5 @@ export default function ChatPanel({ accountId, workspaces, initialWorkspaceId, o
   }
   return <AssistantWorkspace key={assistantHistoryKey(identity.id, workspaceId) + ':' + scope} accountId={identity.id}
     firstName={identity.firstName} workspaceId={workspaceId} workspaces={workspaces} onWorkspaceChange={changeWorkspace}
-    onClose={onClose} learning={learning} initialLearningLabel={initialLearningLabel} />
+    onClose={onClose} learning={learning} initialLearningLabel={initialLearningLabel} academy={academy} />
 }

@@ -116,7 +116,7 @@
 .lp-mission-heading { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 12px; padding: 9px 11px; }
 .lp-mission-heading h3 { margin-top: 3px; font-size: 17px; }
 .lp-mission-heading .lp-kicker { color: var(--mission-accent); }
-.lp-mission-art { position: relative; height: 54px; overflow: hidden; border-radius: 9px; border: 1px solid var(--lp-border); }
+.lp-mission-art { position: relative; height: 54px; overflow: hidden; border-radius: 9px; }
 .lp-mission-art img { object-fit: cover; }
 .lp-mission-steps { margin-inline: 11px; padding: 0 0 6px; }
 .lp-mission-steps li {

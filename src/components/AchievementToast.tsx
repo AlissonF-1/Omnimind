@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Trophy } from 'lucide-react'
+import { Trophy } from '@/components/icons'
 import { playTrophySound } from '@/utils/audio'
 import { useSettings } from '@/contexts/SettingsContext'
 

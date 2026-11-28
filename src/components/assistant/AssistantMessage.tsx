@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import Link from 'next/link'
-import { BookOpen, Check, Copy, LoaderCircle, Sparkles, User, Volume2 } from 'lucide-react'
+import { BookOpen, Check, Copy, LoaderCircle, Sparkles, User, Volume2 } from '@/components/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { assistantSourceHref } from '@/lib/assistant/contracts'

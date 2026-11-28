@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { createUiRequire } from '../helpers/icon-imports.mjs'
 import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
 
-const require = createRequire(import.meta.url)
+const require = createUiRequire(import.meta.url)
 const URLRoot = '../../'
 function load(path, mocks = {}) {
   const source = readFileSync(new URL(URLRoot + path, import.meta.url), 'utf8')

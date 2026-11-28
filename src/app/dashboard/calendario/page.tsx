@@ -1,4 +1,4 @@
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays } from '@/components/icons'
 import { getCalendarData, getExamGoals } from '@/actions/calendar'
 import { getWorkspaces } from '@/actions/workspaces'
 import StudyCalendar from '@/components/StudyCalendar'

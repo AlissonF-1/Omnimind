@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+.omni-icon[data-icon-mode="color"] {
+  --omni-start: var(--omni-light-start);
+  --omni-end: var(--omni-light-end);
+  --omni-accent: var(--omni-light-accent);
+}
+
+.dark .omni-icon[data-icon-mode="color"] {
+  --omni-start: var(--omni-dark-start);
+  --omni-end: var(--omni-dark-end);
+  --omni-accent: var(--omni-dark-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omni-icon.animate-spin { animation: none; }
+}
+
 :root {
   color-scheme: light;
   --background: #f1f3f6; /* Cinza-azulado leve e anti-reflexo */

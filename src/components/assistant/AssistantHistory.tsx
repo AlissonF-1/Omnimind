@@ -1,4 +1,4 @@
-import { MessageSquare, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { MessageSquare, Pencil, Plus, Trash2, X } from '@/components/icons'
 import type { AssistantConversation } from '@/lib/assistant/history'
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })

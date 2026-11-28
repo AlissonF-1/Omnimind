@@ -4,7 +4,7 @@ import CollapsiblePdfImporter from '@/components/CollapsiblePdfImporter'
 import EditableNoteTitle from '@/components/EditableNoteTitle'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, CalendarDays, FileText, Layers, Play } from 'lucide-react'
+import { ArrowLeft, CalendarDays, FileText, Layers, Play } from '@/components/icons'
 import { Suspense } from 'react'
 import './note.css'
 

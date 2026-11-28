@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { createUiRequire } from '../helpers/icon-imports.mjs'
 import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
 import * as noteImages from '../../src/lib/note-image.ts'
 
-const requireModule = createRequire(import.meta.url)
+const requireModule = createUiRequire(import.meta.url)
 const noop = () => undefined
 const load = (path, stubs = {}) => {
   const source = readFileSync(new URL('../../' + path, import.meta.url), 'utf8')

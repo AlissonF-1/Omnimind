@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   AlertTriangle, ArrowUpRight, CheckCircle2, ChevronDown, Clock, FileText, Folder, Layers,
   Loader2, RefreshCw, Search, SearchX,
-} from 'lucide-react'
+} from '@/components/icons'
 import { semanticSearch } from '@/actions/search'
 import { backfillEmbeddings } from '@/actions/embeddings'
 import { SOURCE_TYPE_LABELS, type SemanticSearchResult } from '@/types/search'

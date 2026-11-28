@@ -48,7 +48,7 @@ import {
   Redo2,
   PenTool,
   Sigma,
-} from 'lucide-react'
+} from '@/components/icons'
 
 interface Note {
   id: string

@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useState } from 'react'
-import { AlertTriangle, CalendarDays, CheckCircle2, Flame, LoaderCircle, Play } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle2, Flame, LoaderCircle, Play } from '@/components/icons'
 import { toggleSprintMode } from '@/actions/workspaces'
 
 interface SprintControlProps {

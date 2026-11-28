@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   ArrowDown, ArrowRight, Award, Brain, Calendar, Check, Flame, FolderHeart, GraduationCap,
   Lock, Moon, Sparkles, Sun, Swords, Target, Trophy, Volume2,
-} from 'lucide-react'
+} from '@/components/icons'
 import type { Collection, CollectionItem } from '@/app/dashboard/conquistas/collection'
 import { playTrophySound } from '@/utils/audio'
 
@@ -104,7 +104,7 @@ export default function AchievementsPanel({ collection, workspaceId }: { collect
     <>
       <header className="ag-hero">
         <div className="ag-hero-copy">
-          <span className="ag-hero-mark"><Trophy size={21} aria-hidden="true" /></span>
+          <span className="ag-hero-mark"><Trophy size={26} mode="color" aria-hidden="true" /></span>
           <h1>Minhas conquistas</h1>
           <p>Cada revisão, nota e desafio deixa sua marca.</p>
           <div className="ag-hero-progress">
@@ -118,7 +118,7 @@ export default function AchievementsPanel({ collection, workspaceId }: { collect
           <div className="ag-pedestal" aria-hidden="true">
             {trophy?.imageUrl
               ? <Image src={trophy.imageUrl} alt="" fill sizes="(max-width: 640px) 190px, 240px" preload />
-              : <Trophy className="ag-silhouette" size={82} strokeWidth={1.1} />}
+              : <Trophy className="ag-silhouette" size={82} mode="color" strokeWidth={1.1} />}
           </div>
           <div className="ag-showcase-copy">
             <p className="ag-kicker">{trophy ? 'Diamante · Desbloqueado' : 'Desafio secreto'}</p>

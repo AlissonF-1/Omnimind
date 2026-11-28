@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowUpRight, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { ArrowUpRight, ShieldAlert, ShieldCheck } from '@/components/icons'
 
 interface WorkspaceHealth {
   id: string

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { updateNoteTitle } from '@/actions/notes'
-import { Edit3 } from 'lucide-react'
+import { Edit3 } from '@/components/icons'
 
 interface EditableNoteTitleProps {
   noteId: string

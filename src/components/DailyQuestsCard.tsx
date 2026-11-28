@@ -1,4 +1,4 @@
-import { CheckCircle2, Flame, ListChecks, MessageSquare, NotebookPen } from 'lucide-react'
+import { CheckCircle2, MissionsIcon, NotesIcon, ReviewsIcon, TutorIcon } from '@/components/icons'
 
 interface Quest {
   id: string
@@ -10,9 +10,9 @@ interface Quest {
 }
 
 const questLabels = {
-  guerreiro: { label: 'Revisar cards', icon: Flame },
-  escritor: { label: 'Registrar uma nota', icon: NotebookPen },
-  curioso: { label: 'Perguntar ao tutor', icon: MessageSquare },
+  guerreiro: { label: 'Revisar cards', icon: ReviewsIcon },
+  escritor: { label: 'Registrar uma nota', icon: NotesIcon },
+  curioso: { label: 'Perguntar ao tutor', icon: TutorIcon },
 }
 
 export default function DailyQuestsCard({ quests }: { quests: Quest[] }) {
@@ -22,7 +22,7 @@ export default function DailyQuestsCard({ quests }: { quests: Quest[] }) {
     <article className="dh-panel dh-pad dh-missions">
       <div className="dh-row dh-between">
         <h3 className="dh-title">Missões de hoje</h3>
-        <ListChecks size={18} className="dh-accent" aria-hidden="true" />
+        <MissionsIcon size={25} mode="color" aria-hidden="true" />
       </div>
       {uniqueQuests.length === 0 ? (
         <p className="dh-caption mt-2">Nenhuma missão disponível hoje.</p>
@@ -30,7 +30,7 @@ export default function DailyQuestsCard({ quests }: { quests: Quest[] }) {
         <ul className="mt-3 list-none p-0">
           {uniqueQuests.map((quest) => {
             const info = Object.hasOwn(questLabels, quest.quest_id) ? questLabels[quest.quest_id as keyof typeof questLabels] : undefined
-            const Icon = info?.icon ?? ListChecks
+            const Icon = info?.icon ?? MissionsIcon
             const label = info?.label ?? quest.quest_id
             return (
               <li className="dh-quest" key={quest.id}>

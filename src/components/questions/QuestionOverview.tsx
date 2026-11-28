@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BookOpen, History } from 'lucide-react'
+import { BookOpen, History } from '@/components/icons'
 import { percentage } from '@/lib/questions/performance'
 import type { QuestionStats } from '@/lib/questions/server'
 

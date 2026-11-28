@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useSyncExternalStore } from 'react'
-import { AlertTriangle, ArrowRight, Flame } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Flame } from '@/components/icons'
 import Link from 'next/link'
 
 interface DashboardRelearningAlertProps {

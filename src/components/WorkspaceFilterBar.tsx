@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, X, Loader2 } from 'lucide-react'
+import { Search, X, Loader2 } from '@/components/icons'
 
 interface WorkspaceFilterBarProps {
   initialSearch?: string

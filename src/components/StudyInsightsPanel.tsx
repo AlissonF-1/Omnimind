@@ -1,4 +1,4 @@
-import { Moon, Sparkles, Sun, Sunrise } from 'lucide-react'
+import { Moon, Sparkles, Sun, Sunrise } from '@/components/icons'
 
 type HourlyLog = {
   hourly_reviews?: number[] | null

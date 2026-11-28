@@ -1,4 +1,4 @@
-import { Activity, ChartNoAxesColumnIncreasing } from 'lucide-react'
+import { Activity, AnalyticsIcon } from '@/components/icons'
 import { percentage, type summarizeRecentAttempts } from '@/lib/questions/performance'
 import type { Competency } from '@/lib/questions/server'
 
@@ -32,7 +32,7 @@ export default function QuestionPerformance({ data, topics }: { data: QuestionPe
       <section className="q-panel q-pad" aria-labelledby="q-performance">
         <div className="q-row q-between">
           <h2 id="q-performance" className="q-section-title">Por competência</h2>
-          <ChartNoAxesColumnIncreasing size={21} className="q-muted" aria-hidden="true" />
+          <AnalyticsIcon size={21} className="q-muted" />
         </div>
         <p className="q-subtitle">Acertos e erros nos últimos 14 dias.</p>
         <ul className="q-chart-list">
