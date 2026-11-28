@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Moon, Sun, Monitor } from 'lucide-react'
+import { Moon, Sun, Monitor } from '@/components/icons'
 import { useSettings } from '@/contexts/SettingsContext'
 
 type Theme = 'light' | 'dark' | 'system'

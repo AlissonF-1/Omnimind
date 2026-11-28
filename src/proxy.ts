@@ -13,8 +13,8 @@ export const config = {
      * - _next/image (otimização de imagens)
      * - favicon.ico
      * - Arquivos PWA: sw.js, workbox-*.js, manifest.json
-     * - Arquivos de imagem comuns
+     * - Arquivos de imagem comuns e recursos públicos do laboratório Academy
      */
-    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|sw\\.js\\.map|workbox-.*\\.js|workbox-.*\\.js\\.map|swe-worker-.*\\.js|manifest\\.json|icon-.*\\.png|logo\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|sw\\.js\\.map|workbox-.*\\.js|workbox-.*\\.js\\.map|swe-worker-.*\\.js|manifest\\.json|icon-.*\\.png|logo\\.png|academy/(?:python-frame\\.html|python-worker\\.js|runtime/[^/]+\\.(?:js|txt)|media/[^/]+\\.(?:mp3|ogg|wav))$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

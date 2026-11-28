@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, CircleCheck, CircleX, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CircleCheck, CircleX, Loader2 } from '@/components/icons'
 import ReactMarkdown from 'react-markdown'
 import { submitQuestionAnswer } from '@/actions/questions'
 import { answerSubmission } from '@/lib/questions/practice'
 import type { QuestionActionError, QuestionActionResult, QuestionAnswerInput, QuestionAttemptFeedback } from '@/lib/questions/contracts'
 import type { PracticeOption, PracticeQuestion } from '@/lib/questions/server'
+import { LearningTutorButton, type LearningTutorScope } from '@/components/learning/LearningTutorActions'
 import SqlCode from './SqlCode'
 
 const answerMessages: Record<QuestionActionError, string> = {
@@ -18,7 +19,7 @@ const answerMessages: Record<QuestionActionError, string> = {
   UNAVAILABLE: 'Não foi possível confirmar sua resposta. Tente novamente com a mesma alternativa.',
 }
 
-export function QuestionFeedback({ feedback }: { feedback: QuestionAttemptFeedback }) {
+export function QuestionFeedback({ feedback, learningTutor }: { feedback: QuestionAttemptFeedback; learningTutor?: LearningTutorScope }) {
   const statusRef = useRef<HTMLDivElement>(null)
   const StatusIcon = feedback.isCorrect ? CircleCheck : CircleX
   const correctFirst = [...feedback.options].sort((a, b) =>
@@ -33,6 +34,9 @@ export function QuestionFeedback({ feedback }: { feedback: QuestionAttemptFeedba
         <StatusIcon size={27} className="shrink-0" aria-hidden="true" />
         <span className="q-result-label">{feedback.isCorrect ? 'Resposta correta!' : 'Resposta incorreta'}</span>
       </div>
+      {learningTutor && !feedback.isCorrect && feedback.attemptId && (
+        <LearningTutorButton scope={learningTutor} mode="explain-error" attemptId={feedback.attemptId} />
+      )}
       <h2 id="answer-explanations" className="q-section-title">Entenda as alternativas</h2>
       <ul className="q-explanations">
         {correctFirst.map((option) => {
@@ -55,7 +59,7 @@ export function QuestionFeedback({ feedback }: { feedback: QuestionAttemptFeedba
 
 export default function QuestionPractice({
   question, options, topic, position, total, nextHref, backHref, finishHref,
-  submitAnswerAction = submitQuestionAnswer, backLabel, finishLabel = 'Ver histórico',
+  submitAnswerAction = submitQuestionAnswer, backLabel, finishLabel = 'Ver histórico', learningTutor,
 }: {
   question: PracticeQuestion
   options: PracticeOption[]
@@ -68,6 +72,7 @@ export default function QuestionPractice({
   submitAnswerAction?: (input: QuestionAnswerInput) => Promise<QuestionActionResult>
   backLabel?: string
   finishLabel?: string
+  learningTutor?: LearningTutorScope
 }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -164,7 +169,7 @@ export default function QuestionPractice({
 
           {feedback && (
             <>
-              <QuestionFeedback feedback={feedback} />
+              <QuestionFeedback feedback={feedback} learningTutor={learningTutor} />
               <div className="q-answer-footer !mt-0">
                 <Link href={nextHref ?? finishHref} prefetch={false} className="q-button q-button-primary">
                   {nextHref ? 'Próxima questão' : finishLabel}<ArrowRight size={16} aria-hidden="true" />

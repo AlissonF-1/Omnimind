@@ -25,7 +25,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
           name: 'Ovo Adormecido',
           label: 'Ovo de Pedra (Streak 0)',
           image: '/images/golem_stage1.png',
-          glowClass: 'shadow-[0_0_15px_rgba(156,163,175,0.2)] border-zinc-700/40',
+          glowClass: 'shadow-[0_0_15px_rgba(156,163,175,0.2)]',
           badgeClass: 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50'
         };
       case 'initiate':
@@ -33,7 +33,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
           name: 'Golem de Sílex',
           label: 'Golem Iniciante (Streak 1+)',
           image: '/images/golem_stage2.png',
-          glowClass: 'shadow-[0_0_20px_rgba(59,130,246,0.3)] border-blue-500/40',
+          glowClass: 'shadow-[0_0_20px_rgba(59,130,246,0.3)]',
           badgeClass: 'bg-blue-950/80 text-blue-300 border-blue-500/40'
         };
       case 'warrior':
@@ -41,7 +41,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
           name: 'Golem de Obsidiana',
           label: 'Golem de Néon (Streak 4+)',
           image: '/images/golem_stage3.png',
-          glowClass: 'shadow-[0_0_25px_rgba(168,85,247,0.4)] border-purple-500/40',
+          glowClass: 'shadow-[0_0_25px_rgba(168,85,247,0.4)]',
           badgeClass: 'bg-purple-950/80 text-purple-300 border-purple-500/40'
         };
       case 'champion':
@@ -49,7 +49,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
           name: 'Golem Dourado',
           label: 'Golem Celestial (Streak 10+)',
           image: '/images/golem_stage4.png',
-          glowClass: 'shadow-[0_0_30px_rgba(245,158,11,0.6)] border-amber-500/50 ring-2 ring-amber-500/30',
+          glowClass: 'shadow-[0_0_30px_rgba(245,158,11,0.6)]',
           badgeClass: 'bg-amber-950/90 text-amber-300 border-amber-500/50'
         };
       case 'magma':
@@ -57,7 +57,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
           name: 'Golem de Magma',
           label: 'Golem Lendário (Streak 30+)',
           image: '/images/golem_stage5.png',
-          glowClass: 'shadow-[0_0_35px_rgba(239,68,68,0.8)] border-red-500/60 ring-2 ring-red-500/40 animate-pulse',
+          glowClass: 'shadow-[0_0_35px_rgba(239,68,68,0.8)] animate-pulse',
           badgeClass: 'bg-red-950/90 text-red-300 border-red-500/60 font-black'
         };
     }
@@ -96,7 +96,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
   return (
     <div className="relative flex flex-col items-center justify-center group select-none">
       {/* Contêiner da Imagem 3D com Efeito de Brilho */}
-      <div className={`relative size-14 sm:size-16 rounded-2xl overflow-hidden border p-0.5 transition-all duration-500 bg-surface/80 backdrop-blur-sm ${config.glowClass}
+      <div className={`relative size-14 sm:size-16 rounded-xl transition-all duration-500 ${config.glowClass}
         ${isUpgrading ? 'animate-bounce scale-125 brightness-125' : 'hover:scale-105'}
         ${isMasteryGlowActive ? 'animate-pulse scale-110 brightness-125 drop-shadow-[0_0_25px_rgba(245,158,11,0.85)]' : ''}
       `}>
@@ -109,6 +109,7 @@ export default function StudyCompanion({ streak }: StudyCompanionProps) {
             src={config.image}
             alt={config.name}
             fill
+            sizes="(min-width: 640px) 64px, 56px"
             className="object-cover transition-transform duration-500 group-hover:scale-110"
             priority
           />

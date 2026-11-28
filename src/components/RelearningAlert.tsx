@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, AlertTriangle, X, Clock } from 'lucide-react'
+import { BookOpen, AlertTriangle, X, Clock } from '@/components/icons'
 import Link from 'next/link'
 import { useState, useEffect, useRef, useCallback } from 'react'
 

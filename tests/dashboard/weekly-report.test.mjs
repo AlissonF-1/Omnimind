@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import ts from 'typescript'
+import * as contracts from '../../src/lib/assistant/providers.ts'
 
 const account = '00000000-0000-4000-8000-000000000001'
 const generatedReport = 'Você consolidou um dos seus cartões.\n\nRevise os conceitos em que teve lapsos.'
@@ -23,13 +24,16 @@ function load(path, modules = {}, globals = {}) {
 function fixture(savedReport = null) {
   const calls = []
   const writes = []
-  const providers = load('src/lib/ai-fallback.ts', {}, {
+  const generation = load('src/lib/assistant/generation.ts', {
+    'server-only': {}, '@google/genai': {}, './providers': contracts,
+  }, {
     process: { env: { GROQ_API_KEY: 'fixture' } },
     fetch: async (url, request) => {
       calls.push({ url, body: JSON.parse(request.body) })
       return Response.json({ choices: [{ message: { content: generatedReport } }] })
     },
   })
+  const providers = load('src/lib/ai-fallback.ts', { 'server-only': {}, './assistant/generation': generation })
   const query = {
     select() { return this },
     eq() { return this },
@@ -74,8 +78,9 @@ test('relatório salvo é reutilizado antes de chamar a Groq', async () => {
   assert.equal(writes.length, 0)
 })
 
-test('seleção do relatório fica restrita à chamada que fornece o modelo', async () => {
+test('tarefas do serviço compartilhado usam modelos Groq compatíveis com cada perfil', async () => {
   const { callAIWithFallback, calls } = fixture()
   await callAIWithFallback('Sistema', 'Mensagem')
-  assert.equal(calls[0].body.model, 'llama-3.1-8b-instant')
+  await callAIWithFallback('Sistema', 'Mensagem', 'critical')
+  assert.deepEqual(calls.map(({ body }) => body.model), ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'])
 })

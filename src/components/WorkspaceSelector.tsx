@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowUpRight, Check, FolderOpen, Layers3, Timer } from 'lucide-react'
+import { ArrowUpRight, Check, FolderOpen, Layers3, Timer } from '@/components/icons'
 import { createClient } from '@/utils/supabase/server'
 
 type WorkspaceJoin = { workspace_id: string | null }

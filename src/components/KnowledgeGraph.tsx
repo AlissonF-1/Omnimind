@@ -15,7 +15,7 @@ import {
   Network, Loader2, ZoomIn, ZoomOut, Maximize2, 
   BookOpen, MessageSquare, RefreshCw, X, ArrowRight, ListChecks,
   HelpCircle
-} from 'lucide-react'
+} from '@/components/icons'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 

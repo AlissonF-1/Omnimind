@@ -23,6 +23,8 @@ type ReviewSubmission = {
   submission_url: string | null
   submitted_at: string
 }
+type PracticeAttemptLink = { version_id: string }
+export type LearningPracticeMistake = { attemptId: string; position: number }
 
 export class LearningSchemaUnavailableError extends Error {}
 
@@ -81,8 +83,8 @@ export async function getLearningDetail({ db, userId }: LearningSession, slug: s
   return { path, steps: steps.data ?? [], enrollment: enrollment.data, progress: progress?.data ?? [], canReview: reviewer.data === true }
 }
 
-export async function getLearningPractice(session: LearningSession, enrollment: string, stepId: string) {
-  const { db } = session
+export async function getLearningPractice(session: LearningSession, enrollment: string, stepId: string, withMistakes = false) {
+  const { db, userId } = session
   const [rounds, questions] = await Promise.all([
     db.from('learning_step_rounds').select('round,finished_at,correct,total,passed')
       .eq('enrollment_id', enrollment).eq('step_id', stepId).order('round', { ascending: false })
@@ -95,17 +97,37 @@ export async function getLearningPractice(session: LearningSession, enrollment: 
   const round = rounds.data?.[0]
   if (!round || !questions.data?.length) return null
   const total = questions.data.length
-  if (round.finished_at) return { round, rounds: rounds.data ?? [], total, question: null, nextId: null, position: total }
+  const mistakes: LearningPracticeMistake[] = []
+  let links: PracticeAttemptLink[] | null = null
+  if (withMistakes) {
+    const result = await db.from('learning_step_attempts').select('version_id,attempt_id,attempt:quest_attempts(is_correct)')
+      .eq('enrollment_id', enrollment).eq('step_id', stepId).eq('round', round.round).eq('attempt.user_id', userId)
+      .overrideTypes<(PracticeAttemptLink & { attempt_id: string; attempt: { is_correct: boolean } | null })[], { merge: false }>()
+    if (!result.error) {
+      links = result.data ?? []
+      const incorrect = new Map((result.data ?? []).filter(({ attempt }) => attempt?.is_correct === false)
+        .map(({ version_id, attempt_id }) => [version_id, attempt_id]))
+      for (const { version_id, position } of questions.data) {
+        const attemptId = incorrect.get(version_id)
+        if (attemptId) mistakes.push({ position, attemptId })
+      }
+    }
+  }
+  const practice = { round, rounds: rounds.data ?? [], total, mistakes }
+  if (round.finished_at) return { ...practice, question: null, nextId: null, position: total }
 
-  const attempts = await db.from('learning_step_attempts').select('version_id')
-    .eq('enrollment_id', enrollment).eq('step_id', stepId).eq('round', round.round)
-    .overrideTypes<{ version_id: string }[], { merge: false }>()
-  checkError(attempts.error)
-  const pending = remainingQuestions(questions.data, attempts.data ?? [])
+  if (!links) {
+    const attempts = await db.from('learning_step_attempts').select('version_id')
+      .eq('enrollment_id', enrollment).eq('step_id', stepId).eq('round', round.round)
+      .overrideTypes<PracticeAttemptLink[], { merge: false }>()
+    checkError(attempts.error)
+    links = attempts.data ?? []
+  }
+  const pending = remainingQuestions(questions.data, links)
   const [current, next] = pending
   if (!current) return null
   const question = await getPracticeQuestion(session, current.version_id)
-  return { round, rounds: rounds.data ?? [], total, question, nextId: next?.version_id ?? null, position: total - pending.length + 1 }
+  return { ...practice, question, nextId: next?.version_id ?? null, position: total - pending.length + 1 }
 }
 
 export async function getLearningReviewQueue({ db }: LearningSession, stepId: string) {

@@ -1,9 +1,9 @@
 import Image from 'next/image'
-import { ArrowUpRight, BookOpen, Check, CircleHelp, FileText, Flame, GraduationCap, Layers, Smile } from 'lucide-react'
+import { ArrowUpRight, BookOpen, Check, CircleHelp, FileText, Flame, Layers, Smile, TutorIcon } from '@/components/icons'
 import type { AssistantPersona } from '@/lib/assistant/contracts'
 
 export const assistantPersonas = [
-  { id: 'tutor', title: 'Tutor Socrático', description: 'Guia seu raciocínio com analogias e perguntas.', icon: GraduationCap },
+  { id: 'tutor', title: 'Tutor Socrático', description: 'Guia seu raciocínio com analogias e perguntas.', icon: TutorIcon },
   { id: 'grill', title: 'Examinador', description: 'Desafia seu conhecimento com perguntas e feedback.', icon: Flame },
   { id: 'eli5', title: 'Simplificado', description: 'Explica conceitos com exemplos fáceis de lembrar.', icon: Smile },
 ] as const

@@ -116,7 +116,7 @@
 .lp-mission-heading { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 12px; padding: 9px 11px; }
 .lp-mission-heading h3 { margin-top: 3px; font-size: 17px; }
 .lp-mission-heading .lp-kicker { color: var(--mission-accent); }
-.lp-mission-art { position: relative; height: 54px; overflow: hidden; border-radius: 9px; border: 1px solid var(--lp-border); }
+.lp-mission-art { position: relative; height: 54px; overflow: hidden; border-radius: 9px; }
 .lp-mission-art img { object-fit: cover; }
 .lp-mission-steps { margin-inline: 11px; padding: 0 0 6px; }
 .lp-mission-steps li {
@@ -128,6 +128,21 @@
 .lp-step-name { font-weight: 590; overflow-wrap: anywhere; }
 .lp-activity { display: grid; gap: 16px; min-width: 0; }
 .lp-activity-frame { min-width: 0; }
+.lp-tutor, .lp-tool-links {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px;
+  border: 1px solid var(--lp-border); border-radius: 12px; background: #211a31;
+}
+.lp-tutor { margin-bottom: 12px; }
+.lp-activity > .lp-tutor { margin-bottom: 0; }
+.lp-tutor strong, .lp-tool-links h2 { color: var(--lp-purple); font-size: 13px; }
+.lp-tutor-button, .lp-tool-links .lp-button { min-height: 38px; }
+.lp-tutor-button svg, .lp-tool-links svg { color: var(--lp-purple); }
+.lp-activity-assistant-notice { margin-bottom: 12px; }
+.lp-mistakes { display: grid; gap: 10px; margin-top: 12px; }
+.lp-mistakes li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px;
+  padding-block: 6px; border-top: 1px solid var(--lp-border); color: var(--lp-muted); font-size: 13px;
+}
 .lp-activity-heading, .lp-outcome-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .lp-activity-heading { justify-content: space-between; }
 .lp-activity h1 { font-size: clamp(23px, 4vw, 40px); margin-top: 4px; }
@@ -200,6 +215,7 @@
   .lp-mission-steps .lp-step-link, .lp-mission-steps .lp-form { grid-column: 1 / -1; }
   .lp-mission-heading { grid-template-columns: 63px minmax(0, 1fr); gap: 8px; }
   .lp-mission-art { height: 44px; }
+  .lp-tutor strong, .lp-tool-links h2 { flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-module *, .lp-module *::before, .lp-module *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }

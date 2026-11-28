@@ -1,238 +1,100 @@
-import { createClient } from '@/utils/supabase/server'
+import { createHash, timingSafeEqual } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
-import { getUserStreak } from '@/actions/achievements'
-import { getDynamicDailyGoal } from '@/actions/calendar'
+import { parsePushSubscription } from '@/lib/push/subscription'
 
-async function getMostUrgentWorkspaceId(supabase: any, userId: string): Promise<string | null> {
-  const { data: workspaces } = await supabase
-    .from('workspaces')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('is_archived', false)
-    .limit(1)
-  return workspaces && workspaces.length > 0 ? workspaces[0].id : null
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+type ScheduledTarget = {
+  subscription: unknown
+  due_count: number
+  workspace_id: string | null
+  streak: number
+  daily_goal: number
 }
 
-export const dynamic = 'force-dynamic'; 
-export const runtime = 'nodejs';
-
-// Configura o web-push com as chaves VAPID
-const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
-const privateKey = process.env.VAPID_PRIVATE_KEY || ''
-
-if (publicKey && privateKey) {
-  webpush.setVapidDetails(
-    'mailto:suporte@omnimind.com',
-    publicKey,
-    privateKey
-  )
+function authorized(request: Request, secret: string) {
+  const candidate = request.headers.get('authorization')
+  if (!candidate?.startsWith('Bearer ')) return false
+  const digest = (value: string) => createHash('sha256').update(value).digest()
+  return timingSafeEqual(digest(candidate.slice(7)), digest(secret))
 }
 
-// ⚠️ FLAG DE TESTE: Ignora a contagem de cards e envia uma notificação de teste para TODOS os usuários registrados
-const SKIP_DUE_CHECK = false; // Mude para false quando quiser voltar ao normal
+function notification(target: ScheduledTarget) {
+  const hasDueCards = target.due_count > 0
+  const path = hasDueCards ? '/dashboard/revisoes' : '/dashboard'
+  const url = new URL(path, process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app')
+  if (hasDueCards && target.workspace_id) url.searchParams.set('workspaceId', target.workspace_id)
 
-async function getUserDueCardsCount(supabase: any, userId: string): Promise<number> {
-  // ... (seu código original de contagem permanece idêntico) ...
-  const { data: workspaces } = await supabase
-    .from('workspaces')
-    .select('id, is_sprint_mode, sprint_date')
-    .eq('user_id', userId)
-    .eq('is_archived', false)
+  let body: string
+  if (!hasDueCards) {
+    body = target.streak > 0
+      ? 'Você está em dia há ' + target.streak + ' dia(s). Que tal criar uma nova nota?'
+      : 'Suas revisões estão em dia. Que tal explorar suas notas?'
+  } else if (target.streak >= 3 && target.daily_goal > target.due_count) {
+    body = 'Você está com ' + target.streak + ' dias de sequência! Faltam ' +
+      (target.daily_goal - target.due_count) + ' cards para a meta do dia.'
+  } else {
+    body = target.due_count === 1 ? 'Você tem 1 card pendente para revisar.' :
+      'Você tem ' + target.due_count + ' cards pendentes para revisar.'
+  }
 
-  if (!workspaces || workspaces.length === 0) return 0
-
-  const activeWorkspaceIds = workspaces.map((ws: any) => ws.id)
-  const now = new Date()
-  const sprintWsIds = workspaces
-    .filter((ws: any) => ws.is_sprint_mode && ws.sprint_date && new Date(ws.sprint_date) >= now)
-    .map((ws: any) => ws.id)
-
-  const { data: cards, error } = await supabase
-    .from('flashcards')
-    .select('id, due, state, notes!inner(workspace_id)')
-    .eq('notes.user_id', userId)
-    .in('notes.workspace_id', activeWorkspaceIds)
-
-  if (error || !cards) return 0
-
-  const nowTime = now.getTime()
-  const dueCount = cards.filter((card: any) => {
-    const cardWorkspaceId = card.notes?.workspace_id
-    if (!cardWorkspaceId) return false
-    const isNew = !card.due || card.state === 0 || card.state === null
-    const isDue = card.due ? new Date(card.due).getTime() <= nowTime : false
-    const isSprint = sprintWsIds.includes(cardWorkspaceId)
-    return isNew || isDue || isSprint
-  }).length
-
-  return dueCount
+  return JSON.stringify({
+    title: hasDueCards ? '🔥 Hora de Estudo OmniMind!' : '✨ Suas revisões estão em dia!',
+    body, icon: '/icon-transparent-192.png?v=2', badge: '/notification-badge.png?v=2', data: { url: url.href },
+    actions: hasDueCards ? [
+      { action: 'review-now', title: '✅ Revisar agora' },
+      { action: 'snooze-1h', title: '⏰ Lembrar em 1h' },
+    ] : [{ action: 'open-app', title: '🚀 Abrir OmniMind' }],
+  })
 }
 
-async function getUserDoNotDisturb(supabase: any, userId: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('user_preferences')
-    .select('do_not_disturb')
-    .eq('user_id', userId)
-    .maybeSingle()
-  return data?.do_not_disturb === true
+function result(body: object, status = 200) {
+  return NextResponse.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
 }
 
-async function handleSend(req: Request) {
+async function handleSend(request: Request) {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || !authorized(request, cronSecret)) return result({ error: 'Não autorizado.' }, 401)
+
+  const token = process.env.PUSH_DB_TOKEN
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const privateKey = process.env.VAPID_PRIVATE_KEY
+  if (!token || !/^[0-9a-f]{64}$/.test(token) || !url || !anonKey || !publicKey || !privateKey) {
+    return result({ error: 'Agendamento de Push indisponível.' }, 503)
+  }
+
   try {
-    // 1. Validação de segurança por token
-    const apiKeyHeader = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (cronSecret && apiKeyHeader !== cronSecret) {
-      return NextResponse.json({ error: 'Não autorizado. Token de segurança inválido.' }, { status: 401 })
-    }
-
-    const supabase = await createClient()
-
-    // 2. Busca todas as assinaturas de push registradas
-    const { data: subscriptions, error: subError } = await supabase
-      .from('push_subscriptions')
-      .select('*')
-
-    if (subError || !subscriptions || subscriptions.length === 0) {
-      return NextResponse.json({ success: true, message: 'Nenhuma assinatura registrada para notificar.' })
-    }
-
-    console.log(`[DEBUG] Encontradas ${subscriptions.length} assinaturas no banco.`);
+    const db = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+    const { data, error } = await db.rpc('get_scheduled_push_targets', { p_token: token })
+      .abortSignal(AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]))
+    if (error || !Array.isArray(data)) return result({ error: 'Agendamento de Push indisponível.' }, 503)
 
     let notifiedCount = 0
     let errorCount = 0
-    let skippedDndCount = 0
-
-    // Envia notificações agrupadas por usuário
-    for (const subItem of subscriptions) {
-      const userId = subItem.user_id
-      // 🛡️ AQUI ESTÁ A CORREÇÃO: Garante que o objeto subscription seja um objeto JS válido
-      let subscriptionData = subItem.subscription;
-      if (typeof subscriptionData === 'string') {
-        try {
-          subscriptionData = JSON.parse(subscriptionData);
-        } catch (e) {
-          console.error(`[ERRO] Falha ao parsear JSON da assinatura do usuário ${userId}. Ignorando.`);
-          errorCount++;
-          continue;
-        }
-      }
-
-      // 3. Verifica Modo Não Perturbe
-      const doNotDisturb = await getUserDoNotDisturb(supabase, userId)
-      if (doNotDisturb) {
-        skippedDndCount++
-        continue
-      }
-
-      // 4. Calcula o total de cards pendentes (ou ignora se estiver no modo de teste)
-      let dueCount = 0;
-      if (SKIP_DUE_CHECK) {
-        dueCount = 1; // Força a entrada no bloco de envio
-        console.log(`[DEBUG] Modo de teste ativado. Enviando notificação de teste para ${userId}`);
-      } else {
-        dueCount = await getUserDueCardsCount(supabase, userId);
-      }
-
-      // 1. Pega dados de gamificação
-      const streak = await getUserStreak(userId)
-      const dailyGoal = await getDynamicDailyGoal(userId)
-
-      let title = ''
-      let bodyMessage = ''
-      let targetUrl = ''
-      let actions = []
-
-      if (dueCount > 0 || SKIP_DUE_CHECK) {
-        // 🚨 PRIORIDADE 1: Cards pendentes para revisar
-        const estimatedMinutes = Math.max(2, Math.round(dueCount * 0.5))
-        title = SKIP_DUE_CHECK ? '🧠 TESTE DE NOTIFICAÇÃO' : '🔥 Hora de Estudo OmniMind!'
-
-        if (SKIP_DUE_CHECK) {
-          bodyMessage = 'Esta é uma notificação de teste. Sua assinatura está funcionando!'
-        } else if (streak >= 3 && dailyGoal) {
-          const remaining = Math.max(0, dailyGoal.goal - dueCount)
-          bodyMessage = `🔥 Você está com ${streak} dias de streak! Faltam ${remaining} cards para cumprir a meta do dia.`
-        } else if (dueCount > 5) {
-          bodyMessage = `📚 Você tem ${dueCount} cards acumulados. Revisar agora leva cerca de ${estimatedMinutes} minutos.`
-        } else {
-          bodyMessage = `Você tem ${dueCount} card${dueCount > 1 ? 's' : ''} pendente${dueCount > 1 ? 's' : ''} para revisar. Vamos manter a mente afiada?`
-        }
-
-        const topWorkspaceId = await getMostUrgentWorkspaceId(supabase, userId)
-        targetUrl = topWorkspaceId
-          ? `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes?workspaceId=${topWorkspaceId}`
-          : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard/revisoes`
-
-        actions = [
-          { action: 'review-now', title: '✅ Revisar agora' },
-          { action: 'snooze-1h', title: '⏰ Lembrar em 1h' }
-        ]
-      } else {
-        // ✨ PRIORIDADE 2: Lembrete diário / Check-in quando todas as revisões já estão em dia
-        title = '✨ Suas revisões estão em dia!'
-
-        if (streak >= 1) {
-          bodyMessage = `🔥 Incrível! Suas revisões estão completas e seu streak é de ${streak} dia${streak > 1 ? 's' : ''}! Que tal criar uma nova nota hoje?`
-        } else {
-          bodyMessage = '🧠 Seu segundo cérebro está em dia! Que tal registrar um novo conceito ou explorar suas notas no OmniMind?'
-        }
-
-        targetUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://omnimind-tau.vercel.app'}/dashboard`
-        actions = [
-          { action: 'open-app', title: '🚀 Abrir OmniMind' }
-        ]
-      }
-
-      // 4. Monta o Payload com Botões de Ação
-      const payload = JSON.stringify({
-        title,
-        body: bodyMessage,
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
-        data: { url: targetUrl },
-        actions
-      })
-
-      try {
-        console.log(`[DEBUG] Tentando enviar para: ${subscriptionData.endpoint}`)
-        await webpush.sendNotification(subscriptionData, payload)
-        notifiedCount++
-        console.log(`[DEBUG] Notificação enviada com sucesso para ${userId}`)
-      } catch (pushErr: any) {
-        console.error(`[ERRO] Falha ao enviar push para usuário ${userId}:`, {
-          statusCode: pushErr.statusCode,
-          message: pushErr.message,
-          endpoint: subscriptionData.endpoint || 'N/A'
-        })
-        // Se a assinatura expirou, remove do banco
-        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
-          console.log(`[DEBUG] Removendo assinatura expirada: ${subItem.id}`)
-          await supabase
-            .from('push_subscriptions')
-            .delete()
-            .eq('id', subItem.id)
-        }
-        errorCount++
+    webpush.setVapidDetails('mailto:suporte@omnimind.com', publicKey, privateKey)
+    const targets = data as ScheduledTarget[]
+    for (let offset = 0; offset < targets.length; offset += 5) {
+      const batch = await Promise.allSettled(targets.slice(offset, offset + 5).map(async (target) => {
+        const subscription = parsePushSubscription(target.subscription)
+        if (!subscription) throw new Error('Invalid subscription')
+        await webpush.sendNotification(subscription, notification(target), { timeout: 7000 })
+      }))
+      for (const entry of batch) {
+        if (entry.status === 'fulfilled') notifiedCount++
+        else errorCount++
       }
     }
-
-    console.log(`[RESUMO] Enviadas: ${notifiedCount}, Erros: ${errorCount}, DND ignorados: ${skippedDndCount}`);
-
-    return NextResponse.json({
-      success: true,
-      notifiedCount,
-      errorCount,
-      skippedDndCount
-    })
-
-  } catch (error: any) {
-    console.error('Erro na rota api/push/send:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return result({ success: errorCount === 0, notifiedCount, errorCount })
+  } catch {
+    return result({ error: 'Agendamento de Push indisponível.' }, 503)
   }
 }
 
-export async function POST(req: Request) { return handleSend(req) }
-export async function GET(req: Request) { return handleSend(req) }
+export async function POST(request: Request) { return handleSend(request) }
+export async function GET(request: Request) { return handleSend(request) }

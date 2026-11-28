@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { WifiOff, BrainCircuit, ArrowRight } from 'lucide-react'
+import { WifiOff, BrainCircuit, ArrowRight } from '@/components/icons'
 
 interface OfflineFallbackProps {
   title?: string

@@ -1,7 +1,7 @@
 import FlashcardsManager from '@/components/FlashcardsManager'
 import { getFlashcardsByNote } from '@/actions/flashcards'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/components/icons'
 
 export const dynamic = 'force-dynamic'
 

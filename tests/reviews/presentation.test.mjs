@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { createUiRequire } from '../helpers/icon-imports.mjs'
 import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
 
-const require = createRequire(import.meta.url)
+const require = createUiRequire(import.meta.url)
 const render = (component, props) => renderToStaticMarkup(createElement(component, props))
 
 function load(name, fixtures = {}) {
@@ -25,7 +25,7 @@ function load(name, fixtures = {}) {
     if (moduleName === 'next/link') return function LinkFixture(props) {
       return createElement('a', props)
     }
-    if (moduleName.startsWith('@/') || moduleName === './RelearningAlert') return {}
+    if ((moduleName.startsWith('@/') && moduleName !== '@/components/icons') || moduleName === './RelearningAlert') return {}
     return require(moduleName)
   }
   const state = { exports: {} }

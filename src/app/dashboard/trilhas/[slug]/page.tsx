@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, ClipboardCheck, Target } from 'lucide-react'
+import { ArrowLeft, ClipboardCheck, Target } from '@/components/icons'
 import { LearningActivity, LearningReview } from '@/components/learning/LearningActivity'
 import { LearningHero, LearningMap, learningKindLabel } from '@/components/learning/LearningPresentation'
 import { isLearningSlug, learningHref, learningPath, nextLearningStep } from '@/lib/learning/progress'

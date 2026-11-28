@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Braces, Database, Filter, GitMerge, Hash, History, Layers3, ListFilter, Terminal } from 'lucide-react'
+import { ArrowRight, Braces, Database, Filter, GitMerge, Hash, History, Layers3, ListFilter, Terminal } from '@/components/icons'
 import { historyHref, practiceHref } from '@/lib/questions/practice'
 import type { Competency, QuestionStats } from '@/lib/questions/server'
 import { QuestionEmptyState, QuestionStatsCards } from './QuestionOverview'

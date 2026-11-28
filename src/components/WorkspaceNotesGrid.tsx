@@ -8,12 +8,14 @@ import {
   Edit2,
   Trash2,
   FolderInput,
+  FileText,
+  FolderOpen,
   Check,
   X,
   AlertTriangle,
   GripVertical,
   Loader2
-} from 'lucide-react'
+} from '@/components/icons'
 import { updateNoteTitle, updateNoteTopic, deleteNote } from '@/actions/notes'
 import {
   DndContext,
@@ -25,7 +27,10 @@ import {
   useDraggable,
   useDroppable,
   closestCorners,
-  DragEndEvent
+  type DragEndEvent,
+  type DragStartEvent,
+  type DraggableAttributes,
+  type DraggableSyntheticListeners,
 } from '@dnd-kit/core'
 
 interface Note {
@@ -43,8 +48,8 @@ interface WorkspaceNotesGridProps {
 
 // Contexto para passar as propriedades de arrasto para o botão de Grip
 const DragHandleContext = createContext<{
-  attributes: any
-  listeners: any
+  attributes: DraggableAttributes
+  listeners: DraggableSyntheticListeners
 } | null>(null)
 
 // Componente do botão de arrasto dedicado (Drag Handle)
@@ -206,7 +211,7 @@ const NoteCardItem = memo(function NoteCardItem({
   return (
     <DraggableCard note={note}>
       <div
-        className={`relative group panel hover:border-primary/50 transition-all flex flex-col justify-between min-h-[140px] h-full bg-surface shadow-sm rounded-xl p-4 ${
+        className={`wp-note-card relative group panel transition-colors flex flex-col justify-between min-h-[140px] h-full shadow-sm rounded-xl p-4 ${
           isDragging ? 'border-primary' : ''
         }`}
       >
@@ -277,6 +282,7 @@ const NoteCardItem = memo(function NoteCardItem({
             <div className="flex items-start gap-1 w-full pr-7">
               {/* Alça de Arraste Dedicada */}
               <DragHandle />
+              <FileText className="wp-note-marker size-4" aria-hidden="true" />
 
               {/* Título Acessível com Link Direto */}
               <Link
@@ -347,7 +353,7 @@ const NoteCardItem = memo(function NoteCardItem({
               <span>{new Date(note.updated_at).toLocaleDateString('pt-BR')}</span>
               <Link
                 href={`/dashboard/${workspaceId}/note/${note.id}`}
-                className="text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
+                className="wp-note-link font-medium hover:underline"
               >
                 Abrir →
               </Link>
@@ -414,9 +420,11 @@ export default function WorkspaceNotesGrid({ initialNotes, flashcardCounts, work
   const [activeDragNote, setActiveDragNote] = useState<Note | null>(null)
 
   // Manter estado sincronizado se as propriedades iniciais mudarem (ex: novo filtro)
-  useEffect(() => {
+  const [lastInitialNotes, setLastInitialNotes] = useState(initialNotes)
+  if (lastInitialNotes !== initialNotes) {
+    setLastInitialNotes(initialNotes)
     setNotes(initialNotes)
-  }, [initialNotes])
+  }
 
   // Sensores DnD com sensibilidade apurada para o DragHandle
   const sensors = useSensors(
@@ -473,7 +481,7 @@ export default function WorkspaceNotesGrid({ initialNotes, flashcardCounts, work
     }
   }, [])
 
-  const handleDragStart = (event: any) => {
+  const handleDragStart = (event: DragStartEvent) => {
     const note = notes.find((n) => n.id === String(event.active.id))
     if (note) setActiveDragNote(note)
   }
@@ -511,7 +519,8 @@ export default function WorkspaceNotesGrid({ initialNotes, flashcardCounts, work
       <div className="space-y-10">
         {Object.entries(groupedNotes).map(([topic, topicNotes]) => (
           <DroppableTopic key={topic} topic={topic}>
-            <div className="flex items-center gap-3 mb-4 border-b border-border pb-2">
+            <div className="wp-note-topic flex items-center gap-3 mb-4 border-b pb-2">
+              <FolderOpen className="size-5 shrink-0 text-primary" aria-hidden="true" />
               <h2 className="text-xl font-bold text-text-strong">{topic}</h2>
               <span className="text-xs font-medium text-text-muted bg-surface-muted px-2 py-1 rounded-full">
                 {topicNotes.length} {topicNotes.length === 1 ? 'nota' : 'notas'}
@@ -538,7 +547,7 @@ export default function WorkspaceNotesGrid({ initialNotes, flashcardCounts, work
 
       <DragOverlay>
         {activeDragNote ? (
-          <div className="panel p-4 min-h-[140px] border-primary shadow-2xl flex flex-col justify-between bg-surface cursor-grabbing rotate-3 opacity-90 rounded-xl">
+          <div className="wp-note-card panel p-4 min-h-[140px] shadow-2xl flex flex-col justify-between cursor-grabbing rotate-3 opacity-90 rounded-xl">
             <div>
               <h3 className="text-base font-semibold text-text-strong line-clamp-2 pr-6">{activeDragNote.title}</h3>
               <div className="flex items-center gap-3 mt-2 text-xs text-text-muted">

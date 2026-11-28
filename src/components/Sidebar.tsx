@@ -1,18 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Archive, ArrowRight, CalendarDays, ChevronDown, Ellipsis, FlaskConical, Folder, Home, Layers, ListChecks, LogOut, MessageSquare,
-  Network, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, Search, Settings, Trash2, Trophy, User, X, Zap,
-} from 'lucide-react'
+  AcademyIcon, AchievementsIcon, Archive, ArrowRight, ChevronDown, Ellipsis, ExperienceIcon, Folder, Home,
+  LearningPathIcon, LogOut, MemoryIcon, PanelLeftClose, PanelLeftOpen, Pencil, Plus, QuestionsIcon,
+  ReviewsIcon, Settings, StudyPlanIcon, Trash2, User, X,
+} from '@/components/icons'
 import { createWorkspace, updateWorkspace, deleteWorkspace, signOut, archiveWorkspace } from '@/actions/workspaces'
 import { SavedThemeToggle } from '@/components/ThemeToggle'
 import AvatarFace from '@/components/AvatarFace'
 import { isDashboardRoute, ULTIMATUM_HREF } from '@/lib/dashboard-navigation'
-import { assistantPath } from '@/lib/assistant/contracts'
+import { AcademyNavigation, AcademyNavigationFallback } from '@/components/academy/AcademyNavigation'
 
 interface Workspace {
   id: string
@@ -34,14 +35,12 @@ interface SidebarProps {
 
 const links = [
   { href: '/dashboard', icon: Home, label: 'Início' },
-  { href: '/dashboard/trilhas', icon: Layers, label: 'Trilhas', documentNavigation: true },
-  { href: assistantPath, icon: MessageSquare, label: 'Conversar com a IA', documentNavigation: true },
-  { href: '/dashboard/questoes', icon: ListChecks, label: 'Questões', documentNavigation: true },
-  { href: '/dashboard/revisoes', icon: RefreshCw, label: 'Revisão ativa' },
-  { href: '/dashboard/feynman', icon: FlaskConical, label: 'Feynman Sandbox' },
-  { href: '/dashboard/busca', icon: Search, label: 'Busca semântica' },
-  { href: '/dashboard/grafo', icon: Network, label: 'Rede de Conexões' },
-  { href: '/dashboard/conquistas', icon: Trophy, label: 'Minhas Conquistas' },
+  { href: '/dashboard/academy', icon: AcademyIcon, label: 'Academy', documentNavigation: true },
+  { href: '/dashboard/trilhas', icon: LearningPathIcon, label: 'Trilhas', documentNavigation: true },
+  { href: '/dashboard/questoes', icon: QuestionsIcon, label: 'Questões', documentNavigation: true },
+  { href: '/dashboard/revisoes', icon: ReviewsIcon, label: 'Revisão ativa' },
+  { href: '/dashboard/busca', icon: MemoryIcon, label: 'Busca semântica' },
+  { href: '/dashboard/conquistas', icon: AchievementsIcon, label: 'Minhas Conquistas' },
 ]
 
 export default function Sidebar({
@@ -62,6 +61,7 @@ export default function Sidebar({
   const activeWorkspaces = workspaces.filter((workspace) => !workspace.is_archived)
   const archivedWorkspaces = workspaces.filter((workspace) => workspace.is_archived)
   const current = (href: string) => isDashboardRoute(pathname, href) ? 'page' : undefined
+  const isAcademy = isDashboardRoute(pathname, '/dashboard/academy')
 
   useEffect(() => {
     if (drawerOpen) closeButton.current?.focus()
@@ -161,14 +161,22 @@ export default function Sidebar({
   }
 
   const editedWorkspace = editing && editing !== 'new' ? editing : null
+  const mainNavigation = <nav className="os-links" aria-label="Navegação principal">
+    {links.map(({ href, icon: Icon, label, documentNavigation }) => {
+      const NavigationLink = documentNavigation ? 'a' : Link
+      return <NavigationLink key={href} href={href} aria-current={current(href)} aria-label={label} title={collapsed ? label : undefined} onClick={() => onClose()}>
+        <Icon size={18} aria-hidden="true" /><span>{label}</span>
+      </NavigationLink>
+    })}
+  </nav>
 
   return (
     <>
       {drawerOpen && <div aria-hidden="true" className="os-scrim" onClick={() => onClose(true)} />}
-      <aside id="dashboard-sidebar" className="os-sidebar" data-open={drawerOpen} data-collapsed={collapsed} aria-label="Menu do OmniMind">
+      <aside id="dashboard-sidebar" className="os-sidebar" data-open={drawerOpen} data-collapsed={collapsed} data-academy={isAcademy} aria-label="Menu do OmniMind">
         <div className="os-brand-row">
           <Link href="/dashboard" className="os-brand" aria-label="OmniMind, início" onClick={() => onClose()}>
-            <Image src="/logo.png" alt="" width={36} height={36} /><span>OmniMind</span>
+            <Image src="/logo.png?v=2" alt="" width={36} height={36} unoptimized /><span>OmniMind{isAcademy && <small className="ac3-brand-label">Academy</small>}</span>
           </Link>
           <button ref={closeButton} type="button" className="os-icon-button os-drawer-close" aria-label="Fechar menu" onClick={() => onClose(true)}>
             <X size={22} aria-hidden="true" />
@@ -176,16 +184,10 @@ export default function Sidebar({
         </div>
 
         <div className="os-sidebar-scroll">
-          <nav className="os-links" aria-label="Navegação principal">
-            {links.map(({ href, icon: Icon, label, documentNavigation }) => {
-              const NavigationLink = documentNavigation ? 'a' : Link
-              return (
-                <NavigationLink key={href} href={href} aria-current={current(href)} aria-label={label} title={collapsed ? label : undefined} onClick={() => onClose()}>
-                  <Icon size={18} aria-hidden="true" /><span>{label}</span>
-                </NavigationLink>
-              )
-            })}
-          </nav>
+          {isAcademy && !collapsed ? <>
+            <Suspense fallback={<AcademyNavigationFallback />}><AcademyNavigation onNavigate={() => onClose()} /></Suspense>
+            <details className="ac3-rail-global"><summary>Menu OmniMind</summary>{mainNavigation}</details>
+          </> : mainNavigation}
 
           <section className="os-workspaces" aria-label="Workspaces">
             <div className="os-workspace-header">
@@ -215,7 +217,7 @@ export default function Sidebar({
           </section>
 
           <div className="os-ultimatum">
-            <div><Zap size={18} aria-hidden="true" /><strong>Modo Ultimato</strong></div>
+            <div><ExperienceIcon size={18} aria-hidden="true" /><strong>Modo Ultimato</strong></div>
             <p>Quiz com seus flashcards menos estáveis.</p>
             <Link href={ULTIMATUM_HREF} className="os-ultimatum-link" aria-label="Iniciar Modo Ultimato" title="Modo Ultimato" onClick={() => onClose()}>
               <span>Iniciar agora</span><ArrowRight size={16} aria-hidden="true" />
@@ -226,7 +228,7 @@ export default function Sidebar({
         <footer className="os-sidebar-footer">
           <div className="os-theme-control"><SavedThemeToggle /></div>
           <Link href="/dashboard/calendario" className="os-utility" aria-label="Calendário" title="Calendário" aria-current={current('/dashboard/calendario')} onClick={() => onClose()}>
-            <CalendarDays size={17} aria-hidden="true" /><span>Calendário</span>
+            <StudyPlanIcon size={17} aria-hidden="true" /><span>Calendário</span>
           </Link>
           <Link href="/dashboard/configuracoes" className="os-utility" aria-label="Configurações" title="Configurações" aria-current={current('/dashboard/configuracoes')} onClick={() => onClose()}>
             <Settings size={17} aria-hidden="true" /><span>Configurações</span>

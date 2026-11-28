@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Check, Layers, LockKeyhole, Play, Route, Send } from 'lucide-react'
+import { ArrowRight, Check, Layers, LockKeyhole, Play, Route, Send } from '@/components/icons'
 import { beginLearningStepAction, enrollLearningAction } from '@/actions/learning'
 import { learningHref, learningStepStatus, type LearningProgress } from '@/lib/learning/progress'
 import type { LearningPath, LearningStep } from '@/lib/learning/server'

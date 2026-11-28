@@ -51,7 +51,7 @@ export default async function DashboardLayout({
   const overdueCards = dashStats?.overdueCards || 0
 
   return (
-    <SettingsProvider initialSettings={settings}>
+    <SettingsProvider key={user?.id} initialSettings={settings}>
       <DashboardShell
         workspaces={workspaces}
         accountId={user?.id ?? null}

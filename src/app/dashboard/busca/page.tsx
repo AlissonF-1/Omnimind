@@ -1,55 +1,46 @@
-import SemanticSearch from '@/components/SemanticSearch'
-import { getWorkspaces } from '@/actions/workspaces'
 import { Suspense } from 'react'
-import { Search, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import { FolderPlus, Loader2, ScanSearch } from '@/components/icons'
+import { getWorkspaces } from '@/actions/workspaces'
+import SemanticSearch from '@/components/SemanticSearch'
+import './search.css'
 
 export const dynamic = 'force-dynamic'
 
-// Componente de fallback para carregamento
-function SearchFallback() {
+async function SearchContent() {
+  const workspaces = await getWorkspaces()
   return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <Loader2 className="size-8 animate-spin text-primary" />
-      <p className="mt-4 text-sm text-text-muted">Carregando workspaces...</p>
-    </div>
+    <>
+      <SemanticSearch workspaces={workspaces} />
+      {workspaces.length === 0 && (
+        <section className="ss-panel ss-empty">
+          <span className="ss-empty-icon"><FolderPlus size={24} aria-hidden="true" /></span>
+          <h2>Nenhum workspace disponível</h2>
+          <p>Crie um workspace no menu lateral para organizar o material que você quer encontrar aqui.</p>
+        </section>
+      )}
+    </>
   )
 }
 
-// Componente principal (Server Component)
-export default async function BuscaPage() {
-  const workspaces = await getWorkspaces()
-
+export default function BuscaPage() {
   return (
-    <div className="page-container px-4 sm:px-6 py-4 sm:py-6">
-      {/* Cabeçalho da página */}
-      <header className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Search className="size-5 text-primary" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-strong">
-            Busca Semântica
-          </h1>
+    <div className="ss-page">
+      <header className="ss-hero">
+        <div className="ss-hero-art" aria-hidden="true">
+          <Image src="/images/dashboard/brain.webp" alt="" fill sizes="(max-width: 640px) 40vw, 510px" />
         </div>
-        <p className="text-sm text-text-medium max-w-2xl">
-          Encontre conhecimento por significado — notas, flashcards, analogias e mnemônicos.
-        </p>
+        <div className="ss-hero-copy">
+          <span className="ss-hero-icon"><ScanSearch size={25} aria-hidden="true" /></span>
+          <div>
+            <h1>Busca semântica</h1>
+            <p>Encontre ideias nas suas notas, flashcards, analogias e mnemônicos pelo significado.</p>
+          </div>
+        </div>
       </header>
-
-      {/* Componente de busca com suspense para carregamento */}
-      <Suspense fallback={<SearchFallback />}>
-        <SemanticSearch workspaces={workspaces} />
+      <Suspense fallback={<div className="ss-panel ss-load" role="status"><Loader2 size={20} className="ss-spinner" aria-hidden="true" /> Carregando workspaces…</div>}>
+        <SearchContent />
       </Suspense>
-
-      {/* Mensagem caso não haja workspaces */}
-      {workspaces.length === 0 && (
-        <div className="mt-8 panel-muted py-12 text-center rounded-2xl">
-          <p className="text-sm font-medium text-text-strong">
-            Nenhum workspace disponível
-          </p>
-          <p className="mt-1 text-xs text-text-muted">
-            Crie um workspace para começar a usar a busca semântica.
-          </p>
-        </div>
-      )}
     </div>
   )
 }

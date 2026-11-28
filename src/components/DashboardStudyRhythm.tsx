@@ -1,4 +1,4 @@
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays } from '@/components/icons'
 import type { profileWeek } from '@/lib/profile'
 
 export default function DashboardStudyRhythm({ days }: { days: ReturnType<typeof profileWeek> }) {

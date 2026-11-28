@@ -1,0 +1,24 @@
+.ac-practice { display: grid; gap: 1rem; min-width: 0; }
+.ac-practice-session { max-width: 66rem; margin-inline: auto; }
+.ac-practice-session h1 { margin: .65rem 0 .35rem; }
+.ac-practice-columns { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.ac-practice-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: .65rem; margin-block: .9rem; }
+.ac-practice-metrics dd { margin: .15rem 0; font-size: clamp(1.15rem, 2vw, 1.75rem); font-weight: 700; }
+.ac-practice-metrics dt, .ac-practice-list small, .ac-practice small { font-size: .83rem; }
+.ac-practice-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.ac-practice-filters label, .ac-practice-start label { display: grid; gap: .4rem; font-weight: 600; font-size: .9rem; min-width: 0; }
+.ac-practice-filters select, .ac-practice-start select, .ac-practice-question .ac-fields textarea { width: 100%; min-width: 0; padding: .55rem; border-radius: .55rem; color: var(--ac-text); background: var(--ac-panel, #171426); border: 1px solid var(--ac-line, #504274); }
+.ac-practice-start { display: flex; gap: .6rem; flex-wrap: wrap; align-items: end; }
+.ac-practice-start:has(select) { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--ac-line, #504274); }
+.ac-practice-start:has(select) > small { flex-basis: 100%; }
+.ac-practice-list { margin: .6rem 0; padding: 0; list-style: none; display: grid; gap: .5rem; }
+.ac-practice-list li { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between; padding: .65rem .15rem; border-bottom: 1px solid var(--ac-line, #504274); min-width: 0; }
+.ac-practice-list li > div { flex: 1 1 9rem; overflow-wrap: anywhere; }
+.ac-practice-list strong, .ac-practice-list small { display: block; }
+.ac-practice-prerequisites { margin: .65rem 0; }
+.ac-practice-prompt { white-space: pre-line; }
+.ac-practice-question .ac-fields textarea { resize: vertical; font-family: ui-monospace, monospace; }
+.ac-practice .ac-choice span:last-child { white-space: pre-line; }
+.ac-practice-error { color: #fca5a5; display: flex; gap: .45rem; align-items: center; flex-basis: 100%; }
+@media (max-width: 960px) { .ac-practice-columns { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 420px) { .ac-practice-filters { grid-template-columns: minmax(0, 1fr); } }

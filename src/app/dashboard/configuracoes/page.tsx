@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal } from '@/components/icons'
 import SettingsTabs from '@/components/settings/SettingsTabs'
 import { createClient } from '@/utils/supabase/server'
 import './settings.css'
@@ -26,6 +26,11 @@ export default async function ConfiguracoesPage() {
         </div>
       </header>
       <SettingsTabs />
+      <footer className="mt-5 text-sm text-text-muted">
+        Ícones de interface por 480 Design.{' '}
+        <a className="underline" href="https://icon-sets.iconify.design/solar/">Solar Icons</a>{' · '}
+        <a className="underline" href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+      </footer>
     </div>
   )
 }

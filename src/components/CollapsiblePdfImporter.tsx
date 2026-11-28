@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { FileText, ChevronDown, ChevronUp } from 'lucide-react'
+import { useId, useState } from 'react'
+import { FileText, ChevronDown } from '@/components/icons'
 import PdfImporter from './PdfImporter'
 
 interface CollapsiblePdfImporterProps {
@@ -10,33 +10,28 @@ interface CollapsiblePdfImporterProps {
 
 export default function CollapsiblePdfImporter({ workspaceId }: CollapsiblePdfImporterProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const panelId = useId()
 
   return (
-    <section className="mb-4 rounded-xl border border-border bg-surface-muted/30 transition-colors hover:border-primary/30">
+    <section className="nt-pdf" aria-label="Importação de documento">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-3 sm:p-4 text-left outline-none focus:outline-none"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        className="nt-pdf-trigger"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <FileText className="size-4 text-primary shrink-0" />
-          <span className="text-xs font-bold uppercase tracking-wider text-text-strong">
-            Importar PDF
-          </span>
-          <span className="text-[10px] text-text-muted normal-case font-medium truncate">
-            (para alimentar esta nota com resumos/flashcards)
-          </span>
-        </div>
-        <div className="text-text-muted hover:text-text-strong transition-colors shrink-0 pl-2">
-          {isOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-        </div>
+        <span className="nt-pdf-icon"><FileText size={19} aria-hidden="true" /></span>
+        <span className="nt-pdf-text">
+          <strong>Importar PDF</strong>
+          <span>Gere um resumo e flashcards a partir de um documento.</span>
+        </span>
+        <ChevronDown size={18} className="nt-pdf-chevron" aria-hidden="true" />
       </button>
       
-      {isOpen && (
-        <div className="p-3 sm:p-4 border-t border-border/40 animate-in fade-in slide-in-from-top-2 duration-200">
-          <PdfImporter workspaceId={workspaceId} />
-        </div>
-      )}
+      <div id={panelId} className="nt-pdf-body" hidden={!isOpen}>
+        {isOpen && <PdfImporter workspaceId={workspaceId} />}
+      </div>
     </section>
   )
 }

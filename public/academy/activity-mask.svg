@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="114" height="100" viewBox="0 0 114 100">
+  <defs>
+    <linearGradient id="sides">
+      <stop offset=".045" stop-opacity="0"/>
+      <stop offset=".16"/>
+      <stop offset=".84"/>
+      <stop offset=".955" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ends" x2="0" y2="1">
+      <stop offset=".055" stop-opacity="0"/>
+      <stop offset=".17" stop-color="white"/>
+      <stop offset=".83" stop-color="white"/>
+      <stop offset=".945" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="corners" cy=".49" r=".67">
+      <stop offset=".53"/>
+      <stop offset="1" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="height" x="0" y="0" width="114" height="100" maskUnits="userSpaceOnUse" style="mask-type:alpha">
+      <rect width="114" height="100" fill="url(#ends)"/>
+    </mask>
+    <mask id="shape" x="0" y="0" width="114" height="100" maskUnits="userSpaceOnUse" style="mask-type:alpha">
+      <rect width="114" height="100" fill="url(#corners)"/>
+    </mask>
+  </defs>
+  <g mask="url(#shape)">
+    <rect width="114" height="100" fill="url(#sides)" mask="url(#height)"/>
+  </g>
+</svg>

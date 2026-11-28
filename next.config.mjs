@@ -5,15 +5,21 @@ const withPWA = withPWAInit({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  // O worker extra grava páginas no Cache API sem consultar Cache-Control.
+  cacheStartUrl: false,
+  dynamicStartUrl: false,
   cacheOnFrontEndNav: false,
+  publicExcludes: ['!noprecache/**/*', '!academy/**/*'],
   extendDefaultRuntimeCaching: true,
   workboxOptions: {
     runtimeCaching: [{
-      urlPattern: ({ url, sameOrigin }) => {
-        if (!sameOrigin) return false;
+      urlPattern: ({ url, sameOrigin, request }) => {
+        if (request?.headers.has('Authorization')) return true;
         try {
-          return /^\/dashboard\/(?:questoes|trilhas|assistente)(?:\/|$)/.test(decodeURI(url.pathname));
+          const path = decodeURI(url.pathname);
+          return sameOrigin
+            ? /^\/(?:dashboard|api|auth)(?:\/|$)/.test(path)
+            : /^\/(?:auth|rest|storage|functions)\/v1(?:\/|$)/.test(path)
+              && !path.startsWith('/storage/v1/object/public/');
         } catch {
           return false;
         }
@@ -27,10 +33,11 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig = {
+  serverExternalPackages: ['pdf-parse'],
   // Adicionamos um objeto vazio para silenciar o aviso do Turbopack
   turbopack: {},
   async headers() {
-    return ['/dashboard/questoes/:path*', '/dashboard/trilhas/:path*', '/dashboard/assistente/:path*'].map((source) => ({
+    return ['/dashboard/:path*', '/api/pdf/:path*', '/api/push/:path*'].map((source) => ({
       source,
       headers: [{ key: 'Cache-Control', value: 'private, no-store, max-age=0' }],
     }));

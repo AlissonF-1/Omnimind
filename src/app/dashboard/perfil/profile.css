@@ -63,11 +63,11 @@
 .pf-identity { display: flex; align-items: flex-start; gap: clamp(12px,2.2cqi,22px); min-width: 0; }
 .pf-avatar {
   display: grid; place-items: center; flex: none; overflow: hidden; width: clamp(66px,10cqi,100px); aspect-ratio: 1;
-  border-radius: 24%; border: 2px solid #b1a2dd; color: #e0cdfd; background: #2b2241;
-  box-shadow: 0 0 0 5px #141021b9; font-size: clamp(23px,4cqi,38px); line-height: 1; font-weight: 700;
+  border-radius: 24%; color: #e0cdfd; background: #2b2241;
+  font-size: clamp(23px,4cqi,38px); line-height: 1; font-weight: 700;
 }
-.pf-avatar[data-rank="violet"] { border-color: #b189ff; box-shadow: 0 0 0 5px #251743ce, 0 0 23px #8953ba6e; }
-.pf-avatar[data-rank="gold"] { border-color: #ffcc78; box-shadow: 0 0 0 5px #322139ce, 0 0 23px #ffbb5664; }
+.pf-avatar[data-rank="violet"] { box-shadow: 0 0 23px #8953ba6e; }
+.pf-avatar[data-rank="gold"] { box-shadow: 0 0 23px #ffbb5664; }
 .pf-identity-copy { min-width: 0; }
 .pf-identity-copy h1 {
   color: #e0c7fc; font: 650 11px/1.4 var(--font-geist-mono, monospace), monospace; letter-spacing: .05em;

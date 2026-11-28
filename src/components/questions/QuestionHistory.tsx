@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, CircleCheck, CircleX } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CircleCheck, CircleX, MistakesIcon } from '@/components/icons'
 import { historyHref, practiceHref, questionsPath } from '@/lib/questions/practice'
 import type { Competency, HistoryAttempt, QuestionStats } from '@/lib/questions/server'
 import { QuestionEmptyState, QuestionStatsCards } from './QuestionOverview'
@@ -41,7 +41,7 @@ export default function QuestionHistory({ attempts, stats, performance, topics, 
         <div className="q-row q-between mt-4">
           <nav aria-label="Filtrar histórico" className="q-row">
             <Link href={historyHref(false, 1, topicSlug)} prefetch={false} aria-current={!errorsOnly ? 'page' : undefined} className="q-button q-filter">Todas</Link>
-            <Link href={historyHref(true, 1, topicSlug)} prefetch={false} aria-current={errorsOnly ? 'page' : undefined} className="q-button q-filter">Revisar erros</Link>
+            <Link href={historyHref(true, 1, topicSlug)} prefetch={false} aria-current={errorsOnly ? 'page' : undefined} className="q-button q-filter"><MistakesIcon size={16} /> Revisar erros</Link>
           </nav>
           {topics.length > 0 && (
             <form action={historyHref()} method="get" className="q-row">

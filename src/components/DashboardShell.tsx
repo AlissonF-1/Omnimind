@@ -50,7 +50,7 @@ export default function DashboardShell({
   const drawerOpen = !onDesktop && sidebarOpen
   const isHome = pathname === '/dashboard'
 
-  useFlashcardsPrefetch()
+  useFlashcardsPrefetch(accountId)
 
   function openMenu() {
     trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null

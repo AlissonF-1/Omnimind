@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+/private/
 
 # debug
 npm-debug.log*
@@ -37,6 +38,7 @@ yarn-error.log*
 .vercel
 
 # next-pwa generated files (regenerated on every build)
+/public/academy/runtime/
 /public/sw.js
 /public/sw.js.map
 /public/workbox-*.js

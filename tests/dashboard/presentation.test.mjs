@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { createUiRequire } from '../helpers/icon-imports.mjs'
 import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
 
-const require = createRequire(import.meta.url)
+const require = createUiRequire(import.meta.url)
 const modules = new Map()
 
 function load(name) {
@@ -30,8 +30,12 @@ function load(name) {
     if (moduleName === '@/components/StudyCompanion' || moduleName === '@/components/AvatarFace') return () => null
     if (moduleName === '@/components/DashboardAssistantTeaser') return load('DashboardAssistantTeaser').default
     if (moduleName === '@/components/ThemeToggle') return { SavedThemeToggle: () => null }
+    if (moduleName === '@/components/academy/AcademyNavigation') return load('academy/AcademyNavigation')
+    if (moduleName === '@/lib/academy/contracts') return { academyPath: '/dashboard/academy' }
+    if (moduleName === '@/lib/academy/practice') return { practicePath: '/dashboard/academy/praticas' }
+    if (moduleName === '@/lib/academy/presentation') return { journeyPath: '/dashboard/academy/jornada', skillsPath: '/dashboard/academy/competencias' }
     if (moduleName === '@/actions/workspaces') return { signOut: async () => {} }
-    if (moduleName === 'next/navigation') return { usePathname: () => '/dashboard/questoes/historico', useRouter: () => ({}) }
+    if (moduleName === 'next/navigation') return { usePathname: () => '/dashboard/questoes/historico', useRouter: () => ({}), useSearchParams: () => new URLSearchParams() }
     if (moduleName.startsWith('@/lib/')) return load(moduleName.slice(2))
     return require(moduleName)
   }
@@ -80,6 +84,7 @@ test('Workspaces começa recolhido e o menu mantém perfil, calendário, configu
     assert.ok(html.includes('href="/dashboard/' + route + '"'))
   }
   assert.match(html, /href="\/dashboard\/questoes" aria-current="page"/)
+  assert.doesNotMatch(html, /href="\/dashboard\/(assistente|feynman|grafo)"/)
 })
 
 test('navegação mobile e banner apontam para as rotas existentes', () => {

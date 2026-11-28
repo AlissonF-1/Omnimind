@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Check, Copy, Eye, EyeOff } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff } from '@/components/icons'
 
 export default function PdfPreview({
   structured,

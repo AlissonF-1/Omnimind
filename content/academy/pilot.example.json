@@ -1,0 +1,576 @@
+{
+  "schemaVersion": 1,
+  "id": "academy-pilot",
+  "version": 1,
+  "description": "Quatro aulas iniciais para praticar programação e inglês desde o começo.",
+  "pilot": true,
+  "competencies": [
+    {
+      "id": "python-variables",
+      "title": "Variáveis e saída",
+      "description": "Representar um dado e acompanhar o que um programa escreve.",
+      "prerequisites": [],
+      "mastery": {
+        "version": 1,
+        "criterion": "verified-practice",
+        "description": "Concluir as atividades de previsão de saída e aplicação em estoque."
+      }
+    },
+    {
+      "id": "python-decisions",
+      "title": "Decisões com if e else",
+      "description": "Escolher entre dois caminhos com uma condição booleana.",
+      "prerequisites": [
+        "python-variables"
+      ],
+      "mastery": {
+        "version": 1,
+        "criterion": "verified-practice",
+        "description": "Interpretar o limite de uma condição e prever o ramo executado em dois cenários."
+      }
+    },
+    {
+      "id": "english-greetings",
+      "title": "Saudar e se apresentar",
+      "description": "Reconhecer e produzir uma apresentação simples em inglês.",
+      "prerequisites": [],
+      "mastery": {
+        "version": 1,
+        "criterion": "verified-practice",
+        "description": "Reconhecer um nome no diálogo e completar uma apresentação curta."
+      }
+    },
+    {
+      "id": "english-routines",
+      "title": "Falar sobre estudos",
+      "description": "Entender e responder perguntas simples sobre o que se estuda.",
+      "prerequisites": [
+        "english-greetings"
+      ],
+      "mastery": {
+        "version": 1,
+        "criterion": "verified-practice",
+        "description": "Distinguir pergunta e afirmação com study e interpretar uma resposta curta."
+      }
+    }
+  ],
+  "resources": [
+    {
+      "id": "coding",
+      "type": "image",
+      "path": "/academy/media/coding.webp",
+      "width": 512,
+      "height": 512,
+      "alt": "Computador sobre uma ilha tecnológica",
+      "author": "OMNI-DESIGN-001",
+      "license": "Uso aprovado no OmniMind; rever termos para redistribuição comercial.",
+      "language": "und",
+      "version": 1
+    },
+    {
+      "id": "english",
+      "type": "image",
+      "path": "/academy/media/english.webp",
+      "width": 502,
+      "height": 502,
+      "alt": "Ilustração da formação em inglês",
+      "author": "OMNI-DESIGN-001",
+      "license": "Uso aprovado no OmniMind; rever termos para redistribuição comercial.",
+      "language": "und",
+      "version": 1
+    },
+    {
+      "id": "hello-mia",
+      "type": "audio",
+      "path": "/academy/media/hello-mia.mp3",
+      "alt": "",
+      "author": "OmniMind · texto autoral; voz sintética local Microsoft Zira",
+      "license": "Material piloto de uso no OmniMind; revisar termos da voz antes de redistribuir.",
+      "language": "en-US",
+      "version": 1
+    },
+    {
+      "id": "hi-ben",
+      "type": "audio",
+      "path": "/academy/media/hi-ben.mp3",
+      "alt": "",
+      "author": "OmniMind · texto autoral; voz sintética local Microsoft Zira",
+      "license": "Material piloto de uso no OmniMind; revisar termos da voz antes de redistribuir.",
+      "language": "en-US",
+      "version": 1
+    },
+    {
+      "id": "nice-to-meet",
+      "type": "audio",
+      "path": "/academy/media/nice-to-meet.mp3",
+      "alt": "",
+      "author": "OmniMind · texto autoral; voz sintética local Microsoft Zira",
+      "license": "Material piloto de uso no OmniMind; revisar termos da voz antes de redistribuir.",
+      "language": "en-US",
+      "version": 1
+    },
+    {
+      "id": "do-you-study",
+      "type": "audio",
+      "path": "/academy/media/do-you-study.mp3",
+      "alt": "",
+      "author": "OmniMind · texto autoral; voz sintética local Microsoft Zira",
+      "license": "Material piloto de uso no OmniMind; revisar termos da voz antes de redistribuir.",
+      "language": "en-US",
+      "version": 1
+    },
+    {
+      "id": "i-do",
+      "type": "audio",
+      "path": "/academy/media/i-do.mp3",
+      "alt": "",
+      "author": "OmniMind · texto autoral; voz sintética local Microsoft Zira",
+      "license": "Material piloto de uso no OmniMind; revisar termos da voz antes de redistribuir.",
+      "language": "en-US",
+      "version": 1
+    },
+    {
+      "id": "i-study-at-night",
+      "type": "audio",
+      "path": "/academy/media/i-study-at-night.mp3",
+      "alt": "",
+      "author": "OmniMind · texto autoral; voz sintética local Microsoft Zira",
+      "license": "Material piloto de uso no OmniMind; revisar termos da voz antes de redistribuir.",
+      "language": "en-US",
+      "version": 1
+    }
+  ],
+  "formations": [
+    {
+      "id": "tecnologia",
+      "kind": "tech",
+      "title": "Do zero ao primeiro emprego em TI",
+      "description": "Comece com programas pequenos em Python. Aprenda a acompanhar valores e decidir o que o código deve fazer.",
+      "art": "coding",
+      "chapters": [
+        {
+          "id": "primeiros-programas",
+          "title": "O despertar do desenvolvedor",
+          "lessons": [
+            {
+              "id": "variaveis-e-saida",
+              "title": "Seu primeiro programa em Python",
+              "summary": "Dê um nome a um valor, atualize esse valor e descubra o que o programa mostra.",
+              "minutes": 18,
+              "competencies": [
+                "python-variables"
+              ],
+              "prerequisites": [],
+              "objectives": [
+                "Criar uma variável com =.",
+                "Usar print para mostrar um valor.",
+                "Prever o resultado de uma atualização passo a passo."
+              ],
+              "lessonMarkdown": "## Um nome para cada informação\n\nProgramar é escrever instruções na ordem em que precisam acontecer. Uma **variável** dá um nome a um valor. Em `itens = 3`, Python calcula o lado direito e associa o resultado ao nome do lado esquerdo.\n\n```python\nitens = 3\nitens = itens + 2\nprint(itens)\n```\n\nLeia de cima para baixo. Após a primeira linha, `itens` vale `3`. Na segunda, Python lê o valor atual, soma `2` e guarda `5` no mesmo nome. A terceira escreve `5` no console. `print` mostra o valor; ele não altera a variável.\n\n## Números e texto\n\n`3` é um número inteiro. `\"3\"` é texto, mesmo escrito com um algarismo. `3 + 2` produz `5`; `\"3\" + \"2\"` produz `\"32\"`. Se você quer somar quantidades, use números sem aspas.\n\n**Erro comum:** escrever `print(\"itens\")` quando quer ver a quantidade. As aspas fazem Python mostrar literalmente a palavra `itens`.",
+              "application": "Imagine um estoque de 3 cabos. Quando chegam mais 2, registre a entrada sem perder o saldo anterior. Uma automação simples começa com essa atualização e termina com um valor que outra pessoa consegue conferir.",
+              "resources": [],
+              "visual": {
+                "kind": "variables",
+                "name": "itens",
+                "start": 3,
+                "end": 5
+              },
+              "exercises": [
+                {
+                  "id": "prever-saida",
+                  "kind": "text",
+                  "phase": "practice",
+                  "prompt": "Qual número aparece depois de `itens = 4`, `itens = itens + 1` e `print(itens)`?",
+                  "accepted": [
+                    "5"
+                  ],
+                  "explanation": "Python lê o 4 já guardado antes de somar 1. O print mostra o resultado 5.",
+                  "hints": [
+                    "Separe o valor anterior do valor depois da soma."
+                  ]
+                },
+                {
+                  "id": "conferir-estoque",
+                  "kind": "text",
+                  "phase": "challenge",
+                  "prompt": "Uma loja tem 6 adaptadores e entrega 2. Que número deve aparecer no console ao mostrar o estoque atualizado?",
+                  "accepted": [
+                    "4"
+                  ],
+                  "explanation": "A entrega reduz o saldo. Subtraia números inteiros: 6 − 2 = 4.",
+                  "hints": [
+                    "A saída de produtos reduz a quantidade."
+                  ]
+                },
+                {
+                  "id": "atualizar-estoque",
+                  "kind": "python",
+                  "prompt": "Complete o programa para mostrar o estoque depois que entram 2 cabos. Use a variável `cabos` e uma soma.",
+                  "starter": "cabos = 3\n# Atualize o estoque e mostre o resultado\n",
+                  "publicCases": [
+                    {
+                      "id": "saida",
+                      "input": "",
+                      "expected": "5"
+                    }
+                  ],
+                  "hiddenCases": [],
+                  "solution": "cabos = 3\ncabos = cabos + 2\nprint(cabos)",
+                  "hints": [
+                    "Use `cabos` no lado direito para ler o valor atual.",
+                    "Na linha final, chame `print` com o nome da variável."
+                  ]
+                },
+                {
+                  "id": "relembrar",
+                  "kind": "text",
+                  "phase": "review",
+                  "prompt": "Ontem o saldo era 8. Hoje chegaram 3 cabos. Qual valor deve sair no console após a atualização?",
+                  "accepted": [
+                    "11"
+                  ],
+                  "explanation": "O valor anterior é 8. A soma registra 11 no mesmo nome antes de imprimir.",
+                  "hints": [
+                    "Atualize o saldo somente depois de ler o valor anterior."
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "decisoes",
+          "title": "Aprendendo a programar",
+          "lessons": [
+            {
+              "id": "decisoes-em-python",
+              "title": "Tome uma decisão com if e else",
+              "summary": "Use um limite para decidir se um pedido está pronto para expedição.",
+              "minutes": 22,
+              "competencies": [
+                "python-decisions"
+              ],
+              "prerequisites": [
+                "variaveis-e-saida"
+              ],
+              "objectives": [
+                "Ler uma comparação com >=.",
+                "Identificar o bloco executado quando a condição é falsa.",
+                "Testar o valor na fronteira de uma condição."
+              ],
+              "lessonMarkdown": "## Uma pergunta que Python consegue responder\n\nA expressão `itens >= 3` pergunta se há **pelo menos** três itens. Python responde `True` ou `False`. O código dentro de `if` roda quando a comparação é verdadeira; o bloco `else` roda no outro caso.\n\n```python\nitens = 3\nif itens >= 3:\n    print(\"Pronto\")\nelse:\n    print(\"Pendente\")\n```\n\nQuando `itens` vale `3`, o programa escreve `Pronto`. O `=` em `>=` inclui o próprio limite. Experimente mudar `itens` para `2` e acompanhar qual ramo é executado.\n\n## A indentação faz parte do programa\n\nOs quatro espaços antes de `print` colocam a instrução dentro de um bloco. `if` e `else` ficam alinhados. A linha com a condição termina em `:`.\n\nA entrada de `input()` é texto. Use `int(input())` quando o exercício fornece um número inteiro e compare esse número com o limite.",
+              "application": "Em um sistema de pedidos, a regra deve funcionar para valores abaixo, exatamente no limite e acima dele. Esses três exemplos ajudam a detectar erros antes que pedidos fiquem parados.",
+              "resources": [],
+              "visual": {
+                "kind": "counter",
+                "name": "itens",
+                "start": 1,
+                "end": 5
+              },
+              "exercises": [
+                {
+                  "id": "na-fronteira",
+                  "kind": "text",
+                  "phase": "practice",
+                  "prompt": "Com `itens = 3`, o exemplo da aula imprime Pronto ou Pendente?",
+                  "accepted": [
+                    "pronto"
+                  ],
+                  "explanation": "O operador >= inclui 3. A comparação é verdadeira e o primeiro bloco executa.",
+                  "hints": [
+                    "Quando a regra diz pelo menos, o valor do limite também entra."
+                  ]
+                },
+                {
+                  "id": "abaixo-do-limite",
+                  "kind": "text",
+                  "phase": "challenge",
+                  "prompt": "Um pedido precisa de pelo menos 5 unidades. Ele tem 4. Escreva `True` ou `False` para `4 >= 5`.",
+                  "accepted": [
+                    "false",
+                    "falso"
+                  ],
+                  "explanation": "4 fica abaixo do mínimo de 5. O resultado da comparação é False.",
+                  "hints": [
+                    "Compare 4 com o mínimo antes de decidir o ramo."
+                  ]
+                },
+                {
+                  "id": "liberar-pedido",
+                  "kind": "python",
+                  "prompt": "Leia um inteiro. Imprima `Pronto` se houver pelo menos 3 itens e `Pendente` caso contrário.",
+                  "starter": "itens = int(input())\n# Escreva a condição e os dois resultados\n",
+                  "publicCases": [
+                    {
+                      "id": "abaixo",
+                      "input": "2",
+                      "expected": "Pendente"
+                    },
+                    {
+                      "id": "limite",
+                      "input": "3",
+                      "expected": "Pronto"
+                    }
+                  ],
+                  "hiddenCases": [
+                    {
+                      "id": "acima",
+                      "input": "7",
+                      "expected": "Pronto"
+                    }
+                  ],
+                  "solution": "itens = int(input())\nif itens >= 3:\n    print(\"Pronto\")\nelse:\n    print(\"Pendente\")",
+                  "hints": [
+                    "Escreva a comparação começando por `itens`.",
+                    "Verifique a saída para 2 e para 3."
+                  ]
+                },
+                {
+                  "id": "relembrar",
+                  "kind": "text",
+                  "phase": "review",
+                  "prompt": "Se `itens = 0`, qual ramo executa em `if itens >= 3`? Responda `if` ou `else`.",
+                  "accepted": [
+                    "else"
+                  ],
+                  "explanation": "Zero não atende ao mínimo. Python escolhe o bloco else.",
+                  "hints": [
+                    "Decida primeiro se 0 >= 3 é verdadeiro."
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ingles",
+      "kind": "english",
+      "title": "English · From Zero to Professional",
+      "description": "Escute apresentações, faça suas primeiras frases e converse sobre a sua rotina de estudos.",
+      "art": "english",
+      "chapters": [
+        {
+          "id": "pre-a1",
+          "title": "Primeiros diálogos · Pré-A1",
+          "lessons": [
+            {
+              "id": "hello-my-name",
+              "title": "Hello! My name is…",
+              "summary": "Você vai reconhecer uma saudação e se apresentar em uma frase curta.",
+              "minutes": 15,
+              "competencies": [
+                "english-greetings"
+              ],
+              "prerequisites": [],
+              "objectives": [
+                "Usar hello e hi para cumprimentar.",
+                "Identificar o nome de quem fala em uma apresentação.",
+                "Completar uma apresentação com my name is."
+              ],
+              "lessonMarkdown": "## Comece com uma saudação\n\n**Hello!** e **Hi!** querem dizer *Olá!* ou *Oi!*. `Hi` é muito comum em conversas informais. Para dizer seu nome, use **My name is + nome**. Em `My name is Mia`, só a parte `Mia` muda quando outra pessoa se apresenta.\n\nVocê também pode dizer **I am Ben** (*Eu sou Ben*). Quando conhecer alguém, **Nice to meet you** significa *Prazer em conhecer você*.\n\n## Escute em partes\n\nEscute uma vez para perceber a saudação. Na segunda vez, tente reconhecer o nome depois de `My name is` ou `I am`. Abra a transcrição quando quiser conferir. Repita a frase com um nome inventado e depois com o seu.",
+              "application": "Em uma primeira reunião ou numa aula, você pode começar com `Hi! My name is ... Nice to meet you.` Uma apresentação curta e clara já permite que a conversa continue.",
+              "resources": [],
+              "dialogue": [
+                {
+                  "speaker": "Mia",
+                  "text": "Hello! My name is Mia.",
+                  "translation": "Olá! Meu nome é Mia.",
+                  "audio": "hello-mia"
+                },
+                {
+                  "speaker": "Ben",
+                  "text": "Hi, Mia! I am Ben.",
+                  "translation": "Oi, Mia! Eu sou Ben.",
+                  "audio": "hi-ben"
+                },
+                {
+                  "speaker": "Mia",
+                  "text": "Nice to meet you.",
+                  "translation": "Prazer em conhecer você.",
+                  "audio": "nice-to-meet"
+                }
+              ],
+              "vocabulary": [
+                {
+                  "term": "hello",
+                  "translation": "olá",
+                  "example": "Hello! My name is Mia."
+                },
+                {
+                  "term": "my name is",
+                  "translation": "meu nome é",
+                  "example": "My name is Ben."
+                },
+                {
+                  "term": "nice to meet you",
+                  "translation": "prazer em conhecer você",
+                  "example": "Nice to meet you, Mia."
+                }
+              ],
+              "exercises": [
+                {
+                  "id": "ouvir-nome",
+                  "kind": "text",
+                  "phase": "practice",
+                  "prompt": "Escute a faixa 2. Qual é o nome de quem está se apresentando?",
+                  "accepted": [
+                    "ben"
+                  ],
+                  "explanation": "A pessoa diz `Hi, Mia! I am Ben`. Mia é quem ela cumprimenta; Ben é quem fala.",
+                  "hints": [
+                    "Preste atenção ao nome depois de I am."
+                  ]
+                },
+                {
+                  "id": "completar-apresentacao",
+                  "kind": "text",
+                  "phase": "challenge",
+                  "prompt": "Complete em inglês com uma palavra: `My name ___ Leo.`",
+                  "accepted": [
+                    "is"
+                  ],
+                  "explanation": "A estrutura é `My name is + nome`.",
+                  "hints": [
+                    "Procure como Mia liga name ao próprio nome."
+                  ]
+                },
+                {
+                  "id": "relembrar",
+                  "kind": "text",
+                  "phase": "review",
+                  "prompt": "Que palavra falta em `Nice to ___ you`?",
+                  "accepted": [
+                    "meet"
+                  ],
+                  "explanation": "`Meet` é o verbo em `Nice to meet you`.",
+                  "hints": [
+                    "É a palavra que corresponde a conhecer no primeiro encontro."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "do-you-study",
+              "title": "Do you study computer science?",
+              "summary": "Entenda uma pergunta sobre estudos e responda com uma frase simples.",
+              "minutes": 17,
+              "competencies": [
+                "english-routines"
+              ],
+              "prerequisites": [
+                "hello-my-name"
+              ],
+              "objectives": [
+                "Distinguir `Do you study…?` de `I study…`.",
+                "Reconhecer uma resposta afirmativa curta.",
+                "Descrever quando você estuda usando `at night`."
+              ],
+              "lessonMarkdown": "## Pergunta e resposta\n\n**I study computer science** significa *Eu estudo Ciência da Computação*. Para perguntar *Você estuda Ciência da Computação?*, comece por **Do you**, seguido de `study`: **Do you study computer science?**\n\nVocê pode responder apenas **Yes, I do** (*Sim*) ou **No, I don't** (*Não*). Se quiser dar mais contexto, acrescente uma frase depois da resposta: **I study at night** significa *Eu estudo à noite*.\n\n## Sua vez\n\nEscute o diálogo sem abrir a transcrição. Identifique se a resposta foi afirmativa. Depois repita a pergunta em voz alta e responda como se estivesse conversando com a outra pessoa.",
+              "application": "Em uma conversa com colegas, alterne entre perguntar e dar uma informação. Após se apresentar, tente perguntar sobre o que a pessoa estuda e dizer em que horário você costuma estudar.",
+              "resources": [],
+              "dialogue": [
+                {
+                  "speaker": "Mia",
+                  "text": "Do you study computer science?",
+                  "translation": "Você estuda Ciência da Computação?",
+                  "audio": "do-you-study"
+                },
+                {
+                  "speaker": "Ben",
+                  "text": "Yes, I do. I study computer science.",
+                  "translation": "Sim. Eu estudo Ciência da Computação.",
+                  "audio": "i-do"
+                },
+                {
+                  "speaker": "Ben",
+                  "text": "I study at night.",
+                  "translation": "Eu estudo à noite.",
+                  "audio": "i-study-at-night"
+                }
+              ],
+              "vocabulary": [
+                {
+                  "term": "study",
+                  "translation": "estudar",
+                  "example": "I study computer science."
+                },
+                {
+                  "term": "at night",
+                  "translation": "à noite",
+                  "example": "I study at night."
+                },
+                {
+                  "term": "yes, I do",
+                  "translation": "sim, eu estudo (neste diálogo)",
+                  "example": "Yes, I do. I study computer science."
+                }
+              ],
+              "exercises": [
+                {
+                  "id": "ouvir-resposta",
+                  "kind": "text",
+                  "phase": "practice",
+                  "prompt": "Ouça a faixa 2. A resposta a `Do you study computer science?` foi afirmativa ou negativa?",
+                  "accepted": [
+                    "afirmativa",
+                    "sim"
+                  ],
+                  "explanation": "Ben começa com `Yes, I do`. É uma resposta afirmativa.",
+                  "hints": [
+                    "A primeira palavra da faixa indica se ele respondeu sim ou não."
+                  ]
+                },
+                {
+                  "id": "completar-pergunta",
+                  "kind": "text",
+                  "phase": "challenge",
+                  "prompt": "Complete em inglês com uma palavra: `___ you study computer science?`",
+                  "accepted": [
+                    "do"
+                  ],
+                  "explanation": "Com `you` e `study`, use `Do you study ...?` para fazer a pergunta.",
+                  "hints": [
+                    "A afirmação `I study ...` não começa com a palavra que marca a pergunta."
+                  ]
+                },
+                {
+                  "id": "relembrar",
+                  "kind": "text",
+                  "phase": "review",
+                  "prompt": "Complete em inglês com uma palavra: `I study at ___.` para dizer que você estuda à noite.",
+                  "accepted": [
+                    "night"
+                  ],
+                  "explanation": "`At night` é a expressão para à noite. `I study at night` informa o seu horário.",
+                  "hints": [
+                    "Lembre-se da última faixa do diálogo."
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "market": {
+    "description": "A síntese curricular orienta a sequência. Programação, Git e SQL são fundamentos transversais; inglês amplia o acesso a materiais técnicos e a oportunidades compatíveis. Frequências do levantamento não determinam pesos ou prontidão.",
+    "sources": [
+      {
+        "id": "sintese-curricular",
+        "title": "OmniMind · Referência de Mercado TI, pp. 1–4",
+        "date": "2026-11-26",
+        "caveat": "Síntese de uma amostra declarada de 68 vagas; descrições variam em detalhamento, grupos de tecnologias se sobrepõem e elegibilidade territorial deve ser verificada."
+      },
+      {
+        "id": "pesquisa-original",
+        "title": "Inteligência de Mercado em TI, metodologia e recortes",
+        "date": "2026-11-26",
+        "caveat": "Levantamento fornecido pelo responsável. A amostra não representa todo o mercado e as vagas não foram rechecadas uma a uma nesta entrega."
+      }
+    ],
+    "vacancies": []
+  }
+}

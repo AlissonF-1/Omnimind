@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert } from '@/components/icons'
 import { learningPath } from '@/lib/learning/progress'
 
 export default function LearningError({ reset }: { reset: () => void }) {

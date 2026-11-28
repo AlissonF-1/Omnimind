@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Flame, Sparkles, X } from 'lucide-react'
+import { Flame, Sparkles, X } from '@/components/icons'
 import { useRouter } from 'next/navigation'
 
 interface StreakRescueModalProps {

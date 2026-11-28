@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Download, X, Smartphone, Sparkles, Check } from 'lucide-react'
+import { Download, X, Smartphone, Sparkles, Check } from '@/components/icons'
 
 export default function InstallPromptModal() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)

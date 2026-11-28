@@ -1,5 +1,5 @@
 'use client';
-import { Sigma, X } from 'lucide-react';
+import { Sigma, X } from '@/components/icons';
 
 interface LaTeXAssistProps {
   onInsert: (latex: string, selection?: { startOffset: number; endOffset: number }) => void;

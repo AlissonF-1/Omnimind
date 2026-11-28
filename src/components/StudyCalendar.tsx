@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, CalendarDays, Plus, X, Target, Trash2, Check, HelpCircle, TrendingUp, Info } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, Plus, X, Target, Trash2, Check, HelpCircle, TrendingUp, Info } from '@/components/icons'
 import { createExamGoal, deleteExamGoal, toggleActiveGoal, getCalendarData } from '@/actions/calendar'
 import type { ExamGoal, DayData } from '@/actions/calendar'
 import Link from 'next/link'

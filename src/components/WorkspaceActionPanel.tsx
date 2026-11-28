@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, Trash2, Settings2, Save, X, AlertTriangle, Loader2 } from 'lucide-react'
+import { Archive, Trash2, Settings2, Save, X, AlertTriangle, Loader2 } from '@/components/icons'
 import { archiveWorkspace, deleteWorkspace, updateWorkspace } from '@/actions/workspaces'
 
 interface WorkspaceActionPanelProps {

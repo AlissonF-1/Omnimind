@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { ArrowRight, Check, Pencil, Shield, Sparkles, Trophy, X } from 'lucide-react'
+import { ArrowRight, Check, Pencil, Shield, Sparkles, Trophy, X } from '@/components/icons'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'

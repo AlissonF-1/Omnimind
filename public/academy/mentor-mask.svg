@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="134" height="100" viewBox="0 0 134 100">
+  <defs>
+    <linearGradient id="sides">
+      <stop offset=".055" stop-opacity="0"/>
+      <stop offset=".19"/>
+      <stop offset=".81"/>
+      <stop offset=".945" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ends" x2="0" y2="1">
+      <stop offset=".055" stop-opacity="0"/>
+      <stop offset=".18" stop-color="white"/>
+      <stop offset=".79" stop-color="white"/>
+      <stop offset=".945" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="height" x="0" y="0" width="134" height="100" maskUnits="userSpaceOnUse" style="mask-type:alpha">
+      <rect width="134" height="100" fill="url(#ends)"/>
+    </mask>
+  </defs>
+  <rect width="134" height="100" fill="url(#sides)" mask="url(#height)"/>
+</svg>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays } from '@/components/icons'
 
 type StudyLog = { study_date: string; review_count: number; topics?: string[] | null }
 

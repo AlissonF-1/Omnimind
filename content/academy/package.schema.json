@@ -1,0 +1,1774 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OmniMind Academy package v1 and v2",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        1,
+        2
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999999
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "pilot": {
+      "type": "boolean"
+    },
+    "competencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 130
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "prerequisites": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "minItems": 0,
+            "maxItems": 32,
+            "uniqueItems": true
+          },
+          "mastery": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999999
+              },
+              "criterion": {
+                "const": "verified-practice"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 350
+              }
+            },
+            "required": [
+              "version",
+              "criterion",
+              "description"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "prerequisites",
+          "mastery"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 180
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/resource"
+      },
+      "minItems": 0,
+      "maxItems": 512
+    },
+    "formations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "kind": {
+            "enum": [
+              "tech",
+              "english"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 110
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 420
+          },
+          "art": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "chapters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "lessons": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/lesson"
+                  },
+                  "minItems": 1,
+                  "maxItems": 70
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "lessons"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "description",
+          "art",
+          "chapters"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 10
+    },
+    "market": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 700
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "caveat": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "date",
+              "caveat"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 30
+        },
+        "vacancies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "sourceUrl": {
+                "type": "string",
+                "maxLength": 550,
+                "pattern": "^https://[^\\s]+$"
+              },
+              "region": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "seniority": {
+                "enum": [
+                  "internship",
+                  "entry",
+                  "unspecified"
+                ]
+              },
+              "collectedOn": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "requirements": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                },
+                "minItems": 0,
+                "maxItems": 32,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "sourceUrl",
+              "region",
+              "seniority",
+              "collectedOn",
+              "requirements"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 250
+        }
+      },
+      "required": [
+        "description",
+        "sources",
+        "vacancies"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "version",
+    "description",
+    "pilot",
+    "competencies",
+    "resources",
+    "formations",
+    "market"
+  ],
+  "definitions": {
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "type": {
+          "enum": [
+            "image",
+            "audio"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/academy/media/[a-z0-9-]+\\.(webp|png|jpg|mp3|ogg|wav)$"
+        },
+        "alt": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 250
+        },
+        "caption": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 350
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "language": {
+          "enum": [
+            "pt-BR",
+            "en-US",
+            "und"
+          ]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99999
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "path",
+        "alt",
+        "author",
+        "license",
+        "language",
+        "version"
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "input": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "expected": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "id",
+        "input",
+        "expected"
+      ]
+    },
+    "lesson": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 110
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 260
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 180
+        },
+        "competencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "objectives": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "lessonMarkdown": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 15000
+        },
+        "application": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "visual": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "variables",
+                "counter"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "start": {
+              "type": "integer",
+              "minimum": -99,
+              "maximum": 99
+            },
+            "end": {
+              "type": "integer",
+              "minimum": -99,
+              "maximum": 99
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "start",
+            "end"
+          ]
+        },
+        "dialogue": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "speaker": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "translation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "audio": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              }
+            },
+            "required": [
+              "speaker",
+              "text",
+              "translation"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 12
+        },
+        "vocabulary": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "term": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "translation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "example": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "audio": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              }
+            },
+            "required": [
+              "term",
+              "translation",
+              "example"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 18
+        },
+        "exercises": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/exercise"
+          },
+          "minItems": 1,
+          "maxItems": 25
+        },
+        "progressFromVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "minutes",
+        "competencies",
+        "prerequisites",
+        "objectives",
+        "lessonMarkdown",
+        "application",
+        "resources",
+        "exercises"
+      ]
+    },
+    "exercise": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "kind": {
+              "const": "text"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "accepted": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600
+              },
+              "minItems": 1,
+              "maxItems": 10
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "phase",
+            "prompt",
+            "hints",
+            "accepted",
+            "explanation"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "kind": {
+              "const": "python"
+            },
+            "starter": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 12000
+            },
+            "publicCases": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/case"
+              },
+              "minItems": 1,
+              "maxItems": 8
+            },
+            "hiddenCases": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/case"
+              },
+              "minItems": 0,
+              "maxItems": 16
+            },
+            "solution": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 12000
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "prompt",
+            "hints",
+            "starter",
+            "publicCases",
+            "hiddenCases",
+            "solution"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "kind": {
+              "const": "question-set"
+            },
+            "versionIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$"
+              },
+              "minItems": 1,
+              "maxItems": 20,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "prompt",
+            "hints",
+            "versionIds"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "kind": {
+              "const": "multiple-choice"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/activityItem"
+              },
+              "minItems": 2,
+              "maxItems": 12
+            },
+            "correctOptionId": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            }
+          },
+          "required": [
+            "id",
+            "phase",
+            "prompt",
+            "hints",
+            "explanation",
+            "kind",
+            "options",
+            "correctOptionId"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "kind": {
+              "const": "ordering"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/activityItem"
+              },
+              "minItems": 2,
+              "maxItems": 12
+            },
+            "correctOrder": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "minItems": 2,
+              "maxItems": 12,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "id",
+            "phase",
+            "prompt",
+            "hints",
+            "explanation",
+            "kind",
+            "items",
+            "correctOrder"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "kind": {
+              "const": "parsons"
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/activityItem"
+              },
+              "minItems": 2,
+              "maxItems": 12
+            },
+            "maxIndent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6
+            },
+            "correctLines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                  },
+                  "indent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  }
+                },
+                "required": [
+                  "id",
+                  "indent"
+                ]
+              },
+              "minItems": 2,
+              "maxItems": 12
+            }
+          },
+          "required": [
+            "id",
+            "phase",
+            "prompt",
+            "hints",
+            "explanation",
+            "kind",
+            "lines",
+            "maxIndent",
+            "correctLines"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "kind": {
+              "const": "matching"
+            },
+            "left": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/activityItem"
+              },
+              "minItems": 2,
+              "maxItems": 12
+            },
+            "right": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/activityItem"
+              },
+              "minItems": 2,
+              "maxItems": 12
+            },
+            "pairs": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 12,
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "phase",
+            "prompt",
+            "hints",
+            "explanation",
+            "kind",
+            "left",
+            "right",
+            "pairs"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "kind": {
+              "const": "output"
+            },
+            "accepted": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 4000
+              },
+              "minItems": 1,
+              "maxItems": 10
+            }
+          },
+          "required": [
+            "id",
+            "phase",
+            "prompt",
+            "hints",
+            "explanation",
+            "kind",
+            "accepted"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "kind": {
+              "const": "trace"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/activityItem"
+              },
+              "minItems": 1,
+              "maxItems": 12
+            },
+            "acceptedByField": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 12,
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "minItems": 1,
+                "maxItems": 10
+              }
+            }
+          },
+          "required": [
+            "id",
+            "phase",
+            "prompt",
+            "hints",
+            "explanation",
+            "kind",
+            "fields",
+            "acceptedByField"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "kind": {
+              "const": "fill-in"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/activityItem"
+              },
+              "minItems": 1,
+              "maxItems": 12
+            },
+            "acceptedByField": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 12,
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "minItems": 1,
+                "maxItems": 10
+              }
+            }
+          },
+          "required": [
+            "id",
+            "phase",
+            "prompt",
+            "hints",
+            "explanation",
+            "kind",
+            "fields",
+            "acceptedByField"
+          ]
+        }
+      ]
+    },
+    "activityItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "legacyExercise": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "kind": {
+              "const": "text"
+            },
+            "phase": {
+              "enum": [
+                "practice",
+                "challenge",
+                "review"
+              ]
+            },
+            "accepted": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600
+              },
+              "minItems": 1,
+              "maxItems": 10
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "phase",
+            "prompt",
+            "hints",
+            "accepted",
+            "explanation"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "kind": {
+              "const": "python"
+            },
+            "starter": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 12000
+            },
+            "publicCases": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/case"
+              },
+              "minItems": 1,
+              "maxItems": 8
+            },
+            "hiddenCases": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/case"
+              },
+              "minItems": 0,
+              "maxItems": 16
+            },
+            "solution": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 12000
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "prompt",
+            "hints",
+            "starter",
+            "publicCases",
+            "hiddenCases",
+            "solution"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1600
+            },
+            "hints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "minItems": 0,
+              "maxItems": 3
+            },
+            "resource": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "kind": {
+              "const": "question-set"
+            },
+            "versionIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$"
+              },
+              "minItems": 1,
+              "maxItems": 20,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "prompt",
+            "hints",
+            "versionIds"
+          ]
+        }
+      ]
+    },
+    "legacyLesson": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 110
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 260
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 180
+        },
+        "competencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "objectives": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "lessonMarkdown": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 15000
+        },
+        "application": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "visual": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "variables",
+                "counter"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "start": {
+              "type": "integer",
+              "minimum": -99,
+              "maximum": 99
+            },
+            "end": {
+              "type": "integer",
+              "minimum": -99,
+              "maximum": 99
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "start",
+            "end"
+          ]
+        },
+        "dialogue": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "speaker": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "translation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "audio": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              }
+            },
+            "required": [
+              "speaker",
+              "text",
+              "translation"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 12
+        },
+        "vocabulary": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "term": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "translation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "example": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "audio": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              }
+            },
+            "required": [
+              "term",
+              "translation",
+              "example"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 18
+        },
+        "exercises": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/legacyExercise"
+          },
+          "minItems": 1,
+          "maxItems": 25
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "minutes",
+        "competencies",
+        "prerequisites",
+        "objectives",
+        "lessonMarkdown",
+        "application",
+        "resources",
+        "exercises"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          }
+        },
+        "required": [
+          "schemaVersion"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "resources": {
+            "type": "array",
+            "maxItems": 200
+          },
+          "formations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "chapters": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "lessons": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/definitions/legacyLesson"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

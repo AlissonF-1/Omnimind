@@ -105,7 +105,7 @@
 .os-account[open] summary > svg:last-child { transform: rotate(180deg); }
 .os-avatar {
   display: grid; place-items: center; flex: none; width: 32px; aspect-ratio: 1;
-  border: 1px solid var(--os-border); border-radius: 50%; color: var(--os-accent); background: var(--os-raised); overflow: hidden;
+  border-radius: 50%; color: var(--os-accent); background: var(--os-raised); overflow: hidden;
 }
 .os-sidebar[data-collapsed="true"] { width: 72px; }
 .os-sidebar[data-collapsed="true"] .os-links a span, .os-sidebar[data-collapsed="true"] .os-brand span,
@@ -141,12 +141,8 @@
   display: flex; position: fixed; right: 22px; bottom: 19px; z-index: 42; align-items: center; gap: 8px;
   cursor: pointer; color: #f5eaff;
 }
-.os-assistant-avatar, .os-dock-assistant img {
-  display: grid; place-items: center; overflow: hidden; flex: none; border-radius: 50%; border: 1px solid #bf85ff;
-  background: radial-gradient(circle,#6f3acd,#251643 72%); box-shadow: 0 0 11px #a058ff8c;
-}
-.os-assistant-avatar { width: 56px; height: 56px; }
-.os-assistant-avatar img, .os-dock-assistant img { object-fit: contain; }
+.os-assistant-avatar { display: grid; place-items: center; flex: none; width: 56px; height: 56px; }
+.os-assistant-avatar img, .os-dock-assistant img { object-fit: contain; filter: drop-shadow(0 0 7px #a058ff8c); }
 .os-assistant-launch-label {
   opacity: 0; transform: translateX(5px); transition: opacity .17s, transform .17s;
   pointer-events: none; background: #241735; border: 1px solid #71529a; border-radius: 10px; padding: 6px 10px;

@@ -1,0 +1,1369 @@
+/* Composition ported from the approved OMNI-DESIGN-003 stylesheet. Scoped to the Academy. */
+.ac3-shell {
+  color-scheme: dark;
+  --bg: #0e0b18;
+  --panel: #191429;
+  --line: #30263f;
+  --muted: #b0a5c5;
+  --text: #f4f0ff;
+  --accent: #a78bfa;
+  --accent2: #22d3ee;
+  --green: #2dd4bf;
+  --gold: #fbbf24;
+  --r: 14px;
+}
+
+.ac3-shell {
+  margin: 0;
+  background: radial-gradient(ellipse at 55% -25%,#23143d 0,transparent 60%),var(--bg);
+  color: var(--text);
+  font: 14px/1.5 'Segoe UI',system-ui,sans-serif;
+}
+
+.ac3-shell button, .ac3-shell input, .ac3-shell textarea, .ac3-shell select {
+  font: inherit;
+}
+
+.ac3-shell button, .ac3-shell a {
+  touch-action: manipulation;
+}
+
+.ac3-shell button {
+  cursor: pointer;
+  color: inherit;
+  border: 1px solid #44365a;
+  background: #211930;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-weight: 600;
+  transition: background .15s,border-color .15s,transform .15s;
+}
+
+.ac3-shell button:hover {
+  background: #34234d;
+  border-color: var(--accent);
+}
+
+.ac3-shell button:focus-visible, .ac3-shell a:focus-visible, .ac3-shell input:focus-visible, .ac3-shell textarea:focus-visible, .ac3-shell select:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 3px;
+}
+
+.ac3-shell button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.ac3-shell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ac3-shell img {
+  max-width: 100%;
+  display: block;
+}
+
+.ac3-shell img[data-art-mask] {
+  object-fit: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.ac3-shell img[data-art-mask="activities"] { mask-image: url('/academy/activity-mask.svg'); }
+.ac3-shell img[data-art-mask="mentor"] { mask-image: url('/academy/mentor-mask.svg'); }
+
+.ac3-shell h1, .ac3-shell h2, .ac3-shell h3, .ac3-shell p {
+  margin: 0;
+}
+
+.ac3-shell h1 {
+  font-size: clamp(25px,3vw,36px);
+  line-height: 1.15;
+  letter-spacing: -1.3px;
+}
+
+.ac3-shell h2 {
+  font-size: 18px;
+  letter-spacing: -.3px;
+}
+
+.ac3-shell h3 {
+  font-size: 15px;
+}
+
+.ac3-shell p {
+  color: var(--muted);
+}
+
+.ac3-shell small, .ac3-shell .ac3-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ac3-shell .ac3-eyebrow {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+}
+
+.ac3-shell .ac3-top {
+  height: 54px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #241c30;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ac3-shell .ac3-topright {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ac3-shell .ac3-ghost {
+  background: transparent;
+}
+
+.ac3-shell .ac3-content {
+  max-width: 1500px;
+  margin: auto;
+  padding: 20px 24px 30px;
+  min-width: 0;
+}
+
+.ac3-shell .ac3-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #514070;
+  border-radius: var(--r);
+  padding: 22px 24px;
+  min-height: 152px;
+  display: flex;
+  align-items: center;
+  isolation: isolate;
+  background: #1d1431;
+  margin-bottom: 15px;
+}
+
+.ac3-shell .ac3-hero:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,#1a132b 0%,#1a132bf7 35%,#1a132b30 73%),var(--scene) center right/cover;
+  z-index: -2;
+}
+
+.ac3-shell .ac3-hero .ac3-heroart {
+  position: absolute;
+  right: 8%;
+  bottom: -12px;
+  width: 155px;
+  max-height: 160px;
+  object-fit: contain;
+  z-index: -1;
+  filter: drop-shadow(0 4px 15px #0008);
+}
+
+.ac3-shell .ac3-hero .ac3-copy {
+  max-width: 64%;
+  display: grid;
+  gap: 7px;
+}
+
+.ac3-shell .ac3-hero p {
+  color: #d9d0e9;
+  max-width: 580px;
+}
+
+.ac3-shell .ac3-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ac3-shell .ac3-primary {
+  background: linear-gradient(110deg,#8549df,#6034b7);
+  border-color: #aa7df4;
+  color: #fff;
+  box-shadow: 0 3px 12px #8b5cf628;
+}
+
+.ac3-shell .ac3-english {
+  --accent: #5eead4;
+  --accent2: #2dd4bf;
+}
+
+.ac3-shell .ac3-english .ac3-primary {
+  background: linear-gradient(110deg,#167e82,#146063);
+  border-color: #3cb8b0;
+}
+
+.ac3-shell .ac3-english .ac3-hero:before {
+  background: linear-gradient(90deg,#102b35 0%,#151e31f5 36%,#151e3130 80%),var(--scene) center right/cover;
+}
+
+.ac3-shell .ac3-grid2 {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 276px;
+  gap: 14px;
+  align-items: start;
+}
+
+.ac3-shell .ac3-stack {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+}
+
+.ac3-shell .ac3-panel {
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg,#1e172f,#151222);
+  border-radius: var(--r);
+  padding: 15px;
+  min-width: 0;
+}
+
+.ac3-shell .ac3-sectionhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ac3-shell .ac3-linkbtn {
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.ac3-shell .ac3-mission {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  background: #100e1b80;
+  border: 1px solid #352a46;
+  border-radius: 10px;
+  margin-top: 7px;
+  min-width: 0;
+}
+
+.ac3-shell .ac3-mission img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.ac3-shell .ac3-mission .ac3-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ac3-shell .ac3-mission strong {
+  display: block;
+  line-height: 1.25;
+}
+
+.ac3-shell .ac3-mission button {
+  padding: 6px 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.ac3-shell .ac3-metrics {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 8px;
+}
+
+.ac3-shell .ac3-metric {
+  padding: 10px;
+  background: #100e1b80;
+  border: 1px solid #332944;
+  border-radius: 8px;
+}
+
+.ac3-shell .ac3-metric strong {
+  font-size: 23px;
+  line-height: 1.15;
+  display: block;
+}
+
+.ac3-shell .ac3-metric small {
+  font-size: 10px;
+}
+
+.ac3-shell .ac3-bar {
+  height: 6px;
+  border-radius: 8px;
+  background: #42354f;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.ac3-shell .ac3-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg,#895cf1,var(--accent2));
+  border-radius: 8px;
+}
+
+.ac3-shell .ac3-formationgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ac3-shell .ac3-formation {
+  position: relative;
+  min-height: 122px;
+  overflow: hidden;
+  text-align: left;
+  padding: 15px 16px;
+  background: linear-gradient(115deg,#2a1b46,#1b152a);
+  border: 1px solid #624695;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.ac3-shell .ac3-formation.ac3-eng {
+  background: linear-gradient(115deg,#163b40,#161e2d);
+  border-color: #26777a;
+}
+
+.ac3-shell .ac3-formation img {
+  position: absolute;
+  width: 105px;
+  height: 100px;
+  object-fit: contain;
+  right: 4px;
+  bottom: 2px;
+}
+
+.ac3-shell .ac3-formation div {
+  z-index: 1;
+  max-width: 70%;
+}
+
+.ac3-shell .ac3-formation strong {
+  font-size: 17px;
+}
+
+.ac3-shell .ac3-chapterrow {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 10px;
+}
+
+.ac3-shell .ac3-chaptercard {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 76px;
+}
+
+.ac3-shell .ac3-chaptercard img {
+  width: 64px;
+  height: 58px;
+  object-fit: contain;
+}
+
+.ac3-shell .ac3-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #594475;
+  background: #322349;
+  color: #dfd0ff;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.ac3-shell .ac3-badge.ac3-ok {
+  color: #8af2da;
+  background: #153a37;
+  border-color: #2c7267;
+}
+
+.ac3-shell .ac3-badge.ac3-lock {
+  color: #c2b8cf;
+  background: #272332;
+  border-color: #494052;
+}
+
+.ac3-shell .ac3-mentor {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ac3-shell .ac3-mentor img {
+  width: 77px;
+  height: 77px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.ac3-shell .ac3-mentor p {
+  font-size: 12px;
+}
+
+.ac3-shell .ac3-splitbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 13px;
+}
+
+.ac3-shell .ac3-splitbar button.ac3-selected, .ac3-shell .ac3-tabs button.ac3-selected {
+  background: #4b2d78;
+  border-color: #b08af4;
+}
+
+.ac3-shell .ac3-english .ac3-splitbar button.ac3-selected, .ac3-shell .ac3-english .ac3-tabs button.ac3-selected {
+  background: #165b60;
+  border-color: #48d6cb;
+}
+
+.ac3-shell .ac3-map {
+  position: relative;
+  min-height: 390px;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 13px;
+  border: 1px solid #44345f;
+  background: radial-gradient(ellipse at 45% 50%,#27183f, #100e1b 75%);
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  grid-template-rows: repeat(2,1fr);
+  gap: 12px;
+  padding: 22px 18px 14px;
+  align-items: center;
+}
+
+.ac3-shell .ac3-map:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle,#ae86f955 1px,transparent 1px);
+  background-size: 35px 35px;
+  z-index: -1;
+  opacity: .45;
+}
+
+.ac3-shell .ac3-maplines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.ac3-shell .ac3-node {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px;
+  min-width: 0;
+  height: 100%;
+  align-content: center;
+}
+
+.ac3-shell .ac3-node img {
+  width: 130px;
+  height: 112px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px #a16aff55);
+}
+
+.ac3-shell .ac3-node.ac3-locked img {
+  filter: saturate(.55) brightness(.7);
+}
+
+.ac3-shell .ac3-node.ac3-selected {
+  background: #6e45b21a;
+  border: 1px solid #a78bfa70;
+  box-shadow: inset 0 0 32px #9a6aff12;
+}
+
+.ac3-shell .ac3-node .ac3-nodetitle {
+  font-size: 12px;
+  line-height: 1.25;
+  max-width: 170px;
+  text-align: center;
+}
+
+.ac3-shell .ac3-node:nth-of-type(4) {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.ac3-shell .ac3-node:nth-of-type(5) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.ac3-shell .ac3-node .ac3-badge {
+  margin-top: 4px;
+}
+
+.ac3-shell .ac3-english .ac3-map {
+  background: radial-gradient(ellipse at 50% 45%,#133f44,#101523 75%);
+}
+
+.ac3-shell .ac3-english .ac3-node.ac3-selected {
+  border-color: #4adace90;
+  background: #2dd4bf15;
+}
+
+.ac3-shell .ac3-detailart {
+  width: 100%;
+  height: 125px;
+  object-fit: contain;
+  margin: 8px auto;
+  filter: drop-shadow(0 6px 12px #0006);
+}
+
+.ac3-shell .ac3-detailtitle {
+  font-size: 19px;
+  line-height: 1.25;
+  margin: 8px 0;
+}
+
+.ac3-shell .ac3-detail p {
+  font-size: 13px;
+}
+
+.ac3-shell .ac3-detail .ac3-primary {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.ac3-shell .ac3-detail ul {
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ac3-shell .ac3-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 13px;
+  overflow: auto;
+}
+
+.ac3-shell .ac3-tabs button {
+  flex: 1;
+  white-space: nowrap;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.ac3-shell .ac3-lessonlayout {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 252px;
+  gap: 14px;
+  align-items: start;
+}
+
+.ac3-shell .ac3-lessonbody {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ac3-shell .ac3-readgrid {
+  display: grid;
+  grid-template-columns: 160px minmax(0,1fr);
+  gap: 15px;
+}
+
+.ac3-shell .ac3-outline {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+}
+
+.ac3-shell .ac3-outline button {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 9px 10px;
+  line-height: 1.3;
+}
+
+.ac3-shell .ac3-outline button.ac3-selected {
+  border-color: var(--accent);
+  background: #3b255f;
+}
+
+.ac3-shell .ac3-reading {
+  min-height: 230px;
+  min-width: 0;
+}
+
+.ac3-shell .ac3-reading h2 {
+  font-size: 21px;
+  margin-bottom: 10px;
+}
+
+.ac3-shell .ac3-reading p, .ac3-shell .ac3-reading li {
+  color: #e1d9ee;
+  line-height: 1.7;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.ac3-shell .ac3-reading ul, .ac3-shell .ac3-reading ol {
+  padding-left: 23px;
+}
+
+.ac3-shell .ac3-reading pre, .ac3-shell .ac3-codeout {
+  background: #0d0c16;
+  border: 1px solid #332845;
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+  font: 13px/1.5 Consolas,monospace;
+  color: #b4e5e9;
+  white-space: pre-wrap;
+}
+
+.ac3-shell .ac3-reading code {
+  font-family: Consolas,monospace;
+  color: #c4b5fd;
+}
+
+.ac3-shell .ac3-flow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.ac3-shell .ac3-flow>div {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #58437e;
+  background: #241d38;
+  padding: 12px 7px;
+  text-align: center;
+  border-radius: 9px;
+}
+
+.ac3-shell .ac3-flow strong {
+  display: block;
+  color: #e1d2ff;
+}
+
+.ac3-shell .ac3-flow span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ac3-shell .ac3-flow .ac3-arrow {
+  flex: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+}
+
+.ac3-shell .ac3-subtle {
+  background: #151122;
+  border-color: #3b2b50;
+}
+
+.ac3-shell .ac3-lessonnav {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid #392f48;
+  padding-top: 12px;
+  margin-top: 10px;
+}
+
+.ac3-shell .ac3-vocabgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(158px,1fr));
+  gap: 9px;
+}
+
+.ac3-shell .ac3-vocab {
+  padding: 12px;
+  background: #15242e;
+  border: 1px solid #28575c;
+  border-radius: 10px;
+}
+
+.ac3-shell .ac3-vocab strong {
+  color: #78f3de;
+  font-size: 16px;
+}
+
+.ac3-shell .ac3-vocab p {
+  font-size: 12px;
+  margin: 5px 0;
+}
+
+.ac3-shell .ac3-vocab button {
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.ac3-shell .ac3-dialogue {
+  display: grid;
+  gap: 10px;
+}
+
+.ac3-shell .ac3-bubble {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #2e555b;
+  background: #14272f;
+  border-radius: 12px;
+  max-width: 94%;
+}
+
+.ac3-shell .ac3-bubble.ac3-other {
+  justify-self: end;
+  background: #242039;
+  border-color: #4c3b67;
+  width: 94%;
+}
+
+.ac3-shell .ac3-avatar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #28676a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.ac3-shell .ac3-bubble p {
+  color: var(--text);
+  margin-top: 3px;
+}
+
+.ac3-shell .ac3-bubble details {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.ac3-shell .ac3-bubble button {
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.ac3-shell .ac3-exercise {
+  padding: 18px;
+  border: 1px solid #54406d;
+  border-radius: 13px;
+  background: #151121;
+}
+
+.ac3-shell .ac3-options {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.ac3-shell .ac3-options button {
+  text-align: left;
+  padding: 13px;
+  background: #21192f;
+}
+
+.ac3-shell .ac3-options button.ac3-chosen {
+  border-color: var(--accent);
+  background: #49316c;
+}
+
+.ac3-shell .ac3-feedback {
+  padding: 12px;
+  border: 1px solid #3b8171;
+  color: #a5f3df;
+  background: #16352f;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.ac3-shell .ac3-feedback.ac3-bad {
+  background: #3a202c;
+  border-color: #98516b;
+  color: #ffd1df;
+}
+
+.ac3-shell .ac3-labgrid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1.3fr);
+  gap: 12px;
+}
+
+.ac3-shell .ac3-editor {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  background: #0d1019;
+  border: 1px solid #393047;
+  border-radius: 8px;
+  color: #c6f0eb;
+  padding: 14px;
+  font: 14px/1.6 Consolas,monospace;
+  tab-size: 4;
+}
+
+.ac3-shell .ac3-loopcells {
+  display: flex;
+  gap: 7px;
+  margin: 15px 0;
+}
+
+.ac3-shell .ac3-loopcells span {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  border: 1px solid #493860;
+  border-radius: 8px;
+}
+
+.ac3-shell .ac3-loopcells span.ac3-on {
+  border-color: #2dd4bf;
+  background: #164a4d;
+  color: #99f6e4;
+}
+
+.ac3-shell .ac3-skillgrid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 20px 12px;
+  padding: 12px 0;
+}
+
+.ac3-shell .ac3-skill {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  text-align: center;
+  min-height: 110px;
+  align-content: center;
+  background: #21182f;
+}
+
+.ac3-shell .ac3-skill img {
+  height: 64px;
+  width: 68px;
+  object-fit: contain;
+}
+
+.ac3-shell .ac3-skill.ac3-selected {
+  border-color: var(--accent);
+  background: #372650;
+}
+
+.ac3-shell .ac3-skill small {
+  font-size: 10px;
+}
+
+.ac3-shell details summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+@media (min-width:1600px) {
+  .ac3-shell .ac3-content {
+    padding: 25px 38px;
+  }
+
+  .ac3-shell .ac3-grid2 {
+    grid-template-columns: minmax(0,1fr) 315px;
+  }
+
+  .ac3-shell .ac3-lessonlayout {
+    grid-template-columns: minmax(0,1fr) 290px;
+  }
+
+  .ac3-shell .ac3-map {
+    min-height: 460px;
+  }
+
+  .ac3-shell .ac3-node img {
+    height: 140px;
+    width: 165px;
+  }
+}
+
+@media (max-width:1050px) {
+  .ac3-shell .ac3-grid2, .ac3-shell .ac3-lessonlayout {
+    grid-template-columns: minmax(0,1fr) 230px;
+  }
+
+  .ac3-shell .ac3-readgrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ac3-shell .ac3-outline {
+    display: flex;
+    overflow: auto;
+  }
+
+  .ac3-shell .ac3-outline button {
+    flex-shrink: 0;
+    max-width: 160px;
+  }
+
+  .ac3-shell .ac3-hero .ac3-copy {
+    max-width: 75%;
+  }
+
+  .ac3-shell .ac3-hero .ac3-heroart {
+    right: 0;
+    opacity: .7;
+  }
+
+  .ac3-shell .ac3-node img {
+    width: 100px;
+    height: 90px;
+  }
+
+  .ac3-shell .ac3-formation img {
+    opacity: .6;
+  }
+
+  .ac3-shell .ac3-labgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width:760px) {
+  .ac3-shell .ac3-top {
+    padding: 0 12px;
+  }
+
+  .ac3-shell .ac3-topright {
+    margin-left: auto;
+  }
+
+  .ac3-shell .ac3-content {
+    padding: 12px;
+  }
+
+  .ac3-shell .ac3-grid2, .ac3-shell .ac3-lessonlayout {
+    grid-template-columns: 1fr;
+  }
+
+  .ac3-shell .ac3-hero {
+    padding: 16px;
+    min-height: 150px;
+  }
+
+  .ac3-shell .ac3-hero .ac3-copy {
+    max-width: 100%;
+    position: relative;
+    z-index: 1;
+  }
+
+  .ac3-shell .ac3-hero:before, .ac3-shell .ac3-english .ac3-hero:before {
+    background: linear-gradient(90deg,#191329f5,#191329c7 75%,#19132970),var(--scene) center right/cover;
+  }
+
+  .ac3-shell .ac3-hero .ac3-heroart {
+    opacity: .22;
+    right: 0;
+  }
+
+  .ac3-shell .ac3-formationgrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ac3-shell .ac3-formation {
+    min-height: 100px;
+  }
+
+  .ac3-shell .ac3-chapterrow {
+    grid-template-columns: 1fr;
+  }
+
+  .ac3-shell .ac3-map {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .ac3-shell .ac3-maplines {
+    display: none;
+  }
+
+  .ac3-shell .ac3-node {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 86px minmax(0,1fr);
+    justify-items: start;
+    text-align: left;
+    align-items: center;
+    min-height: 96px;
+    padding: 6px 10px;
+  }
+
+  .ac3-shell .ac3-node img {
+    grid-row: 1/4;
+    width: 80px;
+    height: 80px;
+  }
+
+  .ac3-shell .ac3-node .ac3-nodetitle {
+    text-align: left;
+    max-width: none;
+  }
+
+  .ac3-shell .ac3-node .ac3-badge {
+    margin: 0;
+  }
+
+  .ac3-shell .ac3-skillgrid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+  .ac3-shell .ac3-readgrid {
+    display: block;
+  }
+
+  .ac3-shell .ac3-outline {
+    margin-bottom: 15px;
+  }
+
+  .ac3-shell .ac3-flow {
+    gap: 4px;
+  }
+
+  .ac3-shell .ac3-flow>div {
+    padding: 8px 4px;
+  }
+
+  .ac3-shell .ac3-bubble {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .ac3-shell .ac3-bubble.ac3-other {
+    width: 100%;
+  }
+
+  .ac3-shell .ac3-bubble button {
+    font-size: 11px;
+  }
+
+  .ac3-shell .ac3-metrics {
+    gap: 5px;
+  }
+
+  .ac3-shell .ac3-metric {
+    padding: 8px;
+  }
+
+  .ac3-shell .ac3-mission {
+    padding: 7px;
+  }
+
+  .ac3-shell .ac3-mission img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ac3-shell .ac3-mission button {
+    font-size: 11px;
+    padding: 7px;
+  }
+
+  .ac3-shell .ac3-panel {
+    padding: 12px;
+  }
+
+  .ac3-shell .ac3-vocabgrid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+  .ac3-shell .ac3-tabs {
+    scrollbar-width: thin;
+  }
+
+  .ac3-shell .ac3-tabs button {
+    flex: 0 0 auto;
+  }
+
+  .ac3-shell .ac3-exercise {
+    padding: 12px;
+  }
+
+  .ac3-shell .ac3-detailart {
+    height: 100px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .ac3-shell *, .ac3-shell *::before, .ac3-shell *::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.ac3-shell .ac3-hero .ac3-heroart {
+  right: 10%;
+  width: 190px;
+  max-height: 180px;
+  bottom: -14px;
+}
+
+.ac3-shell .ac3-detailart {
+  max-height: 95px;
+}
+
+.ac3-shell .ac3-map .ac3-node.ac3-selected {
+  background: radial-gradient(ellipse at center,#7243c33b,transparent 72%);
+  border-color: #a78bfa88;
+}
+
+@media (max-width:760px) {
+  .ac3-shell .ac3-skill:after {
+    display: none;
+  }
+
+  .ac3-shell .ac3-hero .ac3-heroart {
+    right: 0;
+    width: 150px;
+    opacity: .2;
+  }
+}
+
+/* Product bindings for the approved layout */
+.os-main:has(.ac3-shell) { padding: 0; background: #0e0b18; }
+.omni-shell:has(.ac3-shell) { overflow: clip; }
+.os-main:has(.ac3-shell) .os-page, .os-main:has(.ac3-shell) .ac-shell { max-width: none; padding: 0; }
+.omni-shell > .os-sidebar[data-academy="true"]:not([data-collapsed="true"]) { width: 204px; }
+.dark .omni-shell > .os-sidebar[data-academy="true"] { background: #110e1b; border-color: #2a2238; }
+.ac3-brand-label {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--os-accent);
+}
+.ac3-rail-nav { display: grid; gap: 4px; padding-top: 7px; }
+.ac3-rail-nav p {
+  margin: 0;
+  padding: 15px 10px 5px;
+  color: var(--os-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.15px;
+  text-transform: uppercase;
+}
+.ac3-rail-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 41px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.ac3-rail-nav a[aria-current] { border-color: var(--os-accent); box-shadow: inset 3px 0 var(--os-accent); background: var(--os-hover); }
+.dark .ac3-rail-nav a[aria-current] { background: linear-gradient(90deg, #4e2986, #2a1d42); }
+.omni-shell:has([data-ac3-lesson-track="tech"]) .ac3-rail-nav a[data-track="tech"],
+.omni-shell:has([data-ac3-lesson-track="english"]) .ac3-rail-nav a[data-track="english"] {
+  border-color: var(--os-accent);
+  box-shadow: inset 3px 0 var(--os-accent);
+  background: var(--os-hover);
+}
+.dark .omni-shell:has([data-ac3-lesson-track="tech"]) .ac3-rail-nav a[data-track="tech"],
+.dark .omni-shell:has([data-ac3-lesson-track="english"]) .ac3-rail-nav a[data-track="english"] {
+  background: linear-gradient(90deg, #4e2986, #2a1d42);
+}
+.ac3-rail-nav a:hover { border-color: var(--os-border); }
+.ac3-rail-global { margin: 15px 0 7px; border-top: 1px solid var(--os-border); }
+.ac3-rail-global > summary { padding: 10px; cursor: pointer; font-size: 12px; color: var(--os-muted); }
+
+.ac3-shell { min-height: 100dvh; }
+.ac3-shell h1 { font-weight: 700; }
+.ac3-shell .ac3-top > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ac3-top > button { flex: none; }
+:where(.ac3-shell) .ac3-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #44365a;
+  background: #211930;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text);
+  transition: background .15s, border-color .15s;
+}
+.ac3-button:hover { border-color: var(--accent); background: #34234d; }
+.ac3-shell .ac3-button.ac3-ghost { background: transparent; }
+.ac3-shell .ac3-button:focus-visible, .ac3-shell details > summary:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 3px;
+}
+.ac3-shell .ac3-hero .ac3-copy { justify-items: start; }
+.ac3-shell .ac3-heroart { transform: none; }
+.ac3-shell .ac3-hero .ac3-badge { min-height: 38px; }
+.ac3-shell .ac3-start { margin: 0; }
+.ac3-shell .ac3-sectionhead h2 { margin: 0; }
+.ac3-shell .ac3-mission .ac3-button { padding: 6px 10px; min-height: 32px; font-size: 12px; flex-shrink: 0; }
+.ac3-shell .ac3-formation { align-items: start; }
+.ac3-shell .ac3-formation > div { width: 72%; }
+.ac3-shell .ac3-formation > div:last-child { width: min(178px, 70%); }
+.ac3-shell .ac3-formation img { right: 14px; }
+.ac3-shell .ac3-chaptercard { justify-content: start; }
+.ac3-shell .ac3-chaptercard small svg { display: inline; vertical-align: middle; }
+.ac3-shell progress.ac3-bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 8px 0;
+  appearance: none;
+  border-radius: 8px;
+  background: #42354f;
+}
+.ac3-shell progress.ac3-bar::-webkit-progress-bar { background: #42354f; }
+.ac3-shell progress.ac3-bar::-webkit-progress-value { background: linear-gradient(90deg, #895cf1, var(--accent2)); }
+.ac3-shell progress.ac3-bar::-moz-progress-bar { background: linear-gradient(90deg, #895cf1, var(--accent2)); }
+.ac3-mentor-copy { min-width: 0; }
+.ac3-shell .ac3-linkbtn { display: inline-flex; align-items: center; gap: 4px; }
+.ac3-shell .ac3-linkbtn:hover { text-decoration: underline; }
+.ac3-inline-links { display: grid; gap: 5px; padding-inline-start: 1.15rem; color: var(--muted); list-style: disc; }
+.ac3-inline-links a { color: var(--accent); text-decoration: underline; text-underline-offset: .18em; }
+.ac3-map-note { margin-top: 9px !important; font-size: 12px; }
+.ac3-shell .ac3-maplines path {
+  stroke: #ba91ff;
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  fill: none;
+  filter: drop-shadow(0 0 5px #9b67f0);
+}
+.ac3-shell .ac3-english .ac3-maplines path { stroke: #55dfd0; filter: drop-shadow(0 0 5px #2dd4bf); }
+.ac3-shell .ac3-node { color: var(--text); border-radius: 9px; }
+.ac3-shell .ac3-node:hover { border-color: var(--accent); }
+.ac3-shell .ac3-node .ac3-badge { text-align: center; }
+.ac3-shell .ac3-node:nth-of-type(6) { grid-column: 1; grid-row: 2; }
+.ac3-shell .ac3-mobile-detail { display: none; }
+.ac3-shell .ac3-list .ac3-chaptercard { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; }
+.ac3-shell .ac3-list .ac3-selected { border-color: var(--accent); }
+.ac3-shell .ac3-splitbar .ac3-selected { background: #4b2d78; border-color: #b08af4; }
+.ac3-shell .ac3-english .ac3-splitbar .ac3-selected { background: #165b60; border-color: #48d6cb; }
+.ac3-shell .ac3-detail .ac3-primary { justify-content: center; }
+.ac3-shell .ac3-detail > h3:not(:first-child) { margin-top: 8px; }
+.ac3-shell .ac3-detail ul { margin-block: 8px; }
+.ac3-shell .ac3-skill { width: 100%; }
+.ac3-shell .ac3-skillgrid small { line-height: 1.25; }
+.ac3-shell .ac3-related-lesson { padding-block: 3px; }
+
+.ac3-shell .ac3-tabs { padding: 3px; margin: -3px -3px 10px; }
+.ac3-shell .ac3-tabs > a { flex: 1; white-space: nowrap; padding: 9px 11px; font-size: 12px; }
+.ac3-shell .ac3-outline > a {
+  justify-content: start;
+  align-items: start;
+  text-align: start;
+  font-size: 12px;
+  padding: 9px 10px;
+  line-height: 1.3;
+}
+.ac3-shell .ac3-tabs > .ac3-selected, .ac3-shell .ac3-outline > .ac3-selected { border-color: var(--accent); background: #432b68; }
+.ac3-shell .ac3-english .ac3-tabs > .ac3-selected, .ac3-shell .ac3-english .ac3-outline > .ac3-selected { border-color: #48d6cb; background: #165b60; }
+.ac3-shell .ac3-reading :is(ul, ol) { margin-block: 0 10px; }
+.ac3-shell .ac3-reading ul { list-style: disc; }
+.ac3-shell .ac3-reading ol { list-style: decimal; }
+.ac3-shell .ac3-reading h3 { margin-block: 12px 6px; }
+.ac3-shell .ac3-reading pre { white-space: pre-wrap; overflow-x: auto; }
+.ac3-shell .ac3-reading blockquote { margin: 10px 0; padding-inline-start: 12px; border-inline-start: 2px solid var(--accent); }
+.ac3-shell .ac3-lessonnav { align-items: center; }
+.ac3-shell .ac3-objectives { padding-inline-start: 18px; list-style: disc; color: var(--muted); }
+.ac3-shell .ac3-lesson-skills { margin-top: 9px; }
+.ac3-shell .ac3-dialogue-intro { margin-bottom: 12px; }
+.ac3-shell .ac3-vocab-export { margin-top: 12px; }
+.ac3-shell .ac3-vocab-export > summary { margin-bottom: 8px; }
+.ac3-shell .ac3-bubble { grid-template-columns: 36px minmax(0, 1fr) auto; }
+.ac3-shell .ac3-bubble summary { overflow-wrap: anywhere; }
+.ac3-shell .ac3-bubble .ac-audio-play, .ac3-shell .ac3-vocab .ac-audio-play {
+  background: #211930;
+  border-color: #44365a;
+  line-height: 1.2;
+  min-height: 30px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.ac3-shell .ac3-order-game { display: grid; gap: 8px; }
+.ac3-shell .ac3-order-game .ac3-codeout { margin: 5px 0; min-height: 54px; }
+.ac3-shell .ac3-options { margin: 4px 0; }
+.ac3-shell .ac3-options .ac-choice {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  background: #21192f;
+  padding: 11px 13px;
+}
+.ac3-shell .ac3-options .ac-choice:has(input:checked) { border-color: var(--accent); background: #49316c; }
+.ac3-shell .ac3-options .ac-choice > span:nth-child(2) { width: auto; background: transparent; }
+.ac3-shell .ac3-exercise .ac3-feedback { margin-top: 0; }
+.ac3-shell .ac3-labgrid :is(.ac-demo, .ac-lab) { align-self: start; }
+.ac3-shell :is(.ac-lab, .ac-demo) { background: linear-gradient(145deg,#1e172f,#151222); border-color: #30263f; }
+.ac3-shell .ac-editor .ac-codebox { min-height: 180px; }
+
+@media (min-width: 768px) {
+  .omni-shell:has(.ac3-shell[data-focus="true"]) > .os-sidebar { display: none; }
+}
+@media (max-width: 1050px) and (min-width: 768px) {
+  .ac3-shell .ac3-outline > a { max-width: 160px; flex-shrink: 0; }
+}
+@media (max-width: 767px) {
+  .os-main:has(.ac3-shell) { padding: 57px 0 calc(81px + env(safe-area-inset-bottom, 0px)); }
+  .omni-shell:has(.ac3-shell) .os-mobile-brand { visibility: hidden; }
+  .omni-shell > .os-sidebar[data-academy="true"]:not([data-collapsed="true"]) { width: 235px; }
+  .ac3-shell .ac3-top { position: fixed; top: 0; left: 60px; right: 56px; height: 57px; z-index: 41; gap: 5px; padding: 0; border: 0; }
+  .ac3-shell .ac3-top button { padding: 6px 8px; font-size: 11px; }
+  .ac3-shell .ac3-tabs > a { flex: 0 0 auto; }
+  .ac3-shell .ac3-outline { display: flex; overflow-x: auto; padding: 3px; margin-inline: -3px; }
+  .ac3-shell .ac3-outline > a { flex: 0 0 auto; max-width: 155px; }
+  .ac3-shell .ac3-mobile-detail { display: inline-flex; }
+  .ac3-shell .ac3-list .ac3-chaptercard { grid-template-columns: 54px minmax(0, 1fr); }
+  .ac3-shell .ac3-list .ac3-chaptercard .ac3-badge { grid-column: 2; justify-self: start; }
+  .ac3-shell .ac3-grid2 > aside { grid-template-columns: minmax(0, 1fr); }
+  .ac3-shell .ac3-bubble .ac3-avatar { width: 30px; height: 30px; }
+}

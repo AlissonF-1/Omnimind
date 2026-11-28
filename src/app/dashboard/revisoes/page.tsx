@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { ArrowLeft, ArrowRight, FileText, Layers3, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FileText, Layers3, Zap } from '@/components/icons'
 import { getDueFlashcards, getUltimatumCards } from '@/actions/reviews'
 import { getWorkspaceById } from '@/actions/workspaces'
 import ReviewPanel from '@/components/ReviewPanel'

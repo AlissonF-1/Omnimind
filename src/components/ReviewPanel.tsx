@@ -39,7 +39,7 @@ import {
   Swords,
   Ghost,
   Zap,
-} from 'lucide-react'
+} from '@/components/icons'
 import RelearningAlert from './RelearningAlert'
 import { useSettings } from '@/contexts/SettingsContext'
 import { getBestVoice, playButtonClick, playEvaluationSound } from '@/utils/audio'
@@ -95,7 +95,8 @@ function discardRecording(recorder: MediaRecorder) {
 
 export default function ReviewPanel({ initialCards, mode = 'default', workspaceId, noteId }: ReviewPanelProps) {
   const { settings } = useSettings()
-  const { isOnline, pendingCount, isSyncing, syncStatusMessage, refreshPendingCount, syncPendingReviews } = useOfflineSync()
+  const accountId = settings.user_id
+  const { isOnline, pendingCount, isSyncing, syncStatusMessage, refreshPendingCount, syncPendingReviews } = useOfflineSync(accountId)
   const [cards, setCards] = useState<ReviewCard[]>(initialCards)
 
   // Efeito para salvar initialCards no cache offline quando online, ou recuperar se offline
@@ -103,12 +104,12 @@ export default function ReviewPanel({ initialCards, mode = 'default', workspaceI
     let active = true
     async function initOfflineCards() {
       if (navigator.onLine) {
-        if (initialCards.length > 0) await saveCardsToCache(initialCards)
+        if (initialCards.length > 0) await saveCardsToCache(accountId, initialCards)
         return
       }
 
       if (initialCards.length > 0) return
-      const cached = await getCachedCards()
+      const cached = await getCachedCards<ReviewCard>(accountId)
       if (!active) return
 
       const filtered = (cached ?? []).filter((card) => {
@@ -119,7 +120,7 @@ export default function ReviewPanel({ initialCards, mode = 'default', workspaceI
     }
     void initOfflineCards().catch(() => {})
     return () => { active = false }
-  }, [initialCards, noteId, workspaceId])
+  }, [accountId, initialCards, noteId, workspaceId])
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
@@ -996,7 +997,7 @@ export default function ReviewPanel({ initialCards, mode = 'default', workspaceI
 
     // 3. Salva a revisão no banco em background (ou na fila offline se falhar ou estiver offline)
     if (typeof window !== 'undefined' && !navigator.onLine) {
-      savePendingReview({
+      savePendingReview(accountId, {
         cardId: activeCard.id,
         currentFsrsState: activeCard,
         grade,
@@ -1035,7 +1036,7 @@ export default function ReviewPanel({ initialCards, mode = 'default', workspaceI
         })
         .catch((error) => {
           console.error('Erro ao salvar revisão em background (salvando offline):', error)
-          savePendingReview({
+          savePendingReview(accountId, {
             cardId: activeCard.id,
             currentFsrsState: activeCard,
             grade,
